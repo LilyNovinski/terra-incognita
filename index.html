@@ -436,6 +436,11 @@ button:focus-visible,.reg:focus-visible,select:focus-visible{outline:3px solid #
 @keyframes ambSurf{0%,100%{transform:scale(.9995)}50%{transform:scale(1.0055);opacity:.7}}
 .amb .rip{stroke-width:1.5px}
 @media (prefers-reduced-motion:reduce){.cut .lvp{display:none}}
+/* variante nuit : lave et braises plus lumineuses, écume plus douce */
+[data-theme=dark] .cut .lvp{opacity:.45;animation-name:ambGlowN}
+@keyframes ambGlowN{50%{opacity:.85}}
+[data-theme=dark] .cut .srf{animation-name:ambSurfN}
+@keyframes ambSurfN{0%,100%{transform:scale(.9995);opacity:.85}50%{transform:scale(1.0055);opacity:.55}}
 /* contours v2 */
 .edge path{fill:none;vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round;pointer-events:none}
 .edge.on .e1{stroke:#fffaf0;stroke-width:5;opacity:.55}
