@@ -457,4 +457,16 @@ for(const l in EXT_GAME)if(I18N[l])Object.assign(I18N[l].ui,EXT_GAME[l]);
 
 
 
+/* @i18n-polish */
+const EXT_POL={fr:{timerD:"Le sablier laisse le temps de réfléchir et d'écrire, puis avance tout seul quand on regarde les réponses"},
+en:{timerD:"The hourglass leaves plenty of time to think and write, then moves on by itself while you look at the answers"},
+es:{timerD:"El reloj de arena deja tiempo para pensar y escribir, y avanza solo mientras se miran las respuestas"},
+it:{timerD:"La clessidra lascia il tempo di pensare e scrivere, poi va avanti da sola mentre si guardano le risposte"},
+de:{timerD:"Die Sanduhr lässt Zeit zum Nachdenken und Schreiben und geht beim Ansehen der Antworten von selbst weiter"},
+ru:{timerD:"Песочные часы дают время подумать и написать, а при просмотре ответов идут дальше сами"},
+zh:{timerD:"沙漏会留足时间思考和书写，看答案时会自动继续"},
+he:{timerD:"שעון החול משאיר זמן לחשוב ולכתוב, וממשיך לבד כשמסתכלים על התשובות"},
+pt:{timerD:"A ampulheta dá tempo para pensar e escrever, e avança sozinha enquanto vocês veem as respostas"}};
+for(const l in EXT_POL)if(I18N[l])Object.assign(I18N[l].ui,EXT_POL[l]);
+
 /* fin */

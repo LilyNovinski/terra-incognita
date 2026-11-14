@@ -49,7 +49,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Rubik:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sacramento&text=by&display=swap">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="i18n.js?v=20261114f"></script>
+<script src="i18n.js?v=20261114g"></script>
 <style>
 :root{--sea1:#bdeef0;--sea2:#69c9d3;--deep:#0e5866;--deep2:#0a4652;--paper:#fffaf0;--paper2:#fbf0d9;--edge:#ead6ae;--edge2:#d8bd88;--txt:#3b2a1b;--mut:#8a7660;--acc:#ff8a3d;--acc-d:#d9661f;--acc2:#ffb15c;--ink:#1d8e6c;--sur:#d9661f;--ear:#5869b5;--bad:#d64b3c;--gold:#f2b84b}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -541,6 +541,14 @@ button:focus-visible,.reg:focus-visible,select:focus-visible{outline:3px solid #
 
 
 /* @css-game */
+.gauge{display:flex;align-items:center;gap:8px;height:14px;margin:5px 4px 0;opacity:.55;transition:opacity .3s}
+.gauge.on{opacity:1}
+.gauge i{flex:1;height:5px;border-radius:9px;background:#e9dcc4;overflow:hidden;display:block}
+.gauge b{display:block;height:100%;width:calc(var(--p,0)*100%);border-radius:9px;background:linear-gradient(90deg,#5cc8b4,#2a9d8f);transition:width .15s,background .3s}
+.gauge.mid b{background:linear-gradient(90deg,#f6b26b,#f28c38)}
+.gauge.full b{background:#e2603e}
+.gauge span{font:800 11px Nunito,sans-serif;color:var(--acc-d);font-variant-numeric:tabular-nums}
+.gauge.full span{color:#c94a2a}
 .gtiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
 .gtile{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:start;padding:12px 14px;border-radius:18px;background:#fff;border:2px solid var(--edge);box-shadow:0 4px 0 var(--edge2);font:600 15px Nunito,sans-serif;color:var(--txt)}
 div.gtile{grid-column:1/-1}
@@ -586,6 +594,7 @@ h3.gh{margin-top:18px;font-size:17px}
 .tring circle{fill:none;stroke-width:4}.tring .tbk{stroke:var(--edge)}.tring .tfg{stroke:#13a983;stroke-linecap:round;transition:stroke-dasharray .25s linear,stroke .3s}
 .tring b{position:relative;font:700 13px Nunito;color:var(--txt)}
 .tmr.low .tfg{stroke:var(--acc)}.tmr.low b{color:var(--acc-d)}
+.tmr.calm .tring{opacity:.45;transform:scale(.8)}.tmr.calm b{visibility:hidden}.tmr .tring{transition:opacity .4s,transform .4s}
 .tmr.soft .tfg{stroke:#a9b8d6}.tmr.pz .tfg{stroke:var(--edge2)}
 .tplus{padding:4px 8px!important;font:700 12px Nunito!important;border-radius:99px;box-shadow:0 2px 0 var(--edge2)}
 /* fiches du bilan */
@@ -607,6 +616,11 @@ h3.gh{margin-top:18px;font-size:17px}
  .grm{grid-template-columns:1fr}
  .tring{width:38px;height:38px}
 }
+
+
+
+
+/* @css-qa */
 
 
 
@@ -1325,7 +1339,7 @@ const TF=()=>MODE()=='esc'?.7:(st.timer??1);
 const rnd=n=>crypto.getRandomValues(new Uint32Array(1))[0]%n;
 const shuf=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
 const gSlot=()=>[...crypto.getRandomValues(new Uint8Array(6))].map(b=>b.toString(16).padStart(2,'0')).join('');
-const gKw=s=>tidy(s||'').slice(0,60);
+const gKw=s=>tidy(s||'').slice(0,40);
 const gValid=(c,v)=>c.type=='libre'?typeof v=='string'&&!!tidy(v):Number.isInteger(v)&&v>=0&&v<=(c.type=='choix'?9:10);
 // secret de l'hôte, JAMAIS dans st : réponses en attente, slot ↔ auteur
 let SEC={cid:null},SECF={gid:null,f:{}},myPend={cid:null},TK='',RCV=0,RCVV=-1,GID,WIND=0,PZ=null;
@@ -1376,19 +1390,20 @@ function gMirror(s){const c=s.cur;if(s.mode!='mir'||!c||c.mir||c.kind=='door'||s
  if(!s.order.includes(c.explorer)||!s.order.includes(c.terr)||!openSet(c.terr,c.explorer)[c.r])return false;
  s.turn++;s.cur={id:'c'+Date.now(),explorer:c.terr,terr:c.explorer,r:c.r,q:c.q,type:c.type,answer:null,guesses:{},result:null,placeName:'',answered:false,sent:[],mir:true};s.phase='question';return true}
 // Timer : durées de base (Normal), multipliées par le facteur
-const TB={map:45,choix:40,echelle:40,libre:75,ecoute:120,judge:60,reveal:20,name:40,landed:8,end:120,pfiche:20};
+/* phases où l'on choisit / écrit : sablier large et discret ; phases où l'on regarde : sablier normal */
+const TB={map:150,choix:120,echelle:120,libre:240,ecoute:180,judge:150,reveal:20,name:120,landed:8,end:300,pfiche:20},TCALM={map:1,choix:1,echelle:1,libre:1,ecoute:1,judge:1,name:1,end:1};
 const gKey=s=>s.phase+'|'+(s.cur&&s.cur.id)+'|'+s.turn+'|'+(s.cur&&s.cur.grace||0);
 function tmDur(){const s=st,f=TF();let k=s.phase,soft=false;
  if(k=='pfiche')return {d:20,soft:false};if(!f)return null;
  if(k=='question'){if(s.cur.grace)return {d:15,soft:false};k=s.cur.type;soft=k=='ecoute'}else if(k=='judge')soft=true;
- let d=TB[k];if(d==null)return null;if(MODE()=='esc'&&(k=='reveal'||k=='landed'))d/=2;return {d:d*f,soft}}
+ let d=TB[k];if(d==null)return null;if(MODE()=='esc'&&(k=='reveal'||k=='landed'))d/=2;return {d:d*f,soft,calm:!!TCALM[k]&&!s.cur?.grace}}
 function tmSync(){const s=st;if(!s||!isHost)return false;let ch=false;
  if(s.phase!='lobby'&&s.tt!=null&&s.turn!==s.tTurn){if(s.tTurn!=null&&s.turn>s.tTurn){(s.td=s.td||[]).push(Date.now()-s.tt);if(s.td.length>30)s.td.shift()}s.tTurn=s.turn;s.tt=Date.now();ch=true}
  if(s.phase=='end'&&MODE()=='esc'){gFinish(s);ch=true}
  if(MODE()=='por'&&s.phase=='map'&&s.turn>0&&s.turn%(s.L||s.length)==0&&s.pf!==s.turn){s.pf=s.turn;s.phase='pfiche';ch=true}
  if(s.cur&&s.phase=='question'&&SEC.cid!==s.cur.id){const a=(s.cur.sent||[]).length+(s.cur.answered?1:0);gSec(s.cur);if((s.cur.sent||[]).length+(s.cur.answered?1:0)!==a)ch=true}
  const key=gKey(s);if(!TK&&(s.dl||s.paused!=null))armTimer();
- if(key!==TK){TK=key;const t=tmDur();s.dl=t?Date.now()+t.d*1000:null;s.dlT=t?t.d*1000:0;s.tsoft=!!(t&&t.soft);s.paused=null;ch=true}
+ if(key!==TK){TK=key;const t=tmDur();s.dl=t?Date.now()+t.d*1000:null;s.dlT=t?t.d*1000:0;s.tsoft=!!(t&&t.soft);s.tcalm=!!(t&&t.calm);s.paused=null;ch=true}
  return ch}
 function armTimer(){if(!st||!isHost)return;TK=gKey(st);if(st.dl){const r=tmRem();if(r!=null)st.dl=Date.now()+r}}
 window.armTimer=armTimer;
@@ -1429,6 +1444,11 @@ function gProg(){const s=st,w={question:.25,judge:.5,reveal:.65,name:.75,landed:
    ========================================================= */
 function captureFocus(){const a=document.activeElement;if(a&&a.dataset&&a.dataset.d)return{d:a.dataset.d,s:a.selectionStart,e:a.selectionEnd};return null}
 function restoreFocus(f){if(!f)return;const el=$(`[data-d="${f.d}"]`);if(el){el.focus();try{el.setSelectionRange(f.s,f.e)}catch(e){}}}
+/* jauge de caractères : on voit la place qui reste, la réponse sera affichée en entier */
+function gauges(){$$('textarea[maxlength],input[data-d][maxlength]').forEach(el=>{if(el._g&&el._g.isConnected)return;const max=+el.maxLength;if(!(max>=20))return;
+ const g=document.createElement('div');g.className='gauge';g.setAttribute('aria-hidden','true');g.innerHTML='<i><b></b></i><span></span>';el.after(g);el._g=g;
+ const up=()=>{const n=el.value.length,p=Math.min(1,n/max);g.style.setProperty('--p',p.toFixed(3));g.classList.toggle('on',n>0);g.classList.toggle('mid',p>=.7);g.classList.toggle('full',p>=.97);g.querySelector('span').textContent=p>=.7?max-n:''};
+ el.addEventListener('input',up);up()})}
 function bindDrafts(){$$('[data-d]').forEach(el=>{if(drafts[el.dataset.d]!=null&&el.type!='range')el.value=drafts[el.dataset.d];el.addEventListener('input',()=>{drafts[el.dataset.d]=el.value;const e=$('.err');if(e)e.textContent=''})})}
 const err=m=>{const e=$('.err');if(e)e.textContent=m};
 const B=n=>`<b style="color:${col(n)}">${esc(n)}</b>`;
@@ -1452,7 +1472,7 @@ function render(){
  [...sec.querySelectorAll('.tabs,.players')].forEach((e,i)=>{if(sx[i])e.scrollLeft=sx[i]});
  let h=$('.hint');if(!h){h=document.createElement('div');h.className='hint';document.body.appendChild(h)}
  const same=h._t===(v.hint||'');h._t=v.hint||'';h.className='hint'+(mine?' mine':'')+(same?' same':'');h.innerHTML=`<div><span class="pulse"></span><span style="flex:1;font-size:14px">${v.hint||''}</span>${v.hintBtn||''}</div>`;chatHint(h);
- bindDrafts();restoreFocus(f);
+ bindDrafts();gauges();restoreFocus(f);
  $$('.reacts [data-e]').forEach(b=>b.onclick=()=>react(b.dataset.e,b));
  $('#help')&&($('#help').onclick=()=>tutorial());
  $('#mute')&&($('#mute').onclick=()=>{muted=!muted;LS.set('terra:mute',muted);render()});
@@ -1551,7 +1571,7 @@ function vMap(){
   sheet=`<div class="card sheet"><div class="rhead">${regionBadge(r)}<div style="flex:1"><h3>${RN(r)}</h3><p class="mut">${RT(r,1)}${s.n?' · '+T('traced',{c:s.n}):''}</p></div></div>
   <p style="margin-top:12px;font-size:14px;color:var(--txt)">${RT(r,2)}</p>
   ${ok?`${bottles>0&&R[r].t!='ecoute'?`<label class="toggle"><input type="checkbox" id="bt" ${ui.bottle?'checked':''}>${regionBadge('bouteille',34)}<span>${T('bottleLbl')}</span></label>
-   ${ui.bottle?`<p class="bhow">${T('bottleHow',{n:B(t)})}</p><textarea data-d="bottle" placeholder="${esc(T('bottlePh',{n:t}))}"></textarea>
+   ${ui.bottle?`<p class="bhow">${T('bottleHow',{n:B(t)})}</p><textarea data-d="bottle" maxlength="200" placeholder="${esc(T('bottlePh',{n:t}))}"></textarea>
    <p class="mut" style="font-size:12px;font-weight:700;margin:10px 0 6px">${T('exLbl')}</p><div class="bex">${(()=>{const ex=T('bottleEx').split('|'),k=st.turn%ex.length;return [0,1,2].map(i=>ex[(k+i*2)%ex.length]).map(q=>`<button type="button" data-ex="${esc(q)}">${esc(q)}</button>`).join('')})()}</div>`:''}`:''}
    <p class="err"></p><button class="pri wide" id="go">${T(r=='horizon'?'exploreHorizon':'exploreZone')}</button>`
    :`<p class="mut" style="margin-top:12px">🔒 ${lockWhy(me.name,t,r)}</p>`}</div>`}
@@ -1597,7 +1617,7 @@ function vQuestion(){const c=st.cur,terr=c.terr==me.name,key=c.id+':'+me.name;
   if(terr)return {mine:false,hint:T('imagHint'),html:qHead(c)+`<div class="card c"><p class="serif" style="font-size:20px">${T('imagT')}</p><p class="mut" style="margin-top:6px">${T('prepReal')}</p>${progress(c)}</div>${doorBtn}`,bind:bindDoor};
   if(done)return {mine:false,hint:T('predSent'),html:qHead(c)+`<div class="card"><p class="mut">${T('yourPred')}</p><p class="q">${QQ(esc(myPend.cid==c.id&&myPend.g!=null?myPend.g:drafts[key]||''))}</p>${progress(c)}</div>`};
   return {mine:true,hint:T('writeHint',{n:B(c.terr)}),
-   html:qHead(c)+`<div class="card"><label style="margin-top:0">${T('imagine')}</label><textarea data-d="${key}" placeholder="${esc(T('predPh'))}"></textarea><p class="err"></p><button class="pri wide" id="ok">${T('send')}</button>${progress(c)}</div>`,
+   html:qHead(c)+`<div class="card"><label style="margin-top:0">${T('imagine')}</label><textarea data-d="${key}" maxlength="140" placeholder="${esc(T('predPh'))}"></textarea><p class="err"></p><button class="pri wide" id="ok">${T('send')}</button>${progress(c)}</div>`,
    bind(){$('#ok').onclick=()=>{const v=(drafts[key]||'').trim();if(!v)return err(T('writeSth'));send({t:'guess',v,k:gK(c,tidy(v).slice(0,140))})}}}}
  if(done)return {mine:false,hint:T('sentHint'),html:qHead(c)+`<div class="card c"><p class="serif" style="font-size:20px">${T(terr?'secretKept':'sealed')} ✓</p>${progress(c)}</div>${doorBtn}`,bind:bindDoor};
  return {mine:true,hint:terr?T('secretHint'):T('guessHint',{n:B(c.terr)}),
@@ -1660,7 +1680,7 @@ function vEnd(){const mine=st.flags[me.name],os=others(me.name);if(!os.includes(
   <div class="card"><div class="map">${svgMap(o,me.name)}</div><div style="margin-top:10px">${lmList(mapOf(o,me.name))}</div></div>
   ${mine?`<div class="card c"><p class="serif" style="font-size:20px">${T('flagsDone')}</p></div>`:
   `<div class="card"><h3>${T('plant')}</h3><p class="mut" style="margin-top:4px">${T('plantD')}</p>
-  ${os.map(n=>`<label>${DOT(n)} ${esc(n)}</label><textarea data-d="flag:${esc(n)}" style="min-height:64px"></textarea>`).join('')}
+  ${os.map(n=>`<label>${DOT(n)} ${esc(n)}</label><textarea data-d="flag:${esc(n)}" maxlength="240" style="min-height:64px"></textarea>`).join('')}
   <p class="err"></p><button class="pri wide" id="ok">${T('plantBtn')}</button></div>`}`,
   bind(){$$('[data-et]').forEach(b=>b.onclick=()=>{ui.endTab=b.dataset.et;render()});
    $('#ok')&&($('#ok').onclick=()=>{const v={};for(const n of os){const x=(drafts['flag:'+n]||'').trim();if(!x)return err(T('flagEach'));v[n]=x.slice(0,240)}send({t:'flags',v})})}}}
@@ -1688,7 +1708,7 @@ function vCarnet(){const host=me.name==st.host;
 function gWho(c,k){const card=(c.cards||[]).find(x=>x.k==k),n=c.anonR?null:card?card.n:(c.cards?null:k),mine=myPend.cid==c.id&&myPend.k==k;
  if(n&&P(n))return `${DOT(n)}<div class="v"><span class="mut">${esc(n)}</span><br>`;
  return `<span class="dot ganon"></span><div class="v">${mine?`<span class="mut">${T('you2')}</span><br>`:''}`}
-const kwField=c=>`<label class="gkw">🗝️ ${T('kwLbl')}</label><input data-d="${c.id}:kw" maxlength="60" placeholder="${esc(T('kwPh'))}">`;
+const kwField=c=>`<label class="gkw">🗝️ ${T('kwLbl')}</label><input data-d="${c.id}:kw" maxlength="40" placeholder="${esc(T('kwPh'))}">`;
 const gRematchBtns=()=>`<div class="grm"><button class="pri" id="rmSame"><b>⛵ ${T('sameCap')}</b><span>${T('sameCapD')}</span></button><button id="rmNew"><b>🧭 ${T('newCap')}</b><span>${T('newCapD')}</span></button></div>`;
 function bindRematch(){$('#rmSame')&&($('#rmSame').onclick=()=>send({t:'rematch',same:true}));$('#rmNew')&&($('#rmNew').onclick=()=>send({t:'rematch',same:false}))}
 // timer : anneau dans la barre d'aide
@@ -1699,7 +1719,7 @@ function gRing(){if(!TMR.isConnected||!st)return;const r=tmRem();if(r==null){TMR
  const s=Math.max(0,Math.ceil(r/1000)),fr=st.dlT?Math.max(0,Math.min(1,r/st.dlT)):0,pz=st.paused!=null;
  TMR.querySelector('.tfg').style.strokeDasharray=`${(fr*100).toFixed(1)} 100`;
  TMR.querySelector('b').textContent=pz?'⏸':s>=60?Math.floor(s/60)+':'+String(s%60).padStart(2,'0'):s;
- TMR.classList.toggle('low',s<10&&!st.tsoft&&!pz);TMR.classList.toggle('soft',!!st.tsoft);TMR.classList.toggle('pz',pz);
+ TMR.classList.toggle('low',s<10&&!st.tsoft&&!pz);TMR.classList.toggle('soft',!!st.tsoft);TMR.classList.toggle('pz',pz);TMR.classList.toggle('calm',!!st.tcalm&&s>30&&!pz);
  const b=TMR.querySelector('.tring');b.setAttribute('aria-label',T(pz?'resume':'pauseTip'));TMR.querySelector('.tplus').hidden=me.name!=st.host}
 function gAfter(){if(!st)return;
  if(st.v!==RCVV){RCVV=st.v;RCV=Date.now()}
