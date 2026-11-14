@@ -49,7 +49,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Rubik:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sacramento&text=by&display=swap">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="i18n.js?v=20261114h"></script>
+<script src="i18n.js?v=20261114i"></script>
 <style>
 :root{--sea1:#bdeef0;--sea2:#69c9d3;--deep:#0e5866;--deep2:#0a4652;--paper:#fffaf0;--paper2:#fbf0d9;--edge:#ead6ae;--edge2:#d8bd88;--txt:#3b2a1b;--mut:#8a7660;--acc:#ff8a3d;--acc-d:#d9661f;--acc2:#ffb15c;--ink:#1d8e6c;--sur:#d9661f;--ear:#5869b5;--bad:#d64b3c;--gold:#f2b84b}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -651,6 +651,28 @@ h3.gh{margin-top:18px;font-size:17px}
 
 
 /* @css-fun */
+#fx{position:fixed;inset:0;z-index:22;pointer-events:none;overflow:hidden;contain:layout paint}
+.fxp{position:fixed;left:0;top:0;opacity:0;pointer-events:none;line-height:1;user-select:none;-webkit-user-select:none;will-change:transform,opacity}
+.fxring{width:70px;height:70px;border-radius:50%;background:radial-gradient(circle,transparent 56%,#ffd26ab3 62%,transparent 70%)}
+.fxglow{width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,#ffbecdd9,#ffe2a066 45%,transparent 70%)}
+.fxtint{width:100vw;height:100vh}
+.fxtint.warm{background:radial-gradient(ellipse at 50% 108%,#ff781e73,#ffa03c1f 50%,transparent 75%)}
+.fxtint.blue{background:linear-gradient(#4682c847,transparent 60%)}
+.fxtint.gold{background:radial-gradient(circle at 50% 45%,#ffd75a66,transparent 65%)}
+.fxgold{filter:drop-shadow(0 0 10px #ffd34d) drop-shadow(0 0 20px #ffb300)}
+#fxt{position:fixed;left:50%;top:22%;transform:translateX(-50%);opacity:0;z-index:23;pointer-events:none;padding:8px 18px;border-radius:99px;font:800 20px Nunito,Rubik,sans-serif;color:var(--txt);background:linear-gradient(180deg,#fffdf7,#fff1db);border:2px solid #ff9d6b;box-shadow:0 3px 0 #0e58661f,0 10px 24px #0e586638;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis}
+#fxt.gold{border-color:#e8b830;color:#7a5200;box-shadow:0 0 18px #ffd34d99,0 10px 24px #0e586638}
+.rxp .em{display:inline-block}
+.rxp[data-lv="1"] .em{scale:1.25;margin:0 2px}
+.rxp[data-lv="2"] .em{scale:1.5;margin:0 4px}
+.rxp[data-lv="3"] .em{scale:1.75;margin:0 6px}
+.rxp[data-lv="4"] .em{scale:2;margin:0 8px}
+.rxp.gold{border-color:#e8b830;box-shadow:0 0 14px #ffd34dbb,0 8px 18px #0e586630}
+.reacts button{touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;transition:transform .45s ease-out,box-shadow .2s}
+.reacts button.chg{transform:scale(1.45)}
+.reacts button.rdy{box-shadow:0 0 0 3px #ffd34d,0 0 16px #ffb300aa}
+@media (max-width:560px){#fxt{font-size:17px;top:18%}}
+@media (prefers-reduced-motion:reduce){.rxp .em{scale:none!important;margin:0!important}.reacts button.chg{transform:none}}
 
 
 
@@ -1042,25 +1064,130 @@ const SFX={turn:()=>tone([[523,0],[784,.12]]),reveal:()=>tone([[392,0],[523,.1],
 
 /* ---------- UI utilitaires ---------- */
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),Math.max(3200,m.length*70))}
+/* === fun : combos de spam, super emoji, réaction dorée, double-tap === */
+const FX={cmb:{},grp:{},bud:{},live:0,pool:[],sndT:0,pend:{},sendT:0,flT:0,tip:0,rmT:0,dt:null};
+const FXMAX=40,fxRM=()=>{try{return matchMedia('(prefers-reduced-motion:reduce)').matches}catch(e){return false}};
+const fxR=(a,b)=>a+Math.random()*(b-a),fxTf=(x,y,s=1,r=0)=>`translate(${x}px,${y}px) translate(-50%,-50%) scale(${s}) rotate(${r}deg)`;
+const fxLv=n=>n>=40?4:n>=20?3:n>=10?2:n>=5?1:0;
+function fxLvOf(from,e){const c=FX.cmb[from+e];return c&&Date.now()-c.t<1400?fxLv(c.n):0}
+function fxLayer(){let l=$('#fx');if(!l){l=document.createElement('div');l.id='fx';l.setAttribute('aria-hidden','true');document.body.appendChild(l);FX.pool=[];FX.live=0}return l}
+function fxEl(cls){if(FX.live>=FXMAX)return null;const l=fxLayer();let el=FX.pool.pop();if(!el){el=document.createElement('span');l.appendChild(el)}
+ el.className='fxp '+(cls||'');el.style.cssText='';el.textContent='';FX.live++;return el}
+function fxRun(el,kf,dur,delay){const a=el.animate(kf,{duration:dur,delay:delay||0,easing:'linear',fill:'both'});let d=0;
+ const done=()=>{if(d)return;d=1;FX.live--;el.style.display='none';FX.pool.push(el)};a.onfinish=done;a.oncancel=done}
+function fxP(ch,size,kf,dur,delay,cls){const el=fxEl(cls);if(!el)return null;el.textContent=ch;el.style.fontSize=size+'px';fxRun(el,kf,dur,delay);return el}
+function fxTint(cls,peak,dur){const el=fxEl('fxtint '+cls);if(el)fxRun(el,[{opacity:0},{opacity:peak,offset:.25},{opacity:peak*.6,offset:.7},{opacity:0}],dur)}
+function ftone(notes,g){if(muted||fxRM())return;const t=Date.now();if(t-FX.sndT<150)return;FX.sndT=t;
+ try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();if(actx.state=='suspended')actx.resume();
+ notes.forEach(([f,s,d=.12])=>{const o=actx.createOscillator(),gn=actx.createGain(),T0=actx.currentTime+s;o.type='sine';o.frequency.value=f;
+  gn.gain.setValueAtTime(0,T0);gn.gain.linearRampToValueAtTime(g||.025,T0+.015);gn.gain.exponentialRampToValueAtTime(.0001,T0+d);o.connect(gn).connect(actx.destination);o.start(T0);o.stop(T0+d+.05)})}catch(e){}}
+/* version très douce : un seul emoji qui se fond (prefers-reduced-motion) */
+function fxCalm(ch){const t=Date.now();if(t-FX.rmT<900)return;FX.rmT=t;const x=innerWidth/2,y=innerHeight*.4;fxP(ch,64,[{transform:fxTf(x,y),opacity:0},{transform:fxTf(x,y),opacity:.9,offset:.3},{transform:fxTf(x,y),opacity:0}],1100)}
+function fxBanner(txt,gold){let b=$('#fxt');if(!b){b=document.createElement('div');b.id='fxt';b.setAttribute('aria-hidden','true');document.body.appendChild(b)}
+ b.textContent=txt;b.className=gold?'gold':'';if(b._a)b._a.cancel();
+ b._a=b.animate(fxRM()?[{opacity:0},{opacity:1,offset:.15},{opacity:1,offset:.8},{opacity:0}]:[{opacity:0,transform:'translateX(-50%) scale(.7)'},{opacity:1,transform:'translateX(-50%) scale(1.08)',offset:.15},{opacity:1,transform:'translateX(-50%) scale(1)',offset:.8},{opacity:0,transform:'translateX(-50%) translateY(-14px)'}],{duration:2200,fill:'both'})}
+/* effet propre à chaque emoji, intensité = palier 1..4 */
+function fxEffect(e,stage){const W=innerWidth,H=innerHeight,N=[0,6,10,16,22][stage],R=fxR,s0=stage>2?1.25:1;
+ if(e=='❤️'){for(let i=0;i<N;i++){const x=R(.05,.95)*W,sw=R(-40,40),s=R(.9,1.5)*s0;
+  fxP(e,26,[{transform:fxTf(x,H+30,.5),opacity:0},{transform:fxTf(x+sw*.3,H*.82,s),opacity:1,offset:.1},{transform:fxTf(x+sw,H*.62,s*1.35),offset:.28},{transform:fxTf(x-sw*.5,H*.48,s*.95),offset:.42},{transform:fxTf(x+sw,H*.34,s*1.35),opacity:1,offset:.6},{transform:fxTf(x,-30,s),opacity:0}],R(1700,2400),i*70)}}
+ else if(e=='😂'){const fl=H-40;for(let i=0;i<N;i++){const x=R(.05,.9)*W,s=R(1,1.5)*s0;
+  fxP(e,26,[{transform:fxTf(x,-40,s,-20),opacity:0},{transform:fxTf(x,-20,s,-10),opacity:1,offset:.05,easing:'ease-in'},{transform:fxTf(x+20,fl,s,25),offset:.45,easing:'ease-out'},{transform:fxTf(x+40,fl-H*.22,s,-25),offset:.62,easing:'ease-in'},{transform:fxTf(x+55,fl,s,20),offset:.78,easing:'ease-out'},{transform:fxTf(x+65,fl-H*.07,s,-15),offset:.88,easing:'ease-in'},{transform:fxTf(x+70,fl,s,0),opacity:1,offset:.95},{transform:fxTf(x+70,fl,s,0),opacity:0}],R(1500,2100),i*80)}}
+ else if(e=='😮'){const cx=W/2,cy=H*.45,m=Math.max(W,H)/70*1.4,rg=stage>=3?3:2;
+  for(let k=0;k<rg;k++){const el=fxEl('fxring');if(el)fxRun(el,[{transform:fxTf(cx,cy,.1),opacity:.9},{transform:fxTf(cx,cy,m),opacity:0}],900+stage*150,k*180)}
+  fxP(e,60,[{transform:fxTf(cx,cy,.2),opacity:0},{transform:fxTf(cx,cy,1.4+stage*.2),opacity:1,offset:.3},{transform:fxTf(cx,cy,1.8+stage*.2),opacity:0}],1000);
+  for(let i=0;i<(stage>=3?N/2:0);i++){const a=i/(N/2)*6.283,d=R(120,240);fxP(e,24,[{transform:fxTf(cx,cy,.3),opacity:0},{transform:fxTf(cx+Math.cos(a)*d*.4,cy+Math.sin(a)*d*.4,1),opacity:1,offset:.2},{transform:fxTf(cx+Math.cos(a)*d,cy+Math.sin(a)*d,.8),opacity:0}],900,150)}}
+ else if(e=='😢'){if(stage>=2)fxTint('blue',.5+stage*.1,1900);
+  for(let i=0;i<N;i++){const x=R(.03,.97)*W,t=i%3?'💧':'😢',w=R(-10,10);
+   fxP(t,t=='💧'?20:24,[{transform:fxTf(x,-30),opacity:0},{transform:fxTf(x,H*.06),opacity:.95,offset:.06,easing:'ease-in'},{transform:fxTf(x+w,H+30),opacity:.9,offset:.97},{transform:fxTf(x+w,H+30),opacity:0}],R(1100,1700),R(0,500))}}
+ else if(e=='🫂'){for(let i=0;i<stage;i++){const y=H*R(.3,.78),mx=R(.25,.75)*W,dl=i*260,g=14+stage*2;
+  const gl=fxEl('fxglow');if(gl)fxRun(gl,[{transform:fxTf(mx,y,.2),opacity:0},{transform:fxTf(mx,y,.6),opacity:0,offset:.4},{transform:fxTf(mx,y,1.5+stage*.2),opacity:.9,offset:.62},{transform:fxTf(mx,y,2.2+stage*.2),opacity:0}],1700,dl);
+  [[-30,-1],[W+30,1]].forEach(([sx,sg])=>fxP(e,30,[{transform:fxTf(sx,y,.9),opacity:0},{transform:fxTf(sx,y,.9),opacity:1,offset:.05,easing:'ease-in-out'},{transform:fxTf(mx+sg*g,y,1.3),opacity:1,offset:.55},{transform:fxTf(mx+sg*g*.6,y,1.6),opacity:1,offset:.75},{transform:fxTf(mx+sg*g*.6,y-30,1.8),opacity:0}],1700,dl))}}
+ else if(e=='🔥'){fxTint('warm',.5+stage*.12,1800);
+  for(let i=0;i<N;i++){const x=R(.03,.97)*W,sw=R(-30,30),s=R(.9,1.5)*s0;
+   fxP(e,26,[{transform:fxTf(x,H+20,.6),opacity:0},{transform:fxTf(x+sw*.4,H*.86,s),opacity:1,offset:.1},{transform:fxTf(x-sw*.4,H*.72,s*1.25),offset:.3},{transform:fxTf(x+sw*.5,H*.6,s*.9),offset:.5},{transform:fxTf(x,H*R(.3,.5),s*.5),opacity:0}],R(1000,1600),R(0,420))}}}
+function fxExplode(e,n){const W=innerWidth,H=innerHeight,cx=W/2,cy=H*.45,k=Math.max(.6,Math.min(1.3,Math.min(W,H)/700));
+ fxP(e,90,[{transform:fxTf(cx,cy,.2),opacity:0},{transform:fxTf(cx,cy,1.5),opacity:1,offset:.2},{transform:fxTf(cx,cy,2.6),opacity:0}],1100);
+ for(let i=0;i<n;i++){const a=i/n*6.283+fxR(-.2,.2),d=fxR(150,320)*k;
+  fxP(e,28,[{transform:fxTf(cx,cy,.3,0),opacity:0},{transform:fxTf(cx+Math.cos(a)*d*.35,cy+Math.sin(a)*d*.35,1.3,40),opacity:1,offset:.18},{transform:fxTf(cx+Math.cos(a)*d,cy+Math.sin(a)*d+30,.9,fxR(-120,120)),opacity:0}],fxR(900,1300))}}
+function fxStage(e,stage,from){
+ if(fxRM()){if(stage>=2)fxCalm(e);return}
+ fxEffect(e,stage);if(stage==4)fxExplode(e,14);
+ ftone(stage==4?[[523,0,.14],[659,.06,.14],[784,.12,.2]]:[[660+stage*80,0,.1]]);
+ if(!FX.tip&&stage==1&&from==me.name){FX.tip=1;setTimeout(()=>toast(T('fxTip')),1200)}}
+function fxGroup(e,k){const all=k>=st.players.filter(p=>p.online!==false).length;
+ if(fxRM()){fxCalm(e);fxBanner(T(all?'fxAll':'fxGroup',{e}));return}
+ fxEffect(e,2);fxExplode(e,10);ftone([[523,0,.12],[659,.08,.12],[784,.16,.12],[1047,.24,.22]],.03);
+ fxBanner(T(all?'fxAll':'fxGroup',{e}))}
+function fxGold(from,e){fxBanner(T('fxGold',{n:from}),true);if(fxRM()){fxCalm('✨');return}
+ const W=innerWidth,H=innerHeight,cx=W/2,cy=H*.45;fxTint('gold',.9,2000);
+ fxP(e,100,[{transform:fxTf(cx,cy,.2),opacity:0},{transform:fxTf(cx,cy,1.6),opacity:1,offset:.22},{transform:fxTf(cx,cy,1.3),opacity:1,offset:.7},{transform:fxTf(cx,cy,2),opacity:0}],1700,0,'fxgold');
+ for(let i=0;i<16;i++){const x=fxR(.05,.95)*W,t=i%3?'✨':'⭐',s=fxR(.8,1.5);
+  fxP(t,22,[{transform:fxTf(x,H*fxR(.9,1.05),.3),opacity:0},{transform:fxTf(x+fxR(-30,30),H*.6,s),opacity:1,offset:.25},{transform:fxTf(x+fxR(-50,50),H*fxR(.05,.3),s*.6,fxR(-90,90)),opacity:0}],fxR(1400,2100),i*60,'fxgold')}
+ ftone([[784,0,.12],[988,.09,.12],[1319,.18,.12],[1568,.27,.3]],.03)}
+function fxBig(from,e){if(fxRM()){fxCalm(e);return}
+ const W=innerWidth,H=innerHeight,cx=W/2,cy=H*.45,sh=r=>({transform:fxTf(cx+r*6,cy,1.35,r)});
+ fxP(e,150,[{transform:fxTf(cx,cy,.2),opacity:0},{transform:fxTf(cx,cy,1.4),opacity:1,offset:.16,easing:'ease-out'},{...sh(-6),offset:.3},{...sh(6),offset:.4},{...sh(-4),offset:.5},{...sh(4),offset:.6},{transform:fxTf(cx,cy,1.35),opacity:1,offset:.75},{transform:fxTf(cx,cy,2),opacity:0}],1500);
+ const el=fxEl('fxring');if(el)fxRun(el,[{transform:fxTf(cx,cy,.3),opacity:.8},{transform:fxTf(cx,cy,Math.max(W,H)/70,0),opacity:0}],1000);
+ for(let i=0;i<8;i++){const a=i/8*6.283,d=fxR(130,220);fxP(e,22,[{transform:fxTf(cx,cy,.3),opacity:0},{transform:fxTf(cx+Math.cos(a)*d,cy+Math.sin(a)*d,1),opacity:1,offset:.3},{transform:fxTf(cx+Math.cos(a)*d*1.3,cy+Math.sin(a)*d*1.3,.7),opacity:0}],1000,120)}
+ ftone([[392,0,.2],[587,.07,.25]],.03)}
+function fxTap(x,y){const W=innerWidth,H=innerHeight,px=x*W,py=y*H;if(fxRM()){fxCalm('❤️');return}
+ fxP('❤️',42,[{transform:fxTf(px,py,.3),opacity:0},{transform:fxTf(px,py-10,1.5),opacity:1,offset:.25,easing:'ease-out'},{transform:fxTf(px,py-80,1.1),opacity:0}],900);
+ for(let i=0;i<5;i++){const a=i/5*6.283+.5,d=fxR(40,70);fxP('❤️',14,[{transform:fxTf(px,py,.4),opacity:0},{transform:fxTf(px+Math.cos(a)*d,py+Math.sin(a)*d,1),opacity:1,offset:.3},{transform:fxTf(px+Math.cos(a)*d*1.2,py+Math.sin(a)*d*1.2-20,.6),opacity:0}],750)}
+ ftone([[880,0,.08]],.02)}
+/* un coup reçu (ou le sien en local) : combo, paliers, groupe */
+function fxHit(from,e,n,o){const now=Date.now(),key=from+e,cm=FX.cmb[key]||(FX.cmb[key]={n:0,t:0});
+ if(now-cm.t>1400)cm.n=0;const prev=cm.n;cm.t=now;cm.n+=n;const lv=fxLv(cm.n);
+ if(document.hidden)return lv;
+ const k=o&&o.k;if(k=='gold')fxGold(from,e);else if(k=='big')fxBig(from,e);else if(k=='tap'&&o.x!=null)fxTap(o.x,o.y);
+ const th=[5,10,20,40];let sg=0;for(let i=0;i<4;i++)if(prev<th[i]&&cm.n>=th[i])sg=i+1;
+ if(!sg&&cm.n>40&&Math.floor(cm.n/40)>Math.floor(prev/40))sg=4;
+ if(sg)fxStage(e,sg,from);
+ const g=FX.grp[e]||(FX.grp[e]={w:{},t:0});g.w[from]=now;
+ const who=Object.keys(g.w).filter(x=>now-g.w[x]<1500&&(FX.cmb[x+e]||{n:0}).n>=3);
+ if(who.length>=2&&now-g.t>6000){g.t=now;fxGroup(e,who.length)}
+ return lv}
 /* réactions : pile #rx en bas à gauche (qui a mis quoi), regroupement ×N, 3,5 s, 4 max */
-function floatReact(from,e){
+function floatReact(from,e,o){o=o||{};const n=Math.max(1,Math.min(10,Math.floor(+o.n)||1));
+ const lv=from==me.name?fxLvOf(from,e):fxHit(from,e,n,o);
  let box=$('#rx');if(!box){box=document.createElement('div');box.id='rx';box.setAttribute('aria-live','polite');document.body.appendChild(box)}
  const h=$('.hint');box.style.bottom=((h&&h.firstElementChild?h.offsetHeight:0)+10)+'px';
  const c=col(from),id=from+'\u0001'+e;
  let d=[...box.children].find(x=>x._id==id&&!x.classList.contains('out'));
- if(d){d._n++;d.querySelector('.n').textContent='×'+d._n;const em=d.querySelector('.em');em.classList.remove('bo');void em.offsetWidth;em.classList.add('bo')}
- else{d=document.createElement('div');d.className='rxp';d._id=id;d._n=1;d.style.setProperty('--c',c);
-  d.innerHTML=`<span class="av" style="background:${grad(c)}">${esc(([...from][0]||'?').toUpperCase())}</span><b>${esc(from)}</b><span class="em">${esc(e)}</span><span class="n"></span>`;
+ if(d){d._n+=n;d.querySelector('.n').textContent='×'+d._n;const em=d.querySelector('.em');em.classList.remove('bo');void em.offsetWidth;em.classList.add('bo')}
+ else{d=document.createElement('div');d.className='rxp';d._id=id;d._n=n;d.style.setProperty('--c',c);
+  d.innerHTML=`<span class="av" style="background:${grad(c)}">${esc(([...from][0]||'?').toUpperCase())}</span><b>${esc(from)}</b><span class="em">${esc(e)}</span><span class="n">${n>1?'×'+n:''}</span>`;
   box.appendChild(d);
   const live=[...box.children].filter(x=>!x.classList.contains('out'));if(live.length>4)rxOut(live[0])}
+ d.dataset.lv=lv;if(o.k=='gold')d.classList.add('gold');
+ if(lv&&!fxRM()){const em=d.querySelector('.em');try{em.animate([{rotate:'-9deg'},{rotate:'9deg'},{rotate:'-6deg'},{rotate:'0deg'}],{duration:260})}catch(x){}}
  clearTimeout(d._t);d._t=setTimeout(()=>rxOut(d),3500);
  const ch=[...document.querySelectorAll('#tb .chip[data-p]')].find(x=>x.dataset.p==from);
  if(ch){ch.style.setProperty('--pc',c);ch.classList.remove('rxg');void ch.offsetWidth;ch.classList.add('rxg');clearTimeout(ch._g);ch._g=setTimeout(()=>ch.classList.remove('rxg'),1200)}}
 function rxOut(d){clearTimeout(d._t);d.classList.add('out');setTimeout(()=>d.parentNode&&d.parentNode.removeChild(d),360)}
-let lastReact=0;
-function react(e,btn){const now=Date.now();if(now-lastReact<500)return;lastReact=now;
- if(btn){btn.classList.remove('pp');void btn.offsetWidth;btn.classList.add('pp')}
- if(isHost)relayReact(me.name,e);else hostConn&&hostConn.open&&hostConn.send({t:'react',e})}
+/* envoi : effets locaux immédiats, rafales réseau (≤ 4 messages/s) avec compteur */
+function fxSend(e,n,o){const m={t:'react',e,n};if(o){if(o.k)m.k=o.k;if(o.x!=null){m.x=o.x;m.y=o.y}}
+ if(isHost)relayReact(me.name,e,m);else hostConn&&hostConn.open&&hostConn.send(m)}
+function fxFlush(){FX.flT=0;FX.sendT=Date.now();const p=FX.pend;FX.pend={};for(const e in p)fxSend(e,p[e])}
+function react(e,btn,o){if(btn){btn.classList.remove('pp');void btn.offsetWidth;btn.classList.add('pp')}
+ o=o||{};if(!o.k&&Math.random()<.02)o.k='gold';
+ fxHit(me.name,e,1,o);
+ if(o.k){fxSend(e,1,o);return}
+ FX.pend[e]=(FX.pend[e]||0)+1;if(!FX.flT)FX.flT=setTimeout(fxFlush,Math.max(0,250-(Date.now()-FX.sendT)))}
+/* appui long = super emoji ; clic / Entrée = réaction normale */
+function fxBind(b){const e=b.dataset.e;let t1=0,t2=0,down=false,rdy=false;
+ const clr=()=>{clearTimeout(t1);clearTimeout(t2);down=rdy=false;b.classList.remove('chg','rdy')};
+ b.onpointerdown=ev=>{if(ev.button>0)return;down=true;rdy=false;t1=setTimeout(()=>down&&b.classList.add('chg'),160);
+  t2=setTimeout(()=>{if(!b.isConnected||!down)return;rdy=true;b.classList.add('rdy');ftone([[740,0,.07]])},600)};
+ b.onpointerup=()=>{if(!down)return;const big=rdy;clr();big?react(e,b,{k:'big'}):react(e,b)};
+ b.onpointercancel=b.onpointerleave=clr;b.oncontextmenu=ev=>ev.preventDefault();
+ b.onclick=ev=>{if(ev.detail===0)react(e,b)}}
+/* double-tap sur une carte : ❤️ à l'endroit du tap, visible par tout le monde */
+document.addEventListener('pointerup',ev=>{if(ev.pointerType=='mouse'&&ev.button!==0)return;
+ const tg=ev.target;if(!tg.closest||!tg.closest('.card,.guess,.banner')||tg.closest('button,input,textarea,a,.reacts,.dd,[contenteditable]')||!$('.reacts')){FX.dt=null;return}
+ const now=Date.now(),p=FX.dt;
+ if(p&&now-p.t<320&&Math.hypot(ev.clientX-p.x,ev.clientY-p.y)<40){FX.dt=null;try{getSelection().removeAllRanges()}catch(e){}
+  if(me&&st&&(isHost||(hostConn&&hostConn.open)))react('❤️',null,{k:'tap',x:+(ev.clientX/innerWidth).toFixed(3),y:+(ev.clientY/innerHeight).toFixed(3)})}
+ else FX.dt={t:now,x:ev.clientX,y:ev.clientY}});
 const reactBar=()=>`<div class="reacts">${EMO.map(e=>`<button data-e="${e}">${e}</button>`).join('')}</div>`;
 
 /* ---------- Tutoriel ---------- */
@@ -1130,7 +1257,7 @@ function connectTo(id,onFail){
  c.on('open',()=>{lastSeen=Date.now();c.send({t:'hello',name:me.name,color:me.color,saves:allSaves(),pend:window.gPend?gPend():null})});
  c.on('data',d=>{if(hostConn!==c)return;lastSeen=Date.now();
   if(d.t=='state'){got=true;migrating=false;onUnavail=null;const ph=st&&st.host;st=d.st;if(ph&&ph!=st.host)toast(T('newHost',{n:st.host}));persist();render();window.armTimer&&armTimer()}
-  else if(d.t=='react')floatReact(d.from,d.e)
+  else if(d.t=='react')floatReact(d.from,d.e,d)
   else if(d.t=='renamed'){me.name=d.name;setTimeout(()=>toast(T('renamed',{n:d.name})),300)}
   else if(d.t=='chat')chatAdd(d.m)
   else if(d.t=='chatlog')chatMerge(d.log)
@@ -1311,7 +1438,13 @@ function chatHint(h){const d=h&&h.firstElementChild;if(!d||!st)return;const b=do
 
 function broadcast(msg){for(const id in conns){const c=conns[id];if(c.open)try{c.send(msg)}catch(e){}}}
 function bump(){st.v++;st.updatedAt=Date.now();broadcast({t:'state',st});persist();render()}
-function relayReact(from,e){if(!EMO.includes(e))return;broadcast({t:'react',from,e});floatReact(from,e)}
+function relayReact(from,e,o){o=o||{};if(!EMO.includes(e))return;
+ const now=Date.now(),b=FX.bud[from]||(FX.bud[from]={v:30,t:now,g:0});b.v=Math.min(30,b.v+(now-b.t)*.02);b.t=now;
+ let n=Math.min(10,Math.max(1,Math.floor(+o.n)||1),Math.floor(b.v));if(n<1)return;b.v-=n;
+ const m={t:'react',from,e,n};
+ if(o.k=='gold'&&now-b.g>2000){b.g=now;m.k='gold'}else if(o.k=='big')m.k='big';
+ else if(o.k=='tap'&&e=='❤️'&&o.x>=0&&o.x<=1&&o.y>=0&&o.y<=1){m.k='tap';m.x=+(+o.x).toFixed(3);m.y=+(+o.y).toFixed(3)}
+ broadcast(m);floatReact(from,e,m)}
 function hostRecv(c,d){
  if(d.t=='hello'){
   let name=qaCut(chTidy(d.name),20);if(!name)return;
@@ -1327,7 +1460,7 @@ function hostRecv(c,d){
   if(renamed)c.send({t:'renamed',name});conns[c.peer]=c;c.pname=name;clientSaves[name]=d.saves||{};if(d.pend&&window.gRestore)gRestore(name,d.pend);bump();try{c.send({t:'chatlog',log:chatLog})}catch(e){}return}
  if(!c.pname)return;
  if(d.t=='act')act(c.pname,d.a);
- else if(d.t=='react')relayReact(c.pname,d.e)
+ else if(d.t=='react')relayReact(c.pname,d.e,d)
  else if(d.t=='chat'){if(chatIn(c.pname,d.m)===false)try{c.send({t:'chatslow'})}catch(e){}}}
 function kick(name){const p=P(name);if(!isHost||!p||name==st.host)return;
  st.banned=st.banned||[];if(!st.banned.includes(name))st.banned.push(name);
@@ -1561,7 +1694,7 @@ function render(){
  let h=$('.hint');if(!h){h=document.createElement('div');h.className='hint';document.body.appendChild(h)}
  const same=h._t===(v.hint||'');h._t=v.hint||'';h.className='hint'+(mine?' mine':'')+(same?' same':'');h.innerHTML=`<div><span class="pulse"></span><span style="flex:1;font-size:14px">${v.hint||''}</span>${v.hintBtn||''}</div>`;chatHint(h);
  bindDrafts();gauges();restoreFocus(f);
- $$('.reacts [data-e]').forEach(b=>b.onclick=()=>react(b.dataset.e,b));
+ $$('.reacts [data-e]').forEach(fxBind);
  $('#help')&&($('#help').onclick=()=>tutorial());
  $('#mute')&&($('#mute').onclick=()=>{muted=!muted;LS.set('terra:mute',muted);render()});
  $('#codebtn')&&($('#codebtn').onclick=copyInvite);

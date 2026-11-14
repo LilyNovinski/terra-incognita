@@ -459,6 +459,17 @@ for(const l in EXT_GAME)if(I18N[l])Object.assign(I18N[l].ui,EXT_GAME[l]);
 
 /* @i18n-qa : formulation neutre (« découverts » était accordé) */
 const EXT_QA={fr:{thread:"Plus le fil est épais, plus la découverte a été belle."}};for(const l in EXT_QA)if(I18N[l])Object.assign(I18N[l].ui,EXT_QA[l]);
+/* @i18n-fun */
+const EXT_FUN={fr:{fxAll:"Tout le monde {e} !",fxGroup:"Ensemble {e} !",fxGold:"✨ {n} : réaction dorée !",fxTip:"Astuce : maintenir un emoji pour un super emoji, double-tap sur une carte pour un ❤️"},
+en:{fxAll:"Everyone {e}!",fxGroup:"Together {e}!",fxGold:"✨ {n}: golden reaction!",fxTip:"Tip: hold an emoji for a super emoji, double-tap a card for a ❤️"},
+es:{fxAll:"¡Todo el mundo {e}!",fxGroup:"¡Juntos {e}!",fxGold:"✨ {n}: ¡reacción dorada!",fxTip:"Truco: mantener un emoji para un súper emoji, doble toque en una tarjeta para un ❤️"},
+it:{fxAll:"Tutti {e}!",fxGroup:"Insieme {e}!",fxGold:"✨ {n}: reazione dorata!",fxTip:"Consiglio: tenere premuta una emoji per una super emoji, doppio tocco su una carta per un ❤️"},
+de:{fxAll:"Alle {e}!",fxGroup:"Gemeinsam {e}!",fxGold:"✨ {n}: goldene Reaktion!",fxTip:"Tipp: Emoji gedrückt halten für ein Super-Emoji, Karte doppelt antippen für ein ❤️"},
+ru:{fxAll:"Все вместе {e}!",fxGroup:"Вместе {e}!",fxGold:"✨ {n}: золотая реакция!",fxTip:"Подсказка: удерживать эмодзи для супер-эмодзи, двойной тап по карточке для ❤️"},
+zh:{fxAll:"大家一起 {e}！",fxGroup:"一起 {e}！",fxGold:"✨ {n}：金色反应！",fxTip:"提示：长按表情可发送超级表情，双击卡片可送出 ❤️"},
+he:{fxAll:"כולם {e}!",fxGroup:"ביחד {e}!",fxGold:"✨ {n}: תגובה זהובה!",fxTip:"טיפ: להחזיק אימוג'י לאימוג'י־על, הקשה כפולה על כרטיס ל־❤️"},
+pt:{fxAll:"Todo mundo {e}!",fxGroup:"Juntos {e}!",fxGold:"✨ {n}: reação dourada!",fxTip:"Dica: manter um emoji pressionado para um super emoji, toque duplo num cartão para um ❤️"}};for(const l in EXT_FUN)if(I18N[l])Object.assign(I18N[l].ui,EXT_FUN[l]);
+
 /* @i18n-polish */
 const EXT_POL={fr:{timerD:"Le sablier laisse le temps de réfléchir et d'écrire, puis avance tout seul quand on regarde les réponses"},
 en:{timerD:"The hourglass leaves plenty of time to think and write, then moves on by itself while you look at the answers"},
