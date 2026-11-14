@@ -802,7 +802,7 @@ function hostRecv(c,d){
    let color=PAL.includes(d.color)?d.color:PAL[0];if(st.players.some(x=>x.color==color))color=PAL.find(x=>!st.players.some(y=>y.color==x))||color;
    p={name,color,online:true,peer:c.peer};st.players.push(p);toast(T('joined',{n:name}))}
   else{p.online=true;p.peer=c.peer;toast(T('back',{n:name}))}
-  if(renamed)c.send({t:'renamed',name});conns[c.peer]=c;c.pname=name;clientSaves[name]=d.saves||{};SFX.join();bump();return}
+  if(renamed)c.send({t:'renamed',name});conns[c.peer]=c;c.pname=name;clientSaves[name]=d.saves||{};bump();return}
  if(!c.pname)return;
  if(d.t=='act')act(c.pname,d.a);
  else if(d.t=='react')relayReact(c.pname,d.e)}
@@ -906,7 +906,7 @@ function render(){
  const hb=$('#homebtn');if(hb){hb.onclick=()=>ask(T('leaveAsk'),T('home')).then(v=>v&&leave());hb.onkeydown=e=>{if(e.key=='Enter'||e.key==' '){e.preventDefault();hb.onclick()}}}
  v.bind&&v.bind();
  if(key!=lastPhaseKey){lastPhaseKey=key;
-  if(st.phase=='map'&&explorer()==me.name)SFX.turn();
+
   if(st.phase=='reveal'){SFX.reveal();const res=st.cur.result||{};if(Object.values(res).some(x=>x))setTimeout(()=>confetti(res[me.name]?46:22),700)}
   if(st.phase=='landed'){SFX.land();if(st.cur.kind=='named'||st.cur.kind=='ink')setTimeout(()=>sparkles($('.banner .serif')),250)}
   window.scrollTo({top:0,behavior:'smooth'})}}
