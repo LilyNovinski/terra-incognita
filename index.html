@@ -878,6 +878,68 @@ div.g2tone.sel{border-color:var(--acc)}
 
 
 /* @css-dark */
+/* noms en couleur de joueur : les teintes foncées (bleu, violet) passent sous 4.5:1 sur fond nuit, on les éclaircit sans changer la teinte */
+[data-theme=dark] :is(b,span)[style*="color"]:not([style*="background"]),[data-theme=dark] .rxp b{filter:brightness(1.32) saturate(.92)}
+/* zones verrouillées de la météo : visibles mais éteintes (à .22 elles disparaissaient sur fond nuit) */
+[data-theme=dark] .gbad>span.off{opacity:.38;filter:grayscale(1) brightness(1.5)}
+/* jauge de caractères : rail crème restait clair */
+[data-theme=dark] div.gauge>i:first-child,[data-theme=dark] .gauge i{background:#24425c}
+[data-theme=dark] .gauge.full span{color:#ff8f78}
+/* boutons radio des choix : le point orange de la sélection était écrasé, et le cercle vide invisible */
+[data-theme=dark] .opt::before{border-color:#4d7290}
+[data-theme=dark] .opt.sel::before{border-color:var(--acc);box-shadow:inset 0 0 0 5px var(--acc),0 0 0 3px #ff8a3d40}
+/* curseur d'échelle : la partie non remplie se confondait avec la carte */
+[data-theme=dark] input[type=range]::-webkit-slider-runnable-track{background:linear-gradient(90deg,var(--acc2),var(--acc)) 0/var(--p) 100% no-repeat,#2a4b67;box-shadow:inset 0 0 0 1.5px #3d6482,inset 0 2px 3px #0006}
+[data-theme=dark] input[type=range]::-moz-range-track{background:#2a4b67;box-shadow:inset 0 0 0 1.5px #3d6482}
+/* interrupteur (anonymat) éteint : rail lisible */
+[data-theme=dark] .gsw i{background:#0b1c2d;box-shadow:inset 0 0 0 1.5px #4d7290}
+[data-theme=dark] .gsw.on i{background:var(--acc);box-shadow:none}
+/* sablier en pause : l'arc restant (var(--edge2), presque noir) disparaissait */
+[data-theme=dark] .tmr.pz .tfg{stroke:#8aa3b8}
+/* brume de la carte : moins éblouissante la nuit, les zones restent bien distinctes */
+[data-theme=dark] .map .fog{filter:brightness(.82)}
+/* cœur « moment fort » */
+[data-theme=dark] .g2heart{background:linear-gradient(180deg,#1a344d,#142b41);color:var(--txt)}
+[data-theme=dark] .g2heart b{background:#4a1f33;color:#ff9cc0}
+[data-theme=dark] .g2heart.on{background:#3b1d2e;border-color:#ec4f93}
+[data-theme=dark] .g2n{color:#ff8fb6}
+[data-theme=dark] .g2top{border-color:#7a3b55}
+/* souvenirs au-dessus des drapeaux */
+[data-theme=dark] .g2mc{background:#182f45;border-color:var(--edge)}
+/* mots-souvenirs dans les listes */
+[data-theme=dark] .lmkw{color:#ffab6e}
+/* demandes d'arrivée et menu exclure / bannir */
+[data-theme=dark] .g2rq,[data-theme=dark] .g2km{background:#13293d;box-shadow:0 4px 0 var(--edge2),0 14px 34px #000a}
+[data-theme=dark] .g2km button[data-k="1"]:hover{border-color:#ff7d6c}
+/* ton des questions (vue des invités), 18+ et avertissement */
+[data-theme=dark] div.g2tone{background:#10263a}
+[data-theme=dark] .g2_18{background:#c94a2a}
+[data-theme=dark] .g2warn{color:#ff9a80}
+[data-theme=dark] .g2off{opacity:.55}
+/* carnet : noms et chiffres du fil (texte SVG brun foncé sur fond nuit) */
+[data-theme=dark] .card>svg text[fill="#3b2a1b"]{fill:var(--txt)}
+[data-theme=dark] .card>svg circle[stroke="#fff"]{stroke:#ece3cf}
+[data-theme=dark] .g2pill circle{fill:#132a3e}
+[data-theme=dark] .g2pill text{fill:var(--txt)}
+[data-theme=dark] .card>svg line[stroke="#b9a68a"],[data-theme=dark] .g2leg line[stroke="#b9a68a"]{stroke:#7f95a6}
+/* bandeau des effets de réaction */
+[data-theme=dark] #fxt{background:linear-gradient(180deg,#1a344d,#142b41);color:var(--txt);box-shadow:0 3px 0 #0006,0 10px 24px #000a}
+[data-theme=dark] #fxt.gold{color:#ffd76a;box-shadow:0 0 18px #ffd34d66,0 10px 24px #000a}
+/* barres de défilement : rail transparent, pouce arrondi turquoise doux qui s'éclaire au survol */
+html[data-theme=dark]{color-scheme:dark}
+@supports selector(::-webkit-scrollbar){
+ html[data-theme=dark],html[data-theme=dark] :not(.tabs){scrollbar-color:auto;scrollbar-width:auto}
+ html[data-theme=dark] ::-webkit-scrollbar{width:10px;height:8px;background:transparent}
+ html[data-theme=dark] ::-webkit-scrollbar-track,html[data-theme=dark] ::-webkit-scrollbar-corner{background:transparent}
+ html[data-theme=dark] ::-webkit-scrollbar-thumb{background:#3e8f98a6;border-radius:99px;border:2px solid transparent;background-clip:padding-box}
+ html[data-theme=dark] ::-webkit-scrollbar-thumb:hover{background:#6fd0d6;background-clip:padding-box}
+ html[data-theme=dark] ::-webkit-scrollbar-thumb:active{background:#9be6e8;background-clip:padding-box}
+ html[data-theme=dark] .tabs::-webkit-scrollbar{display:none}
+}
+@supports not selector(::-webkit-scrollbar){
+ html[data-theme=dark],html[data-theme=dark] *{scrollbar-color:#3e8f98 transparent}
+ html[data-theme=dark] body :hover{scrollbar-color:#6fd0d6 transparent}
+}
 
 
 
