@@ -50,7 +50,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Rubik:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sacramento&text=by&display=swap">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="i18n.js?v=20261114m"></script>
+<script src="i18n.js?v=20261114n"></script>
 <script src="decks.js?v=2"></script>
 <style>
 :root{--sea1:#bdeef0;--sea2:#69c9d3;--deep:#0e5866;--deep2:#0a4652;--paper:#fffaf0;--paper2:#fbf0d9;--edge:#ead6ae;--edge2:#d8bd88;--txt:#3b2a1b;--mut:#8a7660;--acc:#ff8a3d;--acc-d:#d9661f;--acc2:#ffb15c;--ink:#1d8e6c;--sur:#d9661f;--ear:#5869b5;--bad:#d64b3c;--gold:#f2b84b}
@@ -938,6 +938,138 @@ html[data-theme=dark]{color-scheme:dark}
 
 
 /* @css-game3 */
+/* fin en étapes */
+.g3steps{display:flex;flex-direction:column;align-items:center;gap:6px;margin:4px 0 -6px}
+.g3sx{font:800 11px Nunito,sans-serif;letter-spacing:.6px;text-transform:uppercase;color:var(--deep);background:#fffaf0cc;padding:2px 10px;border-radius:99px}
+.g3sl{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center}
+.g3sl span{font:700 13px Nunito,sans-serif;padding:4px 11px;border-radius:99px;background:#fffaf0aa;color:var(--mut);border:2px solid transparent;white-space:nowrap}
+.g3sl span.done{color:var(--ink);background:#effaf5}
+.g3sl span.on{color:#fff;background:linear-gradient(180deg,var(--acc2),var(--acc));border-color:var(--acc-d);box-shadow:0 2px 0 var(--acc-d)}
+.g3sl i{width:14px;height:2px;border-radius:2px;background:var(--edge2);opacity:.7}
+/* événements */
+.g3ev{display:flex;align-items:center;gap:8px;margin-top:10px;padding:7px 12px;border-radius:14px;background:#fff1db;border:1.5px dashed #f3c27e;font:700 13px Nunito,sans-serif;color:var(--txt);animation:g3wob .7s cubic-bezier(.3,1.6,.5,1) both}
+.g3ev .g3evi{font-size:20px;line-height:1;flex:none}
+.g3ev-whirl,.g3evc.g3ev-whirl{background:#e7f3ff;border-color:#9cc7f0}
+.g3ev-storm,.g3evc.g3ev-storm{background:#ece9fb;border-color:#b5a8e6}
+.g3ev-shell,.g3evc.g3ev-shell{background:#fdeef3;border-color:#f0b2c6}
+.g3ev-rainbow,.g3evc.g3ev-rainbow{background:linear-gradient(90deg,#ffeede,#fff8d9,#e6f7ea,#e5f1ff,#f1e8ff);border-color:#e3c98f}
+.g3ev-past{background:#f5efe3;border-color:#d8bd88}
+@keyframes g3wob{0%{opacity:0;transform:scale(.85) rotate(-2deg)}60%{transform:scale(1.03) rotate(1deg)}}
+.g3evc{display:flex;align-items:center;gap:14px;border-style:dashed;animation:g3wob .7s cubic-bezier(.3,1.6,.5,1) both}
+.g3evc .g3evi{font-size:40px;line-height:1;flex:none;animation:g3sway 2.6s ease-in-out infinite}
+.g3evc p{font:600 16px Nunito,sans-serif}
+@keyframes g3sway{50%{transform:rotate(-10deg) scale(1.08)}}
+/* ça a changé ? */
+.g3pastc{display:flex;align-items:center;gap:10px;margin-top:12px;padding:10px 12px;border-radius:16px;background:#f7f1e6;border:2px solid var(--edge)}
+.card>.g3pastc:first-child{margin-top:0}
+.g3pastc>div{flex:1;min-width:0;overflow-wrap:anywhere}
+.g3pi{font-size:24px;flex:none}
+.g3tag{flex:none;font:800 12px Nunito,sans-serif;padding:3px 10px;border-radius:99px;animation:g3wob .6s .6s both}
+.g3tag.same{background:#dff5ec;color:var(--ink)}.g3tag.moved{background:#ffe6d2;color:var(--acc-d)}
+/* miroir : les deux réponses côte à côte */
+.g3mir{margin-top:12px;padding:12px;border-radius:18px;background:#f4fbfa;border:2px solid #bfe5df}
+.g3mrow{display:flex;align-items:stretch;gap:8px;margin-top:6px}
+.g3mrow>div{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 8px;border-radius:14px;background:#fff;border:2px solid var(--edge);text-align:center;overflow-wrap:anywhere;animation:g3wob .6s both}
+.g3mrow>div:last-child{animation-delay:.25s}
+.g3mrow b{font:600 16px Fredoka,Nunito,sans-serif}
+.g3mvs{align-self:center;font-size:22px;animation:g3wob .6s .5s both}
+.g3mv{margin-top:8px;text-align:center;font:700 15px Fredoka,Nunito,sans-serif;color:var(--deep)}
+.g3mv-same{background:#e8f8f1;border-color:#8fd8bd}.g3mv-same .g3mv{color:var(--ink)}
+.g3mv-diff .g3mv{color:var(--ear)}
+/* notes de voyage */
+.g3note{border-color:#f0d49a;background:linear-gradient(180deg,#fffaf0,#fff6e3)}
+.g3nh{display:flex;align-items:flex-start;gap:10px;font-size:15px}
+.g3nh>span:not(.g3ni){flex:1;min-width:0}
+.g3ni{font-size:24px;line-height:1.1;flex:none}
+.g3note input{margin-top:10px}
+.g3sug{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.g3sug button{padding:5px 11px;border-radius:99px;font:700 13px Nunito,sans-serif;box-shadow:0 2px 0 var(--edge2);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.g3sug button::before{content:"+ ";color:var(--acc-d)}
+.g3sug button.used{opacity:.5}
+.g3row{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
+.g3row button{padding:9px 14px;font-size:15px}
+.g3wr{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.g3wr .chip{padding:3px 10px;font-size:13px}
+.g3pen{display:inline-block;animation:g3wr 1s ease-in-out infinite}
+@keyframes g3wr{50%{transform:translate(2px,-2px) rotate(-12deg)}}
+.g3pinned{position:relative;margin:12px 4px 0;padding:14px 16px 12px 40px;border-radius:4px 4px 14px 4px;background:#fff3b8;color:#3b2a1b;font:600 16px Nunito,sans-serif;box-shadow:0 6px 14px #8a6a1e26;transform:rotate(-1.2deg);animation:g3pinIn .55s cubic-bezier(.3,1.6,.5,1) both;overflow-wrap:anywhere}
+.g3tack{position:absolute;inset-inline-start:10px;top:8px;font-size:20px;animation:g3tack .5s .25s cubic-bezier(.3,1.8,.5,1) both}
+@keyframes g3pinIn{from{opacity:0;transform:translateY(-14px) rotate(4deg) scale(.9)}}
+@keyframes g3tack{from{transform:translateY(-16px) scale(1.6);opacity:0}}
+.g3cnt{flex:none;min-width:26px;height:26px;display:grid;place-items:center;border-radius:99px;background:var(--acc);color:#fff;font:800 13px Nunito;animation:g2pop .45s}
+.g3sub{border-style:dashed}
+.g3lnt{display:inline-block;margin-inline-start:4px;padding:1px 8px;border-radius:4px 4px 10px 4px;background:#fff3b8;color:#5a4416;font-size:12px;font-weight:700;transform:rotate(-1deg)}
+/* qui de nous… */
+.g3who{text-align:center;border-color:#c9d5f3}
+.g3wh{font:800 12px Nunito,sans-serif;letter-spacing:.5px;text-transform:uppercase;color:var(--ear)}
+.g3wq{margin-top:4px;font:600 21px/1.3 Fredoka,Nunito,sans-serif;color:var(--txt)}
+.g3wb{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:12px}
+.g3wb button{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:99px}
+.g3wb button.pop{animation:g2pop .4s}
+.g3wr1{margin-top:12px;font:600 19px Fredoka,Nunito,sans-serif;animation:g3wob .6s both}
+.g3wr1.same{color:var(--ink)}
+.g3wv{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px}
+.g3wv .chip{padding:3px 10px;font-size:13px}
+/* fin : par personne */
+.g3pp{margin-top:14px;padding:12px;border-radius:18px;background:#fff7ea;border:2px solid var(--edge)}
+.g3pph{font:600 17px Fredoka,Nunito,sans-serif;display:flex;align-items:center;gap:8px}
+.g3pp label{margin-top:10px}
+.g3mine li{padding:6px 0}
+.g3nl{display:block;margin-top:5px;padding:5px 10px;border-radius:4px 4px 10px 4px;background:#fff3b8;color:#3b2a1b;font-weight:600;box-shadow:0 2px 5px #8a6a1e1f;width:fit-content;max-width:100%}
+.g3nl+.g3nl{margin-top:4px}
+.g3nl .dot{width:9px;height:9px;margin-inline-end:5px;vertical-align:0}
+/* duo : complicité */
+.g3duo{border-color:#f3b6c9;background:linear-gradient(180deg,#fff5f8,#fffaf0)}
+.g3dh{display:flex;align-items:center;gap:12px}
+.g3dbig{font-size:34px;animation:g3sway 3s ease-in-out infinite}
+.g3dl{font-size:24px;color:#c2335e}
+.g3dp{font:700 26px Fredoka,Nunito;color:#c2335e}
+.g3dbar{display:flex;gap:5px;margin-top:10px}
+.g3dbar i{flex:1;height:8px;border-radius:99px;background:#f6dbe4}
+.g3dbar i.on{background:linear-gradient(90deg,#ff9ab8,#ec4f93)}
+.g3rit{margin-top:12px;padding:10px 12px;border-radius:14px;background:#fff;border:1.5px dashed #f3b6c9;font:700 14px Nunito,sans-serif}
+#g3cx{position:relative;display:flex;align-items:center;gap:8px;margin:-4px 4px 10px;padding:4px 12px;border-radius:99px;background:#fff5f8cc;font:700 12px Nunito,sans-serif;color:#a7284f}
+#g3cx .g3ci{font-size:15px}
+#g3cx .g3cn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#g3cx .g3cb{flex:1;min-width:40px;height:6px;border-radius:99px;background:#f6dbe4;overflow:hidden}
+#g3cx .g3cb i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#ff9ab8,#ec4f93);transition:width .8s cubic-bezier(.3,1.4,.5,1)}
+#g3cx.up .g3ci{animation:g2pop .6s}
+.g3plus{position:absolute;inset-inline-end:10px;top:-4px;font:800 14px Fredoka,Nunito;color:#ec4f93;pointer-events:none;animation:g3up 1.6s ease-out forwards}
+@keyframes g3up{from{opacity:0;transform:translateY(6px) scale(.7)}20%{opacity:1;transform:none}to{opacity:0;transform:translateY(-22px)}}
+.g3fresh{text-align:center;margin:14px 0 -6px;font:700 13px Nunito,sans-serif;color:var(--deep)}
+.g3q,.g3q .g3tack,.g3q .g3mrow>div,.g3q .g3mvs,.g3q .g3tag{animation:none!important}
+@media (prefers-reduced-motion:reduce){.g3ev,.g3evc,.g3evc .g3evi,.g3pinned,.g3tack,.g3mrow>div,.g3mvs,.g3tag,.g3wr1,.g3dbig,.g3pen{animation:none!important}}
+@media (max-width:480px){.g3wq{font-size:19px}.g3evc p{font-size:15px}.g3evc .g3evi{font-size:32px}.g3mrow b{font-size:15px}.g3sl span{font-size:12px;padding:3px 9px}.g3sl i{width:8px}}
+/* nuit */
+[data-theme=dark] .g3sx{background:#0f2335cc;color:#8fd6dc}
+[data-theme=dark] .g3sl span{background:#0f2335aa;color:#93a8b6}
+[data-theme=dark] .g3sl span.done{background:#11443a;color:#72e2bd}
+[data-theme=dark] .g3sl span.on{color:#fff;background:linear-gradient(180deg,var(--acc2),var(--acc))}
+[data-theme=dark] .g3ev{background:#2a2418;border-color:#8a6a35;color:var(--txt)}
+[data-theme=dark] .g3ev-whirl,[data-theme=dark] .g3evc.g3ev-whirl{background:#132f4a;border-color:#3d6f9c}
+[data-theme=dark] .g3ev-storm,[data-theme=dark] .g3evc.g3ev-storm{background:#221f45;border-color:#5b52a0}
+[data-theme=dark] .g3ev-shell,[data-theme=dark] .g3evc.g3ev-shell{background:#3a1f2b;border-color:#94506a}
+[data-theme=dark] .g3ev-rainbow,[data-theme=dark] .g3evc.g3ev-rainbow{background:linear-gradient(90deg,#3a2a20,#33301a,#173528,#162c45,#2a2045);border-color:#7a6a45}
+[data-theme=dark] .g3ev-past,[data-theme=dark] .g3pastc{background:#1d2a33;border-color:#3a4e5e}
+[data-theme=dark] .g3tag.same{background:#11443a;color:#72e2bd}[data-theme=dark] .g3tag.moved{background:#4a2b18;color:#ffb37f}
+[data-theme=dark] .g3mir{background:#0f2b33;border-color:#24555c}
+[data-theme=dark] .g3mrow>div{background:#0f2538;border-color:var(--edge)}
+[data-theme=dark] .g3mv-same{background:#0f3a33;border-color:#2f8f73}
+[data-theme=dark] .g3mv,[data-theme=dark] .g3fresh{color:#8fd6dc}[data-theme=dark] .g3mv-same .g3mv{color:#72e2bd}[data-theme=dark] .g3mv-diff .g3mv{color:#b3beff}
+[data-theme=dark] .g3note{background:linear-gradient(180deg,#1c2f3c,#192a36);border-color:#5a4a2a}
+[data-theme=dark] .g3pinned,[data-theme=dark] .g3nl{background:#f3df8a;color:#2a1f0b;box-shadow:0 6px 14px #0007}
+[data-theme=dark] .g3lnt{background:#4a3f17;color:#ffe38a}
+[data-theme=dark] .g3who{border-color:#34477a}
+[data-theme=dark] .g3wh{color:#b3beff}
+[data-theme=dark] .g3wr1.same{color:#72e2bd}
+[data-theme=dark] .g3pp{background:#0f2335;border-color:var(--edge)}
+[data-theme=dark] .g3duo{background:linear-gradient(180deg,#2a1d2c,#152a3e);border-color:#6a3550}
+[data-theme=dark] .g3dl,[data-theme=dark] .g3dp{color:#ff9ab8}
+[data-theme=dark] .g3dbar i,[data-theme=dark] #g3cx .g3cb{background:#3a2433}
+[data-theme=dark] .g3dbar i.on{background:linear-gradient(90deg,#ff9ab8,#ec4f93)}
+[data-theme=dark] .g3rit{background:#132a3e;border-color:#6a3550}
+[data-theme=dark] #g3cx{background:#2a1d2ccc;color:#ffb3cb}
+[data-theme=dark] .g3plus{color:#ff9ab8}
 
 
 
@@ -1312,7 +1444,7 @@ function regionBadge(r,size=48){
 function lmList(list){
  const L=list.slice().sort((a,b)=>ORDER.indexOf(a.r)-ORDER.indexOf(b.r));
  if(!L.length)return `<p class="mut">${T('fog')}</p>`;
- return L.map(l=>`<div class="lm ${isOld(l)?'fade':''}"><span class="tag ${KIND[l.kind][0]}">${mini(l.kind)}${KN(l.kind)}</span><span><span class="mut">${RN(l.r)}</span>${l.kind!='ear'&&l.kind!='door'&&lmName(l)?' · '+esc(lmName(l)):''}${l.kw?` <span class="lmkw">📌 ${esc(l.kw)}</span>`:''}${isOld(l)?` <span class="mut">· ${T('recheck')}</span>`:''}</span></div>`).join('')}
+ return L.map(l=>`<div class="lm ${isOld(l)?'fade':''}"><span class="tag ${KIND[l.kind][0]}">${mini(l.kind)}${KN(l.kind)}</span><span><span class="mut">${RN(l.r)}</span>${l.kind!='ear'&&l.kind!='door'&&lmName(l)?' · '+esc(lmName(l)):''}${l.kw?` <span class="lmkw">📌 ${esc(l.kw)}</span>`:''}${l.nt?` <span class="g3lnt">📝 ${esc(l.nt)}</span>`:''}${isOld(l)?` <span class="mut">· ${T('recheck')}</span>`:''}</span></div>`).join('')}
 
 /* ---------- Petites animations ---------- */
 function waveText(s,o){return [...s].map((ch,i)=>`<span style="animation-delay:${(o+i)*.05+.15}s">${ch}</span>`).join('')}
@@ -2065,7 +2197,7 @@ function land(mode){const c=st.cur,now=Date.now(),gs=others(c.terr);c.kind=mode;
  else if(mode=='ear')gs.forEach(n=>mapOf(n,c.terr,1).push(c.q.custom?{r:c.r,kind:'ear',name:c.q.q,kw:c.kw||'',date:now}:{r:c.r,kind:'ear',ref:{id:c.q.id},kw:c.kw||'',date:now}));
  else{const rb=gByName(c);for(const n in rb.res)if(P(n))mapOf(n,c.terr,1).push(rb.res[n]?{r:c.r,kind:'ink',...inkMark({...c,guesses:rb.g},n),kw:c.kw||'',date:now}:{r:c.r,kind:'sur',name:c.placeName,kw:c.kw||'',date:now})}
  if(!c.q.custom){st.used[c.terr]=st.used[c.terr]||[];if(!st.used[c.terr].includes(c.q.id))st.used[c.terr].push(c.q.id)}
- gHist(c);st.phase='landed'}
+ gHist(c);g3Land(c);st.phase='landed'}
 function loadBestSave(){const k=saveKey(st.order);const cands=[LS.get(k,null)];for(const n in clientSaves)cands.push(clientSaves[n][k]);
  const best=cands.filter(x=>x&&x.maps).sort((a,b)=>b.updatedAt-a.updatedAt)[0];
  /* game2 : chaque partie repart de cartes vierges ; les anciennes restent dans le carnet (log), les questions déjà vues sont évitées */
@@ -2081,7 +2213,7 @@ function act(from,a){const s=st;if(!P(from))return;g2Resp(from,a);
  case 'pick':{if(s.phase!='map'||from!=explorer())return;const t=a.terr;if(!s.order.includes(t)||t==from||!R[a.r]||(s.mode=='por'&&t!=pSub()))return;
   if(!openSet(from,t)[a.r])return;let q,type=R[a.r].t;
   if(a.bottle&&s.bottles[from]>0){q={id:'b'+Date.now(),q:unQ(tidy(a.bottle).slice(0,200)),custom:from,...(s.anon?{anon:1}:{})};type='libre';s.bottles[from]--}else q=pickQ(a.r,t);
-  s.lp=from;s.cur={id:'c'+Date.now(),explorer:from,terr:t,r:a.r,q,type,answer:null,guesses:{},result:null,placeName:'',answered:false,sent:[],wind:WIND};s.phase='question';break}
+  s.lp=from;s.cur={id:'c'+Date.now(),explorer:from,terr:t,r:a.r,q,type,answer:null,guesses:{},result:null,placeName:'',answered:false,sent:[],wind:WIND};g3Pick(s,from,t,!!q.custom);s.phase='question';break}
  case 'answer':if(s.phase!='question'||from!=s.cur.terr||!['choix','echelle'].includes(s.cur.type)||!gValid(s.cur,a.v))return;gSec(s.cur).ans=a.v;s.cur.answered=true;checkAll();break;
  case 'guess':if(s.phase!='question'||from==s.cur.terr||s.cur.type=='ecoute')return;gGuess(s.cur,from,a);break;
  case 'judge':if(s.phase!='judge'||from!=s.cur.terr)return;gJudge(s.cur,a);break;
@@ -2108,6 +2240,7 @@ function act(from,a){const s=st;if(!P(from))return;g2Resp(from,a);
  case 'recapDone':if(from!=s.host||s.phase!='recap')return;s.phase='carnet';break;
  case 'rematch':if(from!=s.host||!['end','recap','carnet'].includes(s.phase))return;gReset(s);s.phase='lobby';s.players=s.players.filter(p=>p.online);
   if(a.same){act(from,{t:'start'});if(st.phase=='lobby'){tmSync();bump()}return}break;
+ case 'note':case 'who':if(!g3Act(from,a))return;break;
  default:return}
  tmSync();bump()}
 
@@ -2157,7 +2290,7 @@ function gFinish(s){if(['recap','carnet'].includes(s.phase))return;let fl=s.flag
  if(s.anon){fl={};const F=SECF.gid===s.gid?SECF.f:{};for(const [to,t] of shuf(Object.values(F).flatMap(o=>Object.entries(o))))fl[gSlot()]={[to]:t}}
  s.log.push({date:Date.now(),meteo:s.meteo,players:[...s.order],flags:fl,hist:s.hist||[],mode:MODE(),anon:!!s.anon,gid:s.gid,tone:s.tone||0,maps:JSON.parse(JSON.stringify(s.maps||{}))});
  s.log.slice(0,-5).forEach(e=>delete e.maps);s.cur=null;s.phase='recap'}
-function gStartX(s){if(s.mode=='mir'&&s.order.length!=2)s.mode='exp';if(s.order.length<3)s.anon=false;
+function gStartX(s){if(!s.mode&&s.order.length==2)s.mode='mir';if(s.mode=='mir'&&s.order.length!=2)s.mode='exp';if(s.order.length<3)s.anon=false;
  s.L=MODE()=='esc'?2:s.length;s.hist=[];s.td=[];s.gid=Date.now().toString(36);s.tt=Date.now();s.tTurn=0;s.lp=null;s.pf=null;s.dl=null;s.paused=null;
  SEC={cid:null};SECF={gid:s.gid,f:{}}}
 function gReset(s){s.turn=0;s.total=0;s.cur=null;s.flags={};s.bottles={};s.hist=[];s.td=[];s.dl=null;s.paused=null;s.pf=null;s.lp=null;SEC={cid:null};SECF={gid:null,f:{}}}
@@ -2169,10 +2302,10 @@ function gNextEx(){const o=st.order;if(!o.length)return null;
  return o[st.turn%o.length]}
 function gMirror(s){const c=s.cur;if(s.mode!='mir'||!c||c.mir||c.kind=='door'||s.turn+1>=s.total)return false;
  if(!s.order.includes(c.explorer)||!s.order.includes(c.terr)||!openSet(c.terr,c.explorer)[c.r])return false;
- s.turn++;s.cur={id:'c'+Date.now(),explorer:c.terr,terr:c.explorer,r:c.r,q:c.q.for&&c.q.for!=gOf(c.explorer)?pickQ(c.r,c.explorer):c.q,type:c.type,answer:null,guesses:{},result:null,placeName:'',answered:false,sent:[],mir:true};s.phase='question';return true}
+ s.turn++;s.cur={id:'c'+Date.now(),explorer:c.terr,terr:c.explorer,r:c.r,q:c.q.for&&c.q.for!=gOf(c.explorer)?pickQ(c.r,c.explorer):c.q,type:c.type,answer:null,guesses:{},result:null,placeName:'',answered:false,sent:[],mir:true,m1:{t:c.terr,a:c.answer??null}};s.phase='question';return true}
 // Timer : durées de base (Normal), multipliées par le facteur
 /* phases où l'on choisit / écrit : sablier large et discret ; phases où l'on regarde : sablier normal */
-const TB={map:150,choix:120,echelle:120,libre:240,ecoute:180,judge:150,reveal:20,name:120,landed:8,end:300,pfiche:20},TCALM={map:1,choix:1,echelle:1,libre:1,ecoute:1,judge:1,name:1,end:1};
+const TB={map:150,choix:120,echelle:120,libre:240,ecoute:180,judge:150,reveal:20,name:120,landed:40,end:300,pfiche:20},TCALM={map:1,choix:1,echelle:1,libre:1,ecoute:1,judge:1,name:1,end:1};
 const gKey=s=>s.phase+'|'+(s.cur&&s.cur.id)+'|'+s.turn+'|'+(s.cur&&s.cur.grace||0);
 function tmDur(){const s=st,f=TF();let k=s.phase,soft=false;
  if(k=='pfiche')return {d:20,soft:false};if(!f)return null;
@@ -2242,7 +2375,7 @@ function g2Resp(from,a){const s=st,c=s.cur,pm=s.pm;if(!c||!pm||!pm.t0||!P(from))
  const p=pm.pp[from]=pm.pp[from]||{},x=p[T]=p[T]||[0,0];x[0]+=d;x[1]++;if(len>2){const ch=p.ch=p.ch||[0,0];ch[0]+=len;ch[1]+=d}}
 /* a priori (Normal) puis moyenne pondérée qui converge vers les mesures */
 const G2K=2;
-function g2Prior(T,k){return ({map:28,choix:35+3*k,echelle:35+3*k,libre:70+8*k,ecoute:115,judge:30+5*k,reveal:20+2*k,name:25,landed:12,pfiche:20}[T]||20)*(EF[TF()]??1)}
+function g2Prior(T,k){return ({map:28,choix:35+3*k,echelle:35+3*k,libre:70+8*k,ecoute:115,judge:30+5*k,reveal:20+2*k,name:25,landed:22,pfiche:20}[T]||20)*(EF[TF()]??1)}
 function g2Model(){const s=st,pm=s.pm||{ph:{},pp:{},nm:[0,0]},on=s.order.filter(n=>P(n)&&P(n).online),k=Math.max(1,on.length-1),f=TF();
  const base=T=>{const a=pm.ph[T]||[0,0],p=g2Prior(T,k);return (p*G2K+a[0])/(G2K+a[1])};
  const pers=(n,T)=>{const a=(pm.pp[n]||{})[T];return a&&a[1]?(base(T)*G2K+a[0])/(G2K+a[1]):null};
@@ -2450,7 +2583,7 @@ function vLobby(){
 /* === game : salon === */
 const GMI={exp:'⛵',esc:'⚡',por:'🎯',mir:'🪞'};
 function gLobbyBody(host,my,on){
- const onl=st.players.filter(p=>p.online),md=st.mode=='mir'&&on!=2?'exp':MODE(),isEsc=md=='esc',mt=Math.min(2,...onl.map(p=>st.votes[p.name]??1));
+ const onl=st.players.filter(p=>p.online),md=st.mode=='mir'&&on!=2?'exp':!st.mode&&on==2?'mir':MODE(),isEsc=md=='esc',mt=Math.min(2,...onl.map(p=>st.votes[p.name]??1));
  const tf=st.timer??1,an=!!st.anon&&on>=3,L=isEsc?2:st.length,est=o=>gEst({n:on,mode:md,meteo:mt,len:st.length,tf,...o}).min,E=est();
  const by=host?'':`<p class="gby">${T('chosenBy',{n:B(st.host)})}</p>`;
  const tile=m=>{const dis=m=='mir'&&on!=2,tag=host?'button':'div';return `<${tag} class="gtile ${md==m?'sel':''}" ${host?`data-mode="${m}" ${dis?'disabled':''}`:''}><span class="gi">${GMI[m]}</span><span class="gt"><b>${T('mo_'+m)}</b><span class="mut">${T(dis?'mirOnly':'mo_'+m+'D')}</span></span><span class="gmin">≈ ${est({mode:m})} min</span></${tag}>`};
@@ -2469,6 +2602,7 @@ function gLobbyBody(host,my,on){
   ${on>=3?`<h3 class="gh">🎭 ${T('anonT')}</h3>${host?`<button class="gsw ${an?'on':''}" id="anon" role="switch" aria-checked="${an}"><i></i><span>${T('anonD')}</span></button>`:`<p class="gval">${an?'✓ '+T('anonD'):T('anonOff')}</p>`}`:''}
   ${by}</div>
  ${g2ToneCard(host)}
+ ${g3FreshLine()}
  <p class="grecap">${[GMI[md]+' '+T('mo_'+md),MN(mt),T('tm'+TIM.indexOf(isEsc?.7:tf)),T('people',{n:on})].join(' · ')}${an?' · 🎭':''}${st.tone?' · '+G2TI[st.tone]+' '+T('tone'+st.tone):''}${host?'':` · ⏱ ≈ ${E} min`}</p>
  ${host?`<button class="pri wide" id="start" ${on<2?'disabled':''}>${T('startEst',{t:E})}</button>`:''}`}
 
@@ -2514,7 +2648,7 @@ function vMap(){
 
 /* ---------- Question ---------- */
 function qHead(c){const q=LQ(c.q,c.terr);return `<div class="card sheet"><div class="rhead">${regionBadge(c.r)}<div><p class="mut">${T('exploresIsland',{a:BW(c.explorer),b:BW(c.terr)})}</p><h3>${RN(c.r)} <span class="mut">· ${RT(c.r,1)}</span></h3></div></div>
- ${c.wind||c.mir?`<p class="gnote">${T(c.mir?'mirLine':'wind')}</p>`:''}${c.q.custom?`<p class="mut" style="margin-top:12px">${c.q.anon?T('bottleAnon'):T('bottleFrom',{n:esc(c.q.custom)})}</p>`:''}<p class="q" style="margin-top:12px">${fy(q.q,c.terr)}</p></div>`}
+ ${c.wind||c.mir?`<p class="gnote">${T(c.mir?'mirLine':'wind')}</p>`:''}${g3QNote(c)}${c.q.custom?`<p class="mut" style="margin-top:12px">${c.q.anon?T('bottleAnon'):T('bottleFrom',{n:esc(c.q.custom)})}</p>`:''}<p class="q" style="margin-top:12px">${fy(q.q,c.terr)}</p></div>`}
 function choiceInput(c,key){
  const sel=drafts[key],q=LQ(c.q,c.terr);
  if(c.type=='choix')return q.o.map((o,i)=>`<button class="opt ${sel==i?'sel':''}" data-opt="${i}">${esc(o)}</button>`).join('');
@@ -2573,7 +2707,7 @@ function vReveal(){const c=st.cur,dv=driver(c),can=me.name==dv,q=LQ(c.q,c.terr);
   hintBtn:can?`<button class="pri" id="go2" style="padding:8px 14px">${T('cont')}</button>`:'',
   html:qHead(c)+`<div class="card">${c.type!='libre'?`<p class="mut c">${T('answered',{n:esc(c.terr)})}</p><div class="big-ans flip"><div>${show(c.answer)}</div></div>`:''}
   <div class="flip">${Object.entries(c.result).map(([n,ok],i)=>`<div class="guess ${ok?'ok':'no'}" style="animation-delay:${.25+i*.25}s">${gWho(c,n)}${show(c.guesses[n])}</div><span class="verdict" style="color:${ok?'var(--ink)':'var(--sur)'}">${T(ok?'spotOn':'surprise')}</span></div>`).join('')}</div>
-  <p class="mut c" style="margin-top:10px">${anyWrong?T('surpLine',{n:esc(c.terr)}):T('allRight')}</p>${c.unveil?`<p class="gnote c">🎭 ${T('g2Unveil')}</p>`:''}${g2HeartBtn(c)}${reactBar()}</div>`,
+  <p class="mut c" style="margin-top:10px">${anyWrong?T('surpLine',{n:esc(c.terr)}):T('allRight')}</p>${c.unveil?`<p class="gnote c">🎭 ${T('g2Unveil')}</p>`:''}${g3RevealExtra(c)}${g2HeartBtn(c)}${reactBar()}</div>`,
   bind(){$('#go2')&&($('#go2').onclick=()=>send({t:'toName'}))}}}
 
 /* ---------- Nommer ---------- */
@@ -2591,22 +2725,25 @@ function vLanded(){const c=st.cur,dv=driver(c),can=me.name==dv,iAm=c.terr!=me.na
  const sub={door:()=>T('sDoor',{n:tn}),ear:()=>T('sEar'),ink:()=>T('sInk',{n:tn}),named:()=>T('sNamed',{p:esc(c.placeName||T('noname')),n:tn})}[c.kind]();
  const colr={door:'#aaa',ear:'var(--ear)',ink:'var(--ink)',named:'var(--sur)'}[c.kind];
  return {mine:can,hint:can?T('nextHint'):T('nextBy',{n:B(dv)}),hintBtn:can?`<button class="pri" id="go2" style="padding:8px 14px">${T('cont')}</button>`:'',
+  ...g3LandedHint(c,can),
   html:`<div class="banner sheet"><p class="serif" style="color:${colr}">${title}</p><p class="mut" style="margin-top:8px">${sub}</p></div>
+  ${g3LandedCards(c)}
   ${iAm?`<div class="card"><p class="mut" style="margin-bottom:8px">${T('yourMapOf',{n:tn})}</p><div class="map">${svgMap(me.name,c.terr)}</div></div>`:`<div class="card c"><p class="mut">${T('yourIsl')}</p></div>`}<div class="c">${g2HeartBtn(c)}</div>${reactBar()}`,
-  bind(){$('#go2')&&($('#go2').onclick=()=>send({t:'next'}))}}}
+  bind(){$('#go2')&&($('#go2').onclick=()=>send({t:'next'}));g3BindLanded(c)}}}
 
 /* ---------- Échange des cartes ---------- */
 function vEnd(){const mine=st.flags[me.name],os=others(me.name);if(!os.includes(ui.endTab))ui.endTab=os[0];const o=ui.endTab;
  const waiting=st.order.filter(n=>!st.flags[n]&&P(n).online);
  if(!st.order.includes(me.name))return {mine:false,hint:T('g2Spect'),html:`<div class="banner"><p class="serif">${T('exchange')}</p><p class="mut" style="margin-top:6px">${T('g2Spect')}</p></div>`};
  return {mine:!mine,hint:mine?T('waitFlags',{list:waiting.map(esc).join(', ')}):T('endHint'),
-  html:`<div class="banner"><p class="serif">${T('exchange')}</p><p class="mut" style="margin-top:6px">${T('exchangeD')}</p></div>
-  <div class="tabs" style="justify-content:center">${os.map(n=>`<button data-et="${esc(n)}" class="${o==n?'sel':''}">${DOT(n)}${T('seenBy',{n:esc(n)})}</button>`).join('')}</div>
-  <div class="card g2end"><div class="map">${svgMap(o,me.name)}</div><div style="margin-top:10px">${lmList(mapOf(o,me.name))}</div></div>
+  html:`${g3Steps('end')}<div class="banner"><p class="serif">${T('exchange')}</p><p class="mut" style="margin-top:6px">${T(mine?'exchangeD':'g3EndD')}</p></div>
   ${mine?`<div class="card c"><p class="serif" style="font-size:20px">${T('flagsDone')}</p></div>`:
-  `<div class="card"><h3>${T('plant')}</h3><p class="mut" style="margin-top:4px">${T('plantD')}</p>
-  ${os.map(n=>`<label>${DOT(n)} ${esc(n)}</label>${g2Mem(n)}<textarea data-d="flag:${esc(n)}" maxlength="240" style="min-height:64px"></textarea><p class="g2lock">${T(st.anon?'g2LockA':'g2Lock',{n:NS(n)})}</p>`).join('')}
-  <p class="err"></p><button class="pri wide" id="ok">${T('plantBtn')}</button></div>`}`,
+  `<div class="card"><h3>${T('plant')}</h3>
+  ${os.map(n=>`<div class="g3pp"><p class="g3pph">${DOT(n)} <b>${esc(n)}</b></p>${g3Mine(n)}<label>${T('g3FlagL',{n:esc(n)})}</label><textarea data-d="flag:${esc(n)}" maxlength="240" style="min-height:64px" placeholder="${esc(T('plantD'))}"></textarea><p class="g2lock">${T(st.anon?'g2LockA':'g2Lock',{n:NS(n)})}</p></div>`).join('')}
+  <p class="err"></p><button class="pri wide" id="ok">${T('plantBtn')}</button></div>`}
+  <h3 class="gh c">${T('g3MyIsl')}</h3>
+  <div class="tabs" style="justify-content:center">${os.map(n=>`<button data-et="${esc(n)}" class="${o==n?'sel':''}">${DOT(n)}${T('seenBy',{n:esc(n)})}</button>`).join('')}</div>
+  <div class="card g2end"><div class="map">${svgMap(o,me.name)}</div><div style="margin-top:10px">${lmList(mapOf(o,me.name))}</div></div>`,
   bind(){$$('[data-et]').forEach(b=>b.onclick=()=>{ui.endTab=b.dataset.et;render()});
    $('#ok')&&($('#ok').onclick=()=>{const v={};for(const n of os){const x=(drafts['flag:'+n]||'').trim();if(!x)return err(T('flagEach'));v[n]=x.slice(0,240)}send({t:'flags',v})})}}}
 
@@ -2626,7 +2763,7 @@ function constellation(){const n=st.order.length,W=400,H=n>2?260:150,cx=200,cy=H
 const G2TW=[3,8,14],G2TC=['#f6b26b','#ff8a3d','#e2603e'],g2Tier=w=>w>=6?2:w>=3?1:0;
 function vCarnet(){const host=me.name==st.host;
  return {mine:host,hint:host?T('againHint'):T('bye',{n:esc(st.host)}),
-  html:`<div class="banner"><p class="serif">${T('logbook')}</p><p class="mut" style="margin-top:6px">${T('expCount',{c:st.log.length})}</p></div>
+  html:`${g3Steps('carnet')}<div class="banner"><p class="serif">${T('logbook')}</p><p class="mut" style="margin-top:6px">${T('expCount',{c:st.log.length})}</p></div>
   <div class="card"><p class="mut c">${T('thread')}</p>${constellation()}</div>
   ${st.log.slice().reverse().map((e,i)=>`<div class="card flat"><p class="mut">${T('expLine',{i:st.log.length-i,d:new Date(e.date).toLocaleDateString(D().loc,{day:'numeric',month:'long',year:'numeric'}),m:MN(e.meteo)})}</p>
    ${Object.entries(e.flags).flatMap(([from,to])=>Object.entries(to).filter(([n])=>n==me.name||from==me.name).map(([n,txt])=>`<p style="margin-top:10px;font-size:14px"><span class="mut">${e.anon?'✉️':`<span style="color:${col(from)}">${esc(from)}</span>`} →<span style="color:${col(n)}">${esc(n)}</span></span><br>${QQ(esc(txt))}</p>`)).join('')}${e.hist&&e.hist.length?`<button class="ghost" data-rev="${st.log.length-1-i}" style="margin-top:6px">${T('review')}</button>`:''}</div>`).join('')}
@@ -2651,7 +2788,7 @@ function gRing(){if(!TMR.isConnected||!st)return;const r=tmRem();if(r==null){TMR
  TMR.querySelector('b').textContent=pz?'⏸':s>=60?Math.floor(s/60)+':'+String(s%60).padStart(2,'0'):s;
  TMR.classList.toggle('low',s<10&&!st.tsoft&&!pz);TMR.classList.toggle('soft',!!st.tsoft);TMR.classList.toggle('pz',pz);TMR.classList.toggle('calm',!!st.tcalm&&s>30&&!pz);
  const b=TMR.querySelector('.tring');b.setAttribute('aria-label',T(pz?'resume':'pauseTip'));TMR.querySelector('.tplus').hidden=me.name!=st.host}
-function gAfter(){if(!st)return;g2After();
+function gAfter(){if(!st)return;g2After();g3After();
  if(st.v!==RCVV){RCVV=st.v;RCV=Date.now()}
  if(!isHost)TK=gKey(st);
  if(st.gid!==GID){if(GID!==undefined&&st.gid){drafts={};Object.assign(ui,{terr:null,region:null,bottle:false,mapTab:null,endTab:null,rcTab:null});myPend={cid:null}}GID=st.gid}
@@ -2673,18 +2810,19 @@ function gRecapData(e){const H=e.hist||[],out={};
   const top=[...new Set([...mine.filter(h=>h.placeName),...mine.filter(h=>h.kw),...mine.filter(h=>gN(h.ko)&&h.answer!=null)])].slice(0,3),rest=mine.filter(h=>!top.includes(h));
   const three=top.map(h=>it(h,full(h))),surp=rest.filter(h=>gN(h.ko)).map(h=>it(h,full(h))),ans=rest.filter(h=>!gN(h.ko)&&gA(h)).map(h=>it(h,full(h)));
   const bots=H.filter(h=>h.terr==p&&h.q.c).map(h=>({r:'bouteille',q:h.q.c,a:h.q.by&&!e.anon?'🍾 '+h.q.by:'🍾'}));
+  const notes=g3Notes(H,p);
   const flags=[];if(p==me.name)for(const from in e.flags||{}){const t=(e.flags[from]||{})[p];if(t)flags.push({r:'',q:e.anon?'✉️':from,a:QQ(t)})}
-  out[p]={three,ans,surp,bots,flags}}
+  out[p]={notes,three,ans,surp,bots,flags}}
  return out}
-const GSEC=[['three','r3','⭐'],['ans','rAns','💬'],['surp','rSurp','✨'],['bots','rBot','🍾'],['flags','rFlags','🚩']];
+const GSEC=[['notes','g3RN','📝'],['three','r3','⭐'],['ans','rAns','💬'],['surp','rSurp','✨'],['bots','rBot','🍾'],['flags','rFlags','🚩']];
 function gRecapBody(e,id){const ppl=e.players||[],d=gRecapData(e);let t=ui[id+'Tab'];if(!ppl.includes(t))t=ui[id+'Tab']=ppl.find(n=>n!=me.name)||ppl[0];const x=d[t]||{};
- const li=o=>`<li>${o.r?regionBadge(o.r,26):''}<div><span class="mut">${esc(o.q)}</span><br>${esc(o.a)}</div></li>`;
- const secs=GSEC.filter(([k])=>x[k]&&x[k].length).map(([k,l,ic])=>`<h3 class="gh">${ic} ${T(l)}</h3><ul class="gfacts ${k=='three'?'g3':''}">${x[k].map(li).join('')}</ul>`).join('');
- return `${g2Moments(e)}<div class="tabs" style="justify-content:center">${ppl.map(n=>`<button data-rt="${esc(n)}" class="${t==n?'sel':''}">${DOT(n)}${esc(n)}</button>`).join('')}</div>
+ const li=o=>`<li>${o.r?regionBadge(o.r,26):''}<div><span class="mut">${esc(o.q)}</span><br>${esc(o.a)}${g3NoteLines(o)}</div></li>`;
+ const secs=GSEC.filter(([k])=>x[k]&&x[k].length).map(([k,l,ic])=>`<h3 class="gh">${ic} ${T(k=='notes'&&t==me.name?'g3RNme':l)}</h3><ul class="gfacts ${k=='three'?'g3':''}">${x[k].map(li).join('')}</ul>`).join('');
+ return `${g3DuoCard(e)}${g2Moments(e)}<div class="tabs" style="justify-content:center">${ppl.map(n=>`<button data-rt="${esc(n)}" class="${t==n?'sel':''}">${DOT(n)}${esc(n)}</button>`).join('')}</div>
  <div class="card grc">${secs||`<p class="mut c">${T('rEmpty')}</p>`}</div>`}
 function gRecapText(e){const d=gRecapData(e),L=[`Terra Incognita · ${T('recapT')} · ${new Date(e.date||Date.now()).toLocaleDateString(D().loc)}`];
  const top=(e.hist||[]).filter(h=>h.lk&&h.lk.length).sort((a,b)=>b.lk.length-a.lk.length).slice(0,3);if(top.length){L.push('','❤️ '+T('g2Top'));top.forEach(h=>L.push(' • '+h.terr+' · '+gQ(h)+' — '+(h.placeName||gA(h)||'·')+' (❤️ '+h.lk.length+')'))}
- for(const p of e.players||[]){L.push('','== '+p+' ==');if(!GSEC.some(([k])=>d[p][k].length))L.push(T('rEmpty'));for(const [k,l] of GSEC)if(d[p][k].length){L.push(T(l));d[p][k].forEach(o=>L.push(' • '+(o.q?o.q+' — ':'')+o.a))}}
+ for(const p of e.players||[]){L.push('','== '+p+' ==');if(!GSEC.some(([k])=>d[p][k].length))L.push(T('rEmpty'));for(const [k,l] of GSEC)if(d[p][k].length){L.push(T(k=='notes'&&p==me.name?'g3RNme':l));d[p][k].forEach(o=>{L.push(' • '+(o.q?o.q+' — ':'')+o.a);(o.n||[]).forEach(([w,v])=>L.push('    📝 '+w+' : '+v))})}}
  return L.join('\n').replace(/<[^>]+>/g,'')}
 function gSaveTxt(e){const txt=gRecapText(e);
  if(navigator.share&&matchMedia('(pointer:coarse)').matches){navigator.share({title:'Terra Incognita',text:txt}).catch(()=>{});return}
@@ -2692,7 +2830,7 @@ function gSaveTxt(e){const txt=gRecapText(e);
 function gBindRecap(id,e,re){$$('[data-rt]').forEach(b=>b.onclick=()=>{ui[id+'Tab']=b.dataset.rt;re()});$('#gsave')&&($('#gsave').onclick=()=>gSaveTxt(e))}
 function vRecap(){const e=st.log.at(-1)||{players:st.order,hist:st.hist||[],flags:{}},host=me.name==st.host;
  return {mine:host,hint:host?T('recapHint'):T('recapWait',{n:B(st.host)}),hintBtn:host?`<button class="pri" id="go2" style="padding:8px 14px">${T('toLog')}</button>`:'',
-  html:`<div class="banner"><p class="serif">${T('recapT')}</p><p class="mut" style="margin-top:6px">${T('recapD')}</p></div>${gRecapBody(e,'rc')}<button class="wide" id="gsave">💾 ${T('saveTxt')}</button>`,
+  html:`${g3Steps('recap')}<div class="banner"><p class="serif">${T('recapT')}</p><p class="mut" style="margin-top:6px">${T('recapD')}</p></div>${gRecapBody(e,'rc')}<button class="wide" id="gsave">💾 ${T('saveTxt')}</button>`,
   bind(){gBindRecap('rc',e,render);$('#go2')&&($('#go2').onclick=()=>send({t:'recapDone'}))}}}
 function gReview(i){const e=st&&st.log[i];if(!e)return;
  $('#modal').innerHTML=`<div class="modal"><div class="card grev"><p class="serif c" style="font-size:21px">${T('recapT')}</p>${gRecapBody(e,'rv')}${g2OldMap(e)}<div class="row"><button class="ghost" id="rvx">${T('cont')}</button><button id="gsave">💾 ${T('saveTxt')}</button></div></div></div>`;
@@ -2702,6 +2840,147 @@ function vPfiche(){const L=st.L||st.length,sub=st.order[Math.floor((st.turn-1)/L
   html:`<div class="banner sheet"><p class="serif">${T('pfT',{n:NS(sub)})}</p><p class="mut" style="margin-top:6px">${T('pfD')}</p></div>
   <div class="card grc">${H.length?`<ul class="gfacts">${H.map(h=>`<li>${regionBadge(h.r,26)}<div><span class="mut">${esc(gQ(h))}</span><br>${esc(h.placeName?'✨ '+h.placeName:gA(h)||'·')}</div></li>`).join('')}</ul>`:`<p class="mut c">${T('pfEmpty')}</p>`}${reactBar()}</div>`,
   bind(){$('#go2')&&($('#go2').onclick=()=>send({t:'pfDone'}))}}}
+
+/* === game3 : notes de voyage, événements, « ça a changé ? », duo (complicité, qui de nous), fin en 3 étapes ===
+   - Notes : juste après chaque atterrissage, chaque personne (sauf l'île explorée) écrit en une ligne ce qu'elle retient. La note est épinglée sur sa carte
+     (lmList), scellée pour la personne concernée jusqu'au bilan, où elle reçoit le recueil ; chacun retrouve SES notes, rangées par personne.
+   - Rejouabilité : une ancienne question revient parfois (« ça a changé ? », réponse d'avant affichée), événements doux au hasard, « Qui de nous… » avec
+     des énoncés jamais répétés dans une même partie, compteur de questions jamais posées dans le salon.
+   - Duo : Miroir par défaut (chaque question posée aux deux, comparaison des deux réponses), jauge de complicité qui ne baisse jamais, rituel de fin. */
+const G3EI={bottle:'🍾',whirl:'🌀',storm:'⛈️',shell:'🐚',rainbow:'🌈'},G3EL=['whirl','storm','shell','rainbow'],G3WN=20,G3LV=[0,5,12,22,35,50];
+const g3H=cid=>(st.hist||[]).find(h=>h.cid==cid);
+const g3Writers=h=>st.order.filter(n=>n!=h.terr&&P(n)&&P(n).online);
+const g3Done=h=>g3Writers(h).every(n=>(h.nt||{})[n]!=null||(h.ns||[]).includes(n));
+const g3WoDone=c=>!c.wo||st.order.filter(n=>P(n)&&P(n).online).every(n=>(c.wo.v||{})[n]!=null);
+const g3D=d=>new Date(d).toLocaleDateString(D().loc,{day:'numeric',month:'long'});
+/* hôte : une ancienne question de cette zone, posée lors d'une partie précédente, avec sa réponse */
+function g3PastFor(t,r){const tn=st.tone||0,used=st.used[t]||[],out=[];
+ for(const e of st.log||[])for(const h of e.hist||[]){if(h.terr!=t||h.r!=r||!h.q||!h.q.id||h.kind=='door'||used.includes(h.q.id))continue;const q=QBY[h.q.id];
+  if(!q||(q.deck=='coquin'&&tn<1)||(q.deck=='trash'&&tn<2))continue;const rv=h.rv&&h.rv[0],k=h.placeName?'pn':rv?'rv':h.kw?'kw':'',t2=h.placeName||(rv&&(rv.v||rv))||h.kw||'';
+  if(h.answer==null&&!t2)continue;out.push({id:h.q.id,p:{a:h.answer??null,t:String(t2).slice(0,140),k,d:e.date}})}
+ return out.length?out[rnd(out.length)]:null}
+function g3Pick(s,from,t,custom){const c=s.cur;
+ if(!custom&&s.turn>0){const p=g3PastFor(t,c.r);if(p&&rnd(100)<40&&QBY[p.id]){c.q=QBY[p.id];c.past=p.p}}
+ if(s.turn>=1&&s.turn-(s.evT??-9)>=2&&rnd(100)<24){const L=Object.keys(G3EI).filter(k=>!(k=='whirl'&&s.mode=='mir')&&!(k=='rainbow'&&s.order.length!=2)&&!(k=='shell'&&c.type=='ecoute')&&!(k=='bottle'&&MODE()=='esc'));
+  const k=L[rnd(L.length)];c.ev=k;s.evT=s.turn;if(k=='bottle')s.bottles[from]=(s.bottles[from]||0)+1}}
+/* hôte, juste après land() : relie l'entrée d'historique au tour, compare le miroir, programme un « Qui de nous… » */
+function g3Land(c){const s=st,h=s.hist&&s.hist.at(-1);if(!h)return;h.cid=c.id;if(c.ev)h.ev=c.ev;if(c.past)h.past=1;
+ const g=others(c.terr).find(n=>mapOf(n,c.terr).length);h.dt=g?mapOf(g,c.terr).at(-1).date:0;
+ if(c.kind!='door'&&c.m1&&c.m1.a!=null&&c.answer!=null&&c.type!='libre')h.mm=(c.type=='echelle'?Math.abs(c.answer-c.m1.a)<=1:c.answer==c.m1.a)?1:0;
+ const n=s.order.length,want=c.kind!='door'&&!G3EL.includes(c.ev)&&(n==2?(s.mode=='mir'?!!c.mir:s.turn%2==1):s.turn%3==2);
+ if(want){if(s.woG!==s.gid){s.woG=s.gid;s.woU=[]}const L=[...Array(G3WN).keys()].filter(i=>!s.woU.includes(i)),i=L.length?L[rnd(L.length)]:rnd(G3WN);s.woU.push(i);c.wo={i,v:{}};h.wo={i,v:{}}}}
+function g3Act(from,a){const s=st;
+ if(a.t=='note'){if(['lobby','carnet'].includes(s.phase)||!s.order.includes(from))return false;const h=g3H(a.cid);if(!h||from==h.terr)return false;
+  const v=qaCut(tidy(a.v||''),140);h.nt=h.nt||{};h.ns=(h.ns||[]).filter(x=>x!=from);
+  if(v)h.nt[from]=v;else{delete h.nt[from];if(a.skip)h.ns.push(from)}
+  const l=mapOf(from,h.terr).find(l=>l.date==h.dt&&l.r==h.r&&l.kind!='door');if(l){if(v)l.nt=v;else delete l.nt}
+  g3Hurry();return true}
+ if(a.t=='who'){const c=s.cur;if(s.phase!='landed'||!c||!c.wo||!s.order.includes(a.v)||!s.order.includes(from)||c.wo.v[from]!=null)return false;
+  c.wo.v[from]=a.v;const h=g3H(c.id);if(h)h.wo={i:c.wo.i,v:{...c.wo.v}};g3Hurry();return true}
+ return false}
+/* sablier : quand tout le monde a noté (et voté), l'atterrissage se termine vite */
+function g3Hurry(){const s=st,c=s.cur;if(s.phase!='landed'||!c||!s.dl)return;const h=g3H(c.id);if(h&&g3Done(h)&&g3WoDone(c))s.dl=Math.min(s.dl,Date.now()+4000)}
+/* complicité (duo) : ne fait que monter */
+function g3Cx(H){let p=0;for(const h of H||[]){if(h.kind=='door')continue;let x=gN(h.ok)*2+(h.kind=='named'?1:0)+(h.kind=='ear'?2:0)+gN(h.lk)+Object.values(h.nt||{}).filter(Boolean).length+(h.mm?3:0);
+  const w=h.wo&&h.wo.v&&Object.values(h.wo.v);if(w&&w.length==2&&w[0]==w[1])x+=2;if(h.ev=='rainbow')x*=2;p+=x}return p}
+function g3Lv(p){let i=0;while(i<G3LV.length-1&&p>=G3LV[i+1])i++;const N=T('cxL').split('|'),a=G3LV[i],b=G3LV[i+1];return {i,name:N[i]||'',f:b?(p-a)/(b-a):1}}
+/* ---- vues ---- */
+function g3Steps(k){const L=MODE()=='esc'?['recap','carnet']:['end','recap','carnet'],i=L.indexOf(k),ic={end:'🚩',recap:'⭐',carnet:'📖'};if(i<0)return '';
+ return `<div class="g3steps"><span class="g3sx">${T('g3Step',{a:i+1,b:L.length})}</span><div class="g3sl">${L.map((x,j)=>`<span class="${j<i?'done':j==i?'on':''}">${ic[x]} ${T('g3S_'+x)}</span>`).join('<i aria-hidden="true"></i>')}</div></div>`}
+function g3PastTxt(c){const p=c.past;if(!p)return '';if(p.a!=null&&!c.q.custom){const q=LQ(c.q);return c.type=='choix'?(q.o||[])[p.a]||'':p.a+' / 10'}
+ return p.k=='pn'?'✨ '+p.t:p.k=='kw'?'📌 '+p.t:QQ(p.t)}
+function g3PastBox(c){const p=c.past;if(!p)return '';const same=p.a!=null&&c.answer!=null?(c.type=='echelle'?Math.abs(c.answer-p.a)<=1:c.answer==p.a):null;
+ return `<div class="g3pastc" data-g3a="a${c.id}${st.phase}"><span class="g3pi" aria-hidden="true">🕰️</span><div><span class="mut">${T('g3PastWas',{d:g3D(p.d)})}</span><br><b>${esc(g3PastTxt(c))}</b></div>${same==null?'':`<span class="g3tag ${same?'same':'moved'}">${T(same?'g3Same':'g3Moved')}</span>`}</div>`}
+function g3QNote(c){let h='';
+ if(c.ev)h+=`<p class="g3ev g3ev-${c.ev}" data-g3a="e${c.id}"><span class="g3evi" aria-hidden="true">${G3EI[c.ev]}</span><span>${T('ev_'+c.ev,{n:BW(c.ev=='bottle'||c.ev=='whirl'?c.explorer:c.terr)})}</span></p>`;
+ if(c.past)h+=`<p class="g3ev g3ev-past" data-g3a="q${c.id}"><span class="g3evi" aria-hidden="true">🕰️</span><span>${T('g3Past',{d:g3D(c.past.d)})}</span></p>`;return h}
+function g3RevealExtra(c){let h=c.past?g3PastBox(c):'';
+ if(c.m1&&c.m1.a!=null&&c.answer!=null&&c.type!='libre'&&!c.q.custom){const q=LQ(c.q),sh=v=>c.type=='choix'?esc((q.o||[])[v]||''):v+' / 10',d=Math.abs(c.answer-c.m1.a),k=d==0?'same':c.type=='echelle'&&d<=1?'near':'diff';
+  h+=`<div class="g3mir g3mv-${k}" data-g3a="m${c.id}"><p class="mut c">${T('g3MirT')}</p><div class="g3mrow"><div>${DOT(c.m1.t)}<span class="mut">${esc(c.m1.t)}</span><b>${sh(c.m1.a)}</b></div><span class="g3mvs" aria-hidden="true">${k=='diff'?'🌗':'🔗'}</span><div>${DOT(c.terr)}<span class="mut">${esc(c.terr)}</span><b>${sh(c.answer)}</b></div></div><p class="g3mv">${T('g3Mm_'+k)}</p></div>`}
+ return h}
+/* suggestions de note, tirées de la réponse */
+function g3Sugg(c){const q=c.q.custom?null:LQ(c.q),out=[];
+ if(c.placeName)out.push(c.placeName);
+ if(c.answer!=null&&q){if(c.type=='choix'&&q.o)out.push(q.o[c.answer]);else if(c.type=='echelle')out.push(trimQ(q.q)+' → '+c.answer+'/10')}
+ if(c.kw)out.push(c.kw);
+ if(c.type=='libre')for(const n in c.result||{})if(c.result[n]&&c.guesses[n]!=null)out.push(String(c.guesses[n]));
+ return [...new Set(out.map(x=>qaCut(tidy(x),80)).filter(Boolean))].slice(0,4)}
+function g3NoteCard(c,h){const ws=st.order.filter(n=>n!=c.terr),nt=h.nt||{},ns=h.ns||[],k='note:'+c.id;
+ const chips=`<div class="g3wr">${ws.map(n=>`<span class="chip ${P(n)&&P(n).online?'':'off'}">${DOT(n)}${esc(n)} ${nt[n]?'<span class="g3ok">📌</span>':ns.includes(n)?'<span class="mut">–</span>':'<span class="g3pen">✍️</span>'}</span>`).join('')}</div>`;
+ const head=sub=>`<p class="g3nh"><span class="g3ni" aria-hidden="true">📝</span><span><b>${T('g3NoteT',{n:NS(c.terr)})}</b>${sub?`<br><span class="mut">${T('g3NoteD')}</span>`:''}</span></p>`;
+ if(c.terr==me.name){const got=ws.filter(n=>nt[n]).length;return `<div class="card g3note g3sub"><p class="g3nh"><span class="g3ni" aria-hidden="true">✍️</span><span><b>${T('g3Subj')}</b><br><span class="mut">${T('g3SubjD')}</span></span>${got?`<b class="g3cnt">${got}</b>`:''}</p>${chips}</div>`}
+ if(!st.order.includes(me.name))return '';
+ const mine=nt[me.name],edit=ui.g3ed==c.id;
+ if(mine&&!edit)return `<div class="card g3note done">${head(0)}<div class="g3pinned" data-g3a="p${c.id}${esc(mine)}"><span class="g3tack" aria-hidden="true">📌</span><span>${esc(mine)}</span></div><div class="g3row"><button class="ghost" id="g3edit">${T('g3Edit')}</button></div>${ws.length>1?chips:''}</div>`;
+ if(ns.includes(me.name)&&!edit)return `<div class="card g3note done">${head(0)}<div class="g3row"><button class="ghost" id="g3edit">📝 ${T('g3Write')}</button></div>${ws.length>1?chips:''}</div>`;
+ const sg=g3Sugg(c);
+ return `<div class="card g3note">${head(1)}
+ ${sg.length?`<div class="g3sug">${sg.map(x=>`<button type="button" data-g3s="${esc(x)}">${esc(x)}</button>`).join('')}</div>`:''}
+ <input data-d="${k}" maxlength="140" placeholder="${esc(T('g3NotePh'))}" aria-label="${esc(T('g3NoteT',{n:c.terr}))}">
+ <div class="g3row"><button class="ghost" id="g3skip">${T('g3Skip')}</button><button class="pri" id="g3pin">📌 ${T('g3Pin')}</button></div>${ws.length>1?chips:''}</div>`}
+function g3WhoCard(c){const w=c.wo,v=w.v||{},on=st.order.filter(n=>P(n)&&P(n).online),all=on.every(n=>v[n]!=null),my=v[me.name],pr=T('woQ').split('|')[w.i%G3WN]||'';let body;
+ if(my==null&&st.order.includes(me.name)&&!all)body=`<div class="g3wb">${st.order.map(n=>`<button type="button" data-g3w="${esc(n)}">${DOT(n)}${n==me.name?T('g3Me'):esc(n)}</button>`).join('')}</div>`;
+ else if(!all)body=`<p class="mut c typing g3wwait">${T('g3WoWait')}<span><i></i><i></i><i></i></span></p>`;
+ else{const t={};Object.values(v).forEach(x=>t[x]=(t[x]||0)+1);const mx=Math.max(...Object.values(t)),top=Object.keys(t).filter(x=>t[x]==mx);
+  if(st.order.length==2)body=top.length==1&&mx==2?`<p class="g3wr1 same" data-g3a="w${c.id}">🔗 ${T('g3WoSame',{n:B(top[0])})}</p>`:`<p class="g3wr1" data-g3a="w${c.id}">😄 ${T('g3WoDiff')}</p>`;
+  else body=top.length==1?`<p class="g3wr1 same" data-g3a="w${c.id}">👑 ${T('g3WoSame',{n:B(top[0])})} <span class="mut">· ${mx}</span></p>`:`<p class="g3wr1" data-g3a="w${c.id}">😄 ${T('g3WoTie')}</p>`;
+  body+=`<div class="g3wv">${Object.entries(v).map(([a,b])=>`<span class="chip">${DOT(a)}${esc(a)} <span class="mut">→</span> <b style="color:${col(b)}">${esc(b)}</b></span>`).join('')}</div>`}
+ return `<div class="card g3who ${all?'done':''}"><p class="g3wh">👥 ${T('woHead')}</p><p class="g3wq">${esc(pr)}</p>${body}</div>`}
+function g3LandedCards(c){const h=g3H(c.id);let o='';
+ if(c.ev&&G3EL.includes(c.ev))o+=`<div class="card g3evc g3ev-${c.ev}" data-g3a="L${c.id}"><span class="g3evi" aria-hidden="true">${G3EI[c.ev]}</span><p>${T('evL_'+c.ev,{n:B(c.ev=='shell'?c.terr:c.explorer)})}</p></div>`;
+ if(c.past&&c.type=='ecoute')o+=`<div class="card">${g3PastBox(c)}</div>`;
+ if(h&&c.kind!='door')o+=g3NoteCard(c,h);
+ if(c.wo)o+=g3WhoCard(c);
+ return o}
+function g3LandedHint(c,can){const h=g3H(c.id);if(!can||!h||c.kind=='door')return {};const ws=g3Writers(h);if(!ws.length)return {};
+ const d=ws.filter(n=>(h.nt||{})[n]!=null||(h.ns||[]).includes(n)).length;if(d>=ws.length&&g3WoDone(c))return {};return {hint:T('g3HintWait',{a:d,b:ws.length})}}
+function g3BindLanded(c){const k='note:'+c.id,inp=$(`[data-d="${CSS.escape(k)}"]`);
+ const pin=()=>{const v=(drafts[k]||'').trim();if(!v){inp&&inp.focus();return}ui.g3ed=null;const b=$('#g3pin');b&&sparkles(b,12);tone([[784,0],[1175,.09,.45]]);send({t:'note',cid:c.id,v});toast(T('g3PinT',{n:c.terr}))};
+ $('#g3pin')&&($('#g3pin').onclick=pin);if(inp)inp.onkeydown=e=>{if(e.key=='Enter'&&!e.isComposing){e.preventDefault();pin()}};
+ $('#g3skip')&&($('#g3skip').onclick=()=>{ui.g3ed=null;send({t:'note',cid:c.id,v:'',skip:1})});
+ $('#g3edit')&&($('#g3edit').onclick=()=>{const h=g3H(c.id);ui.g3ed=c.id;drafts[k]=(h&&h.nt&&h.nt[me.name])||drafts[k]||'';render();setTimeout(()=>{const i=$(`[data-d="${CSS.escape(k)}"]`);i&&i.focus()},30)});
+ $$('[data-g3s]').forEach(b=>b.onclick=()=>{const cur=(drafts[k]||'').trim(),x=b.dataset.g3s;if(cur.includes(x))return;drafts[k]=qaCut(cur?cur+' · '+x:x,140);const i=$(`[data-d="${CSS.escape(k)}"]`);if(i){i.value=drafts[k];i.focus()}b.classList.add('used')});
+ $$('[data-g3w]').forEach(b=>b.onclick=()=>{b.classList.add('pop');tone([[523,0],[659,.07,.3]]);send({t:'who',v:b.dataset.g3w})})}
+/* fin : mes notes et les réponses, rangées par personne */
+function g3Mine(n){const H=(st.hist||[]).filter(h=>h.terr==n&&h.kind!='door');if(!H.length)return '';
+ return `<ul class="gfacts g3mine">${H.map(h=>{const a=h.placeName?'✨ '+h.placeName:gA(h),nt=(h.nt||{})[me.name];return `<li>${regionBadge(h.q&&h.q.c?'bouteille':h.r,26)}<div><span class="mut">${esc(gQ(h))}</span>${a?'<br>'+esc(a):''}${nt?`<span class="g3nl"><b aria-hidden="true">📝</b> ${esc(nt)}</span>`:''}</div></li>`}).join('')}</ul>`}
+function g3Notes(H,p){const out=[];
+ for(const h of H){if(h.terr!=p||!h.nt)continue;const n=Object.entries(h.nt).filter(([w,v])=>v&&(p==me.name?w!=me.name:w==me.name));if(!n.length)continue;
+  out.push({r:h.q&&h.q.c?'bouteille':h.r,q:gQ(h),a:h.placeName?'✨ '+h.placeName:gA(h)||'·',n})}
+ return out}
+const g3NoteLines=o=>(o.n||[]).map(([w,v])=>`<span class="g3nl"><b>${w==me.name?'📝':DOT(w)+esc(w)}</b> ${esc(v)}</span>`).join('');
+function g3DuoCard(e){const ppl=e.players||[];if(ppl.length!=2)return '';const H=e.hist||[],p=g3Cx(H),L=g3Lv(p);
+ const com=H.filter(h=>h.mm),wo=H.filter(h=>h.wo&&h.wo.v&&Object.keys(h.wo.v).length==2),agree=wo.filter(h=>{const v=Object.values(h.wo.v);return v[0]==v[1]}).length;
+ return `<div class="card g3duo"><div class="g3dh"><span class="g3dbig" aria-hidden="true">🔗</span><div style="flex:1"><p class="mut">${T('cxT')}</p><p class="serif g3dl">${esc(L.name)}</p></div><b class="g3dp">${p}</b></div>
+ <div class="g3dbar" aria-hidden="true">${G3LV.slice(1).map(x=>`<i class="${p>=x?'on':''}"></i>`).join('')}</div>
+ ${com.length?`<h3 class="gh">🪞 ${T('g3Comm')}</h3><ul class="gfacts">${com.map(h=>`<li>${regionBadge(h.r,26)}<div><span class="mut">${esc(gQ(h))}</span><br>${esc(gA(h))}</div></li>`).join('')}</ul>`:''}
+ ${wo.length?`<p class="gnote">👥 ${T('g3WoScore',{a:agree,b:wo.length})}</p>`:''}
+ <p class="g3rit">${T('g3Ritual')}</p></div>`}
+/* salon : questions jamais posées à ce groupe (calculé par l'hôte, qui a les sauvegardes) */
+function g3Fresh(){const on=st.players.filter(p=>p.online).map(p=>p.name);if(on.length<2)return null;const sv=LS.get(saveKey(on),null)||{},tn=st.tone||0;
+ const ok=q=>!q.deck||q.deck=='base'||(q.deck=='coquin'&&tn>=1)||(q.deck=='trash'&&tn==2),all=ORDER.flatMap(r=>Q[r].filter(ok).map(q=>q.id));let m=Infinity;
+ for(const n of on){const s=new Set([...((sv.qseen||{})[n]||[]),...((sv.used||{})[n]||[]),...((st.qseen||{})[n]||[]),...((st.used||{})[n]||[])]);m=Math.min(m,all.filter(id=>!s.has(id)).length)}return m}
+const g3FreshLine=()=>st.g3f==null?'':`<p class="g3fresh">${st.g3f>0?T('g3Fresh',{n:st.g3f}):T('g3Fresh0')}</p>`;
+/* barre de complicité (duo) + petites récompenses */
+let G3AN=new Set(),G3P=null,G3WR={},G3E=null,G3CX={gid:null,v:0,l:0};
+function g3CxBar(){let el=$('#g3cx');const tb=$('#tb'),show=tb&&st.order&&st.order.length==2&&st.order.includes(me.name)&&!['lobby','end','recap','carnet'].includes(st.phase);
+ if(!show){el&&el.remove();return}
+ const p=g3Cx(st.hist),L=g3Lv(p);if(!el||el.parentNode!==tb){el=document.createElement('div');el.id='g3cx';tb.appendChild(el)}const pb=$('#gprog');if(pb&&pb.parentNode==tb&&pb.nextElementSibling!==el)pb.after(el);
+ const h=`<span class="g3ci" aria-hidden="true">🔗</span><span class="g3cn">${T('cxT')} · <b>${esc(L.name)}</b></span><span class="g3cb" aria-hidden="true"><i style="width:${Math.round(L.f*100)}%"></i></span><b class="g3cp">${p}</b>`;
+ if(el._h!==h){el._h=h;el.innerHTML=h;el.dataset.tip=T('cxTip')}
+ if(G3CX.gid!==st.gid){G3CX={gid:st.gid,v:p,l:L.i};return}
+ if(p>G3CX.v){const f=document.createElement('span');f.className='g3plus';f.textContent='+'+(p-G3CX.v);el.appendChild(f);setTimeout(()=>f.remove(),1700);el.classList.remove('up');void el.offsetWidth;el.classList.add('up');
+  if(L.i>G3CX.l){setTimeout(()=>{toast('🔗 '+T('cxUp',{l:L.name}));confetti(36);tone([[523,0],[659,.1],[784,.2],[1046,.3,.6]])},500)}}
+ G3CX.v=p;G3CX.l=L.i}
+function g3After(){const c=st.cur,ph=st.phase,prev=G3P;G3P=ph=='landed'&&c?c.id:null;
+ $$('[data-g3a]').forEach(e=>{const k=e.dataset.g3a;if(G3AN.has(k))e.classList.add('g3q');else G3AN.add(k)});
+ /* une note commencée mais pas épinglée part toute seule quand on quitte l'atterrissage */
+ if(prev&&prev!==G3P){const k='note:'+prev,v=(drafts[k]||'').trim(),h=g3H(prev);
+  if(v&&h&&h.terr!=me.name&&st.order.includes(me.name)&&!(h.nt||{})[me.name]&&!(h.ns||[]).includes(me.name))setTimeout(()=>send({t:'note',cid:prev,v}),0)}
+ if(ph=='question'&&c&&c.ev&&G3E!==c.id){G3E=c.id;setTimeout(()=>{const e=$('.g3ev');e&&sparkles(e.querySelector('.g3evi'),10)},300)}
+ if(ph=='landed'&&c&&c.wo&&g3WoDone(c)&&!G3WR[c.id]){G3WR[c.id]=1;setTimeout(()=>{const r=$('.g3wr1');if(!r)return;sparkles(r,16);const v=Object.values(c.wo.v||{});if(v.length>1&&v.every(x=>x==v[0]))confetti(26)},120)}
+ if(isHost&&ph=='lobby'){const f=g3Fresh();if(f!==st.g3f){st.g3f=f;setTimeout(()=>{if(st&&st.phase=='lobby')bump()},0)}}
+ g3CxBar()}
 
 /* ---------- Accueil ---------- */
 function langSel(){return `<div class="langbar">${thmBtn()}<div class="dd" id="lang"><button class="dd-b" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="${esc(T('lang'))}"><span aria-hidden="true">🌐</span><span>${I18N[LANG].name}</span><i class="chev"></i></button><ul class="dd-l" role="listbox">${Object.keys(I18N).map(k=>`<li role="option" tabindex="-1" data-v="${k}" lang="${k}" aria-selected="${k==LANG}">${I18N[k].name}</li>`).join('')}</ul></div></div>`}
