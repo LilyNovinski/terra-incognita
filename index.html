@@ -50,7 +50,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Rubik:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sacramento&text=by&display=swap">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="i18n.js?v=20261114k"></script>
+<script src="i18n.js?v=20261114l"></script>
 <script src="decks.js?v=1"></script>
 <style>
 :root{--sea1:#bdeef0;--sea2:#69c9d3;--deep:#0e5866;--deep2:#0a4652;--paper:#fffaf0;--paper2:#fbf0d9;--edge:#ead6ae;--edge2:#d8bd88;--txt:#3b2a1b;--mut:#8a7660;--acc:#ff8a3d;--acc-d:#d9661f;--acc2:#ffb15c;--ink:#1d8e6c;--sur:#d9661f;--ear:#5869b5;--bad:#d64b3c;--gold:#f2b84b}
@@ -222,7 +222,7 @@ button:active:not(:disabled){transform:translateY(3px) scale(.98)}
 .chip.turn{animation:pop .45s cubic-bezier(.3,1.6,.5,1) both,turn 2.4s ease-in-out .5s infinite}
 @keyframes turn{50%{transform:translateY(-3px);box-shadow:0 5px 0 var(--edge2),0 0 0 4px #ff8a3d33}}
 .chip .dot{transition:transform .3s}
-.chip:not(.off) .dot{animation:breath 3s ease-in-out infinite}
+
 @keyframes breath{50%{box-shadow:0 0 0 2px #fff,0 0 0 5px #ffffff00,0 0 8px currentColor}}
 .rhead .badge,.modal .badge{animation:badgein .5s cubic-bezier(.3,1.5,.5,1) both,float 4.5s ease-in-out .5s infinite}
 @keyframes float{50%{transform:translateY(-3px) rotate(3deg)}}
@@ -877,6 +877,17 @@ div.g2tone.sel{border-color:var(--acc)}
 
 
 /* @css-qa */
+.players .chip.pc{border-inline-start:5px solid var(--pc)}
+.lmkw{display:inline-block;margin-inline-start:4px;padding:1px 8px;border-radius:99px;background:#fff1db;font-size:12px;font-weight:700;color:var(--acc-d)}
+[data-theme=dark] .lmkw{background:#ffffff14}
+.kwbox{margin-top:16px;padding:12px 14px 10px;border-radius:16px;background:#fff7e8;border:2px dashed #f2c98f}
+.kwh{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px}
+.kwi{font-size:22px;line-height:1;transform:rotate(-12deg);margin-top:2px}
+.kwh b{display:block;font-size:15px;color:var(--txt)}
+.kwh p{margin:2px 0 0;font-size:13px;line-height:1.4;color:var(--mut)}
+.kwbox input{margin:0;background:#fff}
+[data-theme=dark] .kwbox{background:#ffffff0d;border-color:#f2c98f66}
+[data-theme=dark] .kwbox input{background:var(--paper2,#0d1b2b)}
 /* mots très longs, noms longs : on coupe proprement au lieu de déborder */
 .card,.banner,.hint>div,#toast,.lm,.guess,.q,.gfacts li,.status .chip,.modal .card{overflow-wrap:break-word}
 .guess .v,.lm>span:last-child,.hint>div>span{min-width:0}
@@ -1206,7 +1217,7 @@ function regionBadge(r,size=48){
 function lmList(list){
  const L=list.slice().sort((a,b)=>ORDER.indexOf(a.r)-ORDER.indexOf(b.r));
  if(!L.length)return `<p class="mut">${T('fog')}</p>`;
- return L.map(l=>`<div class="lm ${isOld(l)?'fade':''}"><span class="tag ${KIND[l.kind][0]}">${mini(l.kind)}${KN(l.kind)}</span><span><span class="mut">${RN(l.r)}</span>${l.kind!='ear'&&l.kind!='door'&&lmName(l)?' · '+esc(lmName(l)):''}${isOld(l)?` <span class="mut">· ${T('recheck')}</span>`:''}</span></div>`).join('')}
+ return L.map(l=>`<div class="lm ${isOld(l)?'fade':''}"><span class="tag ${KIND[l.kind][0]}">${mini(l.kind)}${KN(l.kind)}</span><span><span class="mut">${RN(l.r)}</span>${l.kind!='ear'&&l.kind!='door'&&lmName(l)?' · '+esc(lmName(l)):''}${l.kw?` <span class="lmkw">📌 ${esc(l.kw)}</span>`:''}${isOld(l)?` <span class="mut">· ${T('recheck')}</span>`:''}</span></div>`).join('')}
 
 /* ---------- Petites animations ---------- */
 function waveText(s,o){return [...s].map((ch,i)=>`<span style="animation-delay:${(o+i)*.05+.15}s">${ch}</span>`).join('')}
@@ -1767,8 +1778,8 @@ function checkAll(force){const c=st.cur;if(!c||c.type=='ecoute'||st.phase!='ques
 function inkMark(c,n){if(!c.q.custom&&(c.type=='choix'||c.type=='echelle'))return {ref:{id:c.q.id,a:c.answer}};return {name:String(c.guesses[n]).slice(0,140)}}
 function land(mode){const c=st.cur,now=Date.now(),gs=others(c.terr);c.kind=mode;
  if(mode=='door')gs.forEach(n=>mapOf(n,c.terr,1).push({r:c.r,kind:'door',date:now}));
- else if(mode=='ear')gs.forEach(n=>mapOf(n,c.terr,1).push(c.q.custom?{r:c.r,kind:'ear',name:c.q.q,date:now}:{r:c.r,kind:'ear',ref:{id:c.q.id},date:now}));
- else{const rb=gByName(c);for(const n in rb.res)if(P(n))mapOf(n,c.terr,1).push(rb.res[n]?{r:c.r,kind:'ink',...inkMark({...c,guesses:rb.g},n),date:now}:{r:c.r,kind:'sur',name:c.placeName,date:now})}
+ else if(mode=='ear')gs.forEach(n=>mapOf(n,c.terr,1).push(c.q.custom?{r:c.r,kind:'ear',name:c.q.q,kw:c.kw||'',date:now}:{r:c.r,kind:'ear',ref:{id:c.q.id},kw:c.kw||'',date:now}));
+ else{const rb=gByName(c);for(const n in rb.res)if(P(n))mapOf(n,c.terr,1).push(rb.res[n]?{r:c.r,kind:'ink',...inkMark({...c,guesses:rb.g},n),kw:c.kw||'',date:now}:{r:c.r,kind:'sur',name:c.placeName,kw:c.kw||'',date:now})}
  if(!c.q.custom){st.used[c.terr]=st.used[c.terr]||[];if(!st.used[c.terr].includes(c.q.id))st.used[c.terr].push(c.q.id)}
  gHist(c);st.phase='landed'}
 function loadBestSave(){const k=saveKey(st.order);const cands=[LS.get(k,null)];for(const n in clientSaves)cands.push(clientSaves[n][k]);
@@ -1883,7 +1894,8 @@ function tmDur(){const s=st,f=TF();let k=s.phase,soft=false;
  if(k=='pfiche')return {d:20,soft:false};if(!f)return null;
  if(k=='question'){if(s.cur.grace)return {d:15,soft:false};k=s.cur.type;soft=k=='ecoute'}else if(k=='judge')soft=true;
  let d=TB[k];if(d==null)return null;if(MODE()=='esc'&&(k=='reveal'||k=='landed'))d/=2;return {d:d*f,soft,calm:!!TCALM[k]&&!s.cur?.grace}}
-function tmSync(){const s=st;if(!s||!isHost)return false;let ch=false;if(s.phase!='lobby'&&g2Track(s))ch=true;
+function tmSync(){const s=st;if(!s||!isHost)return false;let ch=false;
+ if(s.anon&&s.phase=='map'&&s.order.filter(n=>P(n)&&P(n).online).length<3){s.anon=false;ch=true}if(s.phase!='lobby'&&g2Track(s))ch=true;
  if(s.phase!='lobby'&&s.tt!=null&&s.turn!==s.tTurn){if(s.tTurn!=null&&s.turn>s.tTurn){(s.td=s.td||[]).push(Date.now()-s.tt);if(s.td.length>30)s.td.shift()}s.tTurn=s.turn;s.tt=Date.now();ch=true}
  if(s.phase=='end'&&MODE()=='esc'){gFinish(s);ch=true}
  if(MODE()=='por'&&s.phase=='map'&&s.turn>0&&s.turn%(s.L||s.length)==0&&s.pf!==s.turn){s.pf=s.turn;s.phase='pfiche';ch=true}
@@ -2031,7 +2043,7 @@ function g2Moments(e){const H=(e.hist||[]).filter(h=>h.lk&&h.lk.length).sort((a,
  return `<div class="card g2top"><h3>❤️ ${T('g2Top')}</h3><ul class="gfacts">${H.map(h=>`<li>${regionBadge(h.r,26)}<div><span class="mut">${esc(h.terr)} · ${esc(gQ(h))}</span><br>${esc(h.placeName?'✨ '+h.placeName:gA(h)||'·')}</div><span class="g2n">❤️ ${h.lk.length}</span></li>`).join('')}</ul></div>`}
 /* souvenirs sur une personne, juste au-dessus de son drapeau */
 function g2Mem(n){const H=(st.hist||[]).filter(h=>h.terr==n&&h.kind!='door'),out=[];
- for(const h of H){const a=h.placeName?'✨ '+h.placeName:gA(h);if(a)out.push([h.r,a,gQ(h)]);if(h.kw&&!String(a).includes(h.kw))out.push([h.r,'🗝️ '+h.kw,gQ(h)])}
+ for(const h of H){const a=h.placeName?'✨ '+h.placeName:gA(h);if(a)out.push([h.r,a,gQ(h)]);if(h.kw&&!String(a).includes(h.kw))out.push([h.r,'📌 '+h.kw,gQ(h)])}
  for(const h of H)if(h.q&&h.q.c)out.push(['bouteille','🍾 '+h.q.c,'']);
  if(!out.length)return '';return `<div class="g2mem">${out.slice(0,10).map(([r,a,q])=>`<div class="g2mc"${q?` data-tip="${esc(short(q))}"`:''}>${regionBadge(r,20)}<span>${esc(a)}</span></div>`).join('')}</div>`}
 /* carnet : la carte d'une ancienne expédition, en souvenir */
@@ -2115,7 +2127,7 @@ function topbar(){
  const list=(st.order.length&&st.phase!='lobby'?st.order.map(P):st.players).filter(Boolean);
  return `<div class="top"><div class="brand" id="homebtn" role="button" tabindex="0" data-tip="${esc(T('home'))}" aria-label="${esc(T('home'))}">${LOGO(40,'t')}<span>Terra <i>Incognita</i></span>${SIG}</div><button class="code" id="codebtn" data-tip="${esc(T('copyInv'))}" aria-label="${esc(T('copyInv'))}">${st.code}</button>
  <button class="icon" id="mute" data-tip="${esc(T('sound'))}" aria-label="${esc(T('sound'))}">${muted?'🔇':'🔊'}</button>${thmBtn()}<button class="icon" id="help" data-tip="${esc(T('help'))}" aria-label="${esc(T('help'))}">?</button></div>
- <div class="players">${list.map(p=>`<span data-p="${esc(p.name)}" class="chip ${p.name==me.name?'me':''} ${p.online?'':'off'} ${p.name==ex?'turn':''}"><span class="dot" style="background:${grad(p.color)}"></span>${esc(p.name)}${p.name==ex?` <span class="role" data-tip="${esc(T('explores'))}" aria-label="${esc(T('explores'))}">⛵</span>`:''}${p.name==tr?` <span class="role" data-tip="${esc(T('explored'))}" aria-label="${esc(T('explored'))}">🏝️</span>`:''}${p.name==st.host&&st.phase=='lobby'?` <span class="mut">${T('host')}</span>`:''}${isHost&&p.name!=me.name?`<button class="kick" data-kick="${esc(p.name)}" aria-label="${esc(T('kick'))} ${esc(p.name)}"></button>`:''}</span>`).join('')}</div>`}
+ <div class="players">${list.map(p=>`<span data-p="${esc(p.name)}" class="chip pc ${p.name==me.name?'me':''} ${p.online?'':'off'} ${p.name==ex?'turn':''}" style="--pc:${p.color}">${esc(p.name)}${p.name==ex?` <span class="role" data-tip="${esc(T('explores'))}" aria-label="${esc(T('explores'))}">⛵</span>`:''}${p.name==tr?` <span class="role" data-tip="${esc(T('explored'))}" aria-label="${esc(T('explored'))}">🏝️</span>`:''}${p.name==st.host&&st.phase=='lobby'?` <span class="mut">${T('host')}</span>`:''}${isHost&&p.name!=me.name?`<button class="kick" data-kick="${esc(p.name)}" aria-label="${esc(T('kick'))} ${esc(p.name)}"></button>`:''}</span>`).join('')}</div>`}
 
 function view(){
  switch(st.phase){
@@ -2336,7 +2348,8 @@ function vCarnet(){const host=me.name==st.host;
 function gWho(c,k){const card=(c.cards||[]).find(x=>x.k==k),n=c.anonR?null:card?card.n:(c.cards?null:k),mine=myPend.cid==c.id&&myPend.k==k;
  if(n&&P(n))return `${DOT(n)}<div class="v"><span class="mut">${esc(n)}</span><br>`;
  return `<span class="dot ganon"></span><div class="v">${mine?`<span class="mut">${T('you2')}</span><br>`:''}`}
-const kwField=c=>`<label class="gkw">🗝️ ${T('kwLbl')}</label><input data-d="${c.id}:kw" maxlength="40" placeholder="${esc(T('kwPh'))}">`;
+/* « ta réponse en bref » : la personne qui répond à voix haute résume en quelques mots, pour que ça ne s'oublie pas (revient sur la carte et dans le bilan) */
+const kwField=c=>`<div class="kwbox"><div class="kwh"><span class="kwi" aria-hidden="true">📌</span><div><b>${T('kwT')}</b><p>${T('kwD')}</p></div></div><input data-d="${c.id}:kw" maxlength="40" placeholder="${esc(T('kwPh2'))}" aria-label="${esc(T('kwT'))}"></div>`;
 const gRematchBtns=()=>`<div class="grm"><button class="pri" id="rmSame"><b>⛵ ${T('sameCap')}</b><span>${T('sameCapD')}</span></button><button id="rmNew"><b>🧭 ${T('newCap')}</b><span>${T('newCapD')}</span></button></div>`;
 function bindRematch(){$('#rmSame')&&($('#rmSame').onclick=()=>send({t:'rematch',same:true}));$('#rmNew')&&($('#rmNew').onclick=()=>send({t:'rematch',same:false}))}
 // timer : anneau dans la barre d'aide
@@ -2363,11 +2376,11 @@ function gAfter(){if(!st)return;g2After();
 // bilan : textes lisibles d'une entrée d'historique
 function gQ(h){if(h.q.c)return h.q.c;const q=QBY[h.q.id];return q?trimQ(LQ(q).q).replaceAll('{Y}',h.terr):''}
 function gA(h){if(h.answer!=null&&QBY[h.q.id]){const q=LQ(QBY[h.q.id]);return h.type=='choix'?(q.o||[])[h.answer]||'':h.answer+' / 10'}
- if(h.rv&&h.rv.length)return h.rv.map(v=>typeof v=='string'?QQ(v):QQ(v.v)+' — '+v.n).join(' · ');return h.kw?'🗝️ '+h.kw:''}
+ if(h.rv&&h.rv.length)return h.rv.map(v=>typeof v=='string'?QQ(v):QQ(v.v)+' — '+v.n).join(' · ');return h.kw?'📌 '+h.kw:''}
 const gN=x=>Array.isArray(x)?x.length:+x||0;
 function gRecapData(e){const H=e.hist||[],out={};
  for(const p of e.players||[]){const mine=H.filter(h=>h.terr==p&&h.kind!='door'),it=(h,a)=>({r:h.r,q:gQ(h),a});
-  const full=h=>[gA(h),h.kw&&!gA(h).includes(h.kw)?'🗝️ '+h.kw:'',h.placeName?'✨ '+h.placeName:''].filter(Boolean).join(' · ')||'✨ '+T('surprise');
+  const full=h=>[gA(h),h.kw&&!gA(h).includes(h.kw)?'📌 '+h.kw:'',h.placeName?'✨ '+h.placeName:''].filter(Boolean).join(' · ')||'✨ '+T('surprise');
   const top=[...new Set([...mine.filter(h=>h.placeName),...mine.filter(h=>h.kw),...mine.filter(h=>gN(h.ko)&&h.answer!=null)])].slice(0,3),rest=mine.filter(h=>!top.includes(h));
   const three=top.map(h=>it(h,full(h))),surp=rest.filter(h=>gN(h.ko)).map(h=>it(h,full(h))),ans=rest.filter(h=>!gN(h.ko)&&gA(h)).map(h=>it(h,full(h)));
   const bots=H.filter(h=>h.terr==p&&h.q.c).map(h=>({r:'bouteille',q:h.q.c,a:h.q.by&&!e.anon?'🍾 '+h.q.by:'🍾'}));
