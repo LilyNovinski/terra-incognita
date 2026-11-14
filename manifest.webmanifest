@@ -1,0 +1,21 @@
+{
+ "name": "Terra Incognita",
+ "short_name": "Terra Incognita",
+ "description": "A game to really get to know each other.",
+ "start_url": "./",
+ "display": "standalone",
+ "background_color": "#69c9d3",
+ "theme_color": "#127083",
+ "icons": [
+  {
+   "src": "icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  }
+ ]
+}
