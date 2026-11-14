@@ -579,4 +579,16 @@ he:{timerD:"שעון החול משאיר זמן לחשוב ולכתוב, וממ�
 pt:{timerD:"A ampulheta dá tempo para pensar e escrever, e avança sozinha enquanto vocês veem as respostas"}};
 for(const l in EXT_POL)if(I18N[l])Object.assign(I18N[l].ui,EXT_POL[l]);
 
+/* @i18n-kw */
+const EXT_KW={fr:{kwT:"Ta réponse en bref",kwD:"Quelques mots, pour que personne ne l'oublie : ils resteront sur la carte et reviendront dans le bilan de fin. Facultatif.",kwPh2:"ex. : la soupe de mamie, Lisbonne"},
+en:{kwT:"Your answer in a few words",kwD:"So nobody forgets it: these words stay on the map and come back in the final summary. Optional.",kwPh2:"e.g. grandma's soup, Lisbon"},
+es:{kwT:"Tu respuesta en pocas palabras",kwD:"Para que nadie la olvide: quedarán en el mapa y volverán en el resumen final. Opcional.",kwPh2:"p. ej.: la sopa de la abuela, Lisboa"},
+it:{kwT:"La tua risposta in breve",kwD:"Così nessuno la dimentica: resterà sulla mappa e tornerà nel riepilogo finale. Facoltativo.",kwPh2:"es.: la zuppa della nonna, Lisbona"},
+de:{kwT:"Deine Antwort in Kürze",kwD:"Damit sie niemand vergisst: Die Worte bleiben auf der Karte und erscheinen in der Schlussbilanz. Optional.",kwPh2:"z. B. Omas Suppe, Lissabon"},
+ru:{kwT:"Твой ответ в двух словах",kwD:"Чтобы никто не забыл: эти слова останутся на карте и вернутся в итогах. Необязательно.",kwPh2:"напр.: бабушкин суп, Лиссабон"},
+zh:{kwT:"用几个词概括你的回答",kwD:"免得大家忘记：这些词会留在地图上，并在最终总结里再次出现。可不填。",kwPh2:"例如：外婆的汤、里斯本"},
+he:{kwT:"התשובה בכמה מילים",kwD:"כדי שאף אחד לא ישכח: המילים יישארו על המפה ויחזרו בסיכום הסופי. לא חובה.",kwPh2:"למשל: המרק של סבתא, ליסבון"},
+pt:{kwT:"Sua resposta em poucas palavras",kwD:"Para ninguém esquecer: as palavras ficam no mapa e voltam no resumo final. Opcional.",kwPh2:"ex.: a sopa da vó, Lisboa"}};
+for(const l in EXT_KW)if(I18N[l])Object.assign(I18N[l].ui,EXT_KW[l]);
+
 /* fin */

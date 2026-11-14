@@ -50,7 +50,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Rubik:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sacramento&text=by&display=swap">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="i18n.js?v=20261114k"></script>
+<script src="i18n.js?v=20261114l"></script>
 <script src="decks.js?v=1"></script>
 <style>
 :root{--sea1:#bdeef0;--sea2:#69c9d3;--deep:#0e5866;--deep2:#0a4652;--paper:#fffaf0;--paper2:#fbf0d9;--edge:#ead6ae;--edge2:#d8bd88;--txt:#3b2a1b;--mut:#8a7660;--acc:#ff8a3d;--acc-d:#d9661f;--acc2:#ffb15c;--ink:#1d8e6c;--sur:#d9661f;--ear:#5869b5;--bad:#d64b3c;--gold:#f2b84b}
@@ -222,7 +222,7 @@ button:active:not(:disabled){transform:translateY(3px) scale(.98)}
 .chip.turn{animation:pop .45s cubic-bezier(.3,1.6,.5,1) both,turn 2.4s ease-in-out .5s infinite}
 @keyframes turn{50%{transform:translateY(-3px);box-shadow:0 5px 0 var(--edge2),0 0 0 4px #ff8a3d33}}
 .chip .dot{transition:transform .3s}
-.chip:not(.off) .dot{animation:breath 3s ease-in-out infinite}
+
 @keyframes breath{50%{box-shadow:0 0 0 2px #fff,0 0 0 5px #ffffff00,0 0 8px currentColor}}
 .rhead .badge,.modal .badge{animation:badgein .5s cubic-bezier(.3,1.5,.5,1) both,float 4.5s ease-in-out .5s infinite}
 @keyframes float{50%{transform:translateY(-3px) rotate(3deg)}}
@@ -587,7 +587,8 @@ div.gtile{grid-column:1/-1}
 .gmets{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
 .gmet[data-vote]{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:6px;text-align:start;padding:12px;font:600 14px Nunito,sans-serif}
 .gmh{display:flex;align-items:center;justify-content:space-between;gap:6px}.gmh b{font:600 17px Fredoka,Nunito,sans-serif}
-.gauge{display:inline-flex;gap:2px;align-items:flex-end}.gauge i{width:5px;border-radius:2px;background:var(--edge)}.gauge i:nth-child(1){height:7px}.gauge i:nth-child(2){height:11px}.gauge i:nth-child(3){height:15px}.gauge i.on{background:#3aa7b5}
+.wbars{display:inline-flex;gap:2px;align-items:flex-end}.wbars i{width:5px;border-radius:2px;background:var(--edge)}.wbars i:nth-child(1){height:7px}.wbars i:nth-child(2){height:11px}.wbars i:nth-child(3){height:15px}.wbars i.on{background:#3aa7b5}
+[data-theme=dark] .wbars i{background:#ffffff1f}[data-theme=dark] .wbars i.on{background:#5fd4e0;box-shadow:0 0 6px #5fd4e055}
 .gline{font-size:13px;line-height:1.3;color:var(--mut);font-weight:700;min-height:34px}
 .gbad{display:flex;flex-wrap:wrap;gap:2px}.gbad>span{display:inline-flex;transition:opacity .2s}.gbad>span.off{opacity:.22;filter:grayscale(1)}
 .gbad .badge,.gbad svg{width:22px;height:22px;box-shadow:none;animation:none}
@@ -797,7 +798,7 @@ body::before{display:none}
 .fxp{position:fixed;left:0;top:0;opacity:0;pointer-events:none;line-height:1;user-select:none;-webkit-user-select:none;will-change:transform,opacity}
 .fxring{width:70px;height:70px;border-radius:50%;background:radial-gradient(circle,transparent 56%,#ffd26ab3 62%,transparent 70%)}
 .fxglow{width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,#ffbecdd9,#ffe2a066 45%,transparent 70%)}
-.fxtint{width:100vw;height:100vh}
+.fxtint{width:100vw;height:100vh;left:0;top:0;transform:none!important}
 .fxtint.warm{background:radial-gradient(ellipse at 50% 108%,#ff781e73,#ffa03c1f 50%,transparent 75%)}
 .fxtint.blue{background:linear-gradient(#4682c847,transparent 60%)}
 .fxtint.gold{background:radial-gradient(circle at 50% 45%,#ffd75a66,transparent 65%)}
@@ -867,7 +868,36 @@ div.g2tone.sel{border-color:var(--acc)}
 
 
 
+/* @css-dark */
+
+
+
+
+/* @css-game3 */
+
+
+
+
+/* @css-gender */
+
+
+
+
 /* @css-qa */
+/* champs qui grandissent avec le texte : jamais de 2e barre de défilement dans la page */
+textarea{field-sizing:content;overflow:hidden;resize:none}
+.hostico{display:inline-flex;vertical-align:-2px}.hostico svg{display:block;width:18px;height:18px;filter:drop-shadow(0 1px 0 #0002)}
+.players .chip.pc{border-inline-start:5px solid var(--pc)}
+.lmkw{display:inline-block;margin-inline-start:4px;padding:1px 8px;border-radius:99px;background:#fff1db;font-size:12px;font-weight:700;color:var(--acc-d)}
+[data-theme=dark] .lmkw{background:#ffffff14}
+.kwbox{margin-top:16px;padding:12px 14px 10px;border-radius:16px;background:#fff7e8;border:2px dashed #f2c98f}
+.kwh{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px}
+.kwi{font-size:22px;line-height:1;transform:rotate(-12deg);margin-top:2px}
+.kwh b{display:block;font-size:15px;color:var(--txt)}
+.kwh p{margin:2px 0 0;font-size:13px;line-height:1.4;color:var(--mut)}
+.kwbox input{margin:0;background:#fff}
+[data-theme=dark] .kwbox{background:#ffffff0d;border-color:#f2c98f66}
+[data-theme=dark] .kwbox input{background:var(--paper2,#0d1b2b)}
 /* mots très longs, noms longs : on coupe proprement au lieu de déborder */
 .card,.banner,.hint>div,#toast,.lm,.guess,.q,.gfacts li,.status .chip,.modal .card{overflow-wrap:break-word}
 .guess .v,.lm>span:last-child,.hint>div>span{min-width:0}
@@ -1197,7 +1227,7 @@ function regionBadge(r,size=48){
 function lmList(list){
  const L=list.slice().sort((a,b)=>ORDER.indexOf(a.r)-ORDER.indexOf(b.r));
  if(!L.length)return `<p class="mut">${T('fog')}</p>`;
- return L.map(l=>`<div class="lm ${isOld(l)?'fade':''}"><span class="tag ${KIND[l.kind][0]}">${mini(l.kind)}${KN(l.kind)}</span><span><span class="mut">${RN(l.r)}</span>${l.kind!='ear'&&l.kind!='door'&&lmName(l)?' · '+esc(lmName(l)):''}${isOld(l)?` <span class="mut">· ${T('recheck')}</span>`:''}</span></div>`).join('')}
+ return L.map(l=>`<div class="lm ${isOld(l)?'fade':''}"><span class="tag ${KIND[l.kind][0]}">${mini(l.kind)}${KN(l.kind)}</span><span><span class="mut">${RN(l.r)}</span>${l.kind!='ear'&&l.kind!='door'&&lmName(l)?' · '+esc(lmName(l)):''}${l.kw?` <span class="lmkw">📌 ${esc(l.kw)}</span>`:''}${isOld(l)?` <span class="mut">· ${T('recheck')}</span>`:''}</span></div>`).join('')}
 
 /* ---------- Petites animations ---------- */
 function waveText(s,o){return [...s].map((ch,i)=>`<span style="animation-delay:${(o+i)*.05+.15}s">${ch}</span>`).join('')}
@@ -1502,7 +1532,8 @@ const fxLv=n=>n>=40?4:n>=20?3:n>=10?2:n>=5?1:0;
 function fxLvOf(from,e){const c=FX.cmb[from+e];return c&&Date.now()-c.t<1400?fxLv(c.n):0}
 function fxLayer(){let l=$('#fx');if(!l){l=document.createElement('div');l.id='fx';l.setAttribute('aria-hidden','true');document.body.appendChild(l);FX.pool=[];FX.live=0}return l}
 function fxEl(cls){if(FX.live>=FXMAX)return null;const l=fxLayer();let el=FX.pool.pop();if(!el){el=document.createElement('span');l.appendChild(el)}
- el.className='fxp '+(cls||'');el.style.cssText='';el.textContent='';FX.live++;return el}
+ /* une animation finie (fill:both) garde sa position : sans ça, la teinte plein écran restait décalée en rectangle */
+ el.getAnimations().forEach(x=>{try{x.cancel()}catch(e){}});el.className='fxp '+(cls||'');el.style.cssText='';el.textContent='';FX.live++;return el}
 function fxRun(el,kf,dur,delay){const a=el.animate(kf,{duration:dur,delay:delay||0,easing:'linear',fill:'both'});let d=0;
  const done=()=>{if(d)return;d=1;FX.live--;el.style.display='none';FX.pool.push(el)};a.onfinish=done;a.oncancel=done}
 function fxP(ch,size,kf,dur,delay,cls){const el=fxEl(cls);if(!el)return null;el.textContent=ch;el.style.fontSize=size+'px';fxRun(el,kf,dur,delay);return el}
@@ -1679,13 +1710,16 @@ function clientPeer(cb){
   else console.warn(e)});
  p.on('disconnected',()=>{try{if(!p.destroyed)p.reconnect()}catch(e){}})}
 /* se connecter à un hôte ; onFail si l'ID n'existe pas, ne répond pas ou ferme avant l'état */
+/* identifiant d'appareil (local) : reconnaître la même personne qui revient, sans la confondre avec un homonyme */
+const DEV={};/* hôte seulement, jamais dans st */
+function devId(){let v=LS.get('terra:dev',null);if(!v){v=rid()+rid();LS.set('terra:dev',v)}return v}
 function connectTo(id,onFail,ms=25000){
  let got=false,done=false;const fail=()=>{if(done||got)return;done=true;if(onUnavail===fail)onUnavail=null;try{c.close()}catch(e){}if(hostConn===c)hostConn=null;onFail&&onFail()};
  onUnavail=fail;
  const c=peer.connect(id,{reliable:true});hostConn=c;
  /* WebRTC entre deux réseaux (4G, box) peut mettre >10 s à s'établir : ne pas couper trop tôt ; un code inexistant échoue tout de suite via peer-unavailable */
  setTimeout(()=>{if(!c.open)fail()},ms);
- c.on('open',()=>{lastSeen=Date.now();c.send({t:'hello',name:me.name,color:me.color,saves:allSaves(),pend:window.gPend?gPend():null})});
+ c.on('open',()=>{lastSeen=Date.now();c.send({t:'hello',name:me.name,color:me.color,dev:devId(),saves:allSaves(),pend:window.gPend?gPend():null})});
  c.on('data',d=>{if(hostConn!==c)return;lastSeen=Date.now();
   if(d.t=='state'){got=true;migrating=false;onUnavail=null;const ph=st&&st.host;st=d.st;if(ph&&ph!=st.host)toast(T('newHost',{n:st.host}));persist();render();window.armTimer&&armTimer()}
   else if(d.t=='react')floatReact(d.from,d.e,d)
@@ -1719,8 +1753,11 @@ function migrate(to,eForce){
  if(to&&line.includes(to))line=[to,...line.filter(n=>n!=to)];
  let k=line.indexOf(me.name);if(k<0)k=line.length;
  let claimAt=t0+k*2500,claiming=false,busy=false;
- if(!to)toast(T('hostGone'));
+ let probed=!!to;
  const tick=()=>{
+  if(!probed){probed=true;busy=true;
+   /* l'hôte actuel répond-il encore ? (cas typique : téléphone revenu d'un autre onglet) */
+   clientPeer(()=>{if(my!==migSeq||!migrating||isHost)return;connectTo(hid(code,e-1),()=>{if(my!==migSeq||!migrating)return;busy=false;toast(T('hostGone'));claimAt=Date.now()+k*2500;setTimeout(tick,300)},7000)});return}
   if(my!==migSeq||!migrating||isHost)return;
   if(Date.now()-t0>45000){migrating=false;toast(T('lostHost'));lostScreen(code);return}
   if(!claiming&&Date.now()>=claimAt){claiming=true;
@@ -1767,7 +1804,7 @@ function handoff(){if(!isHost||!st)return false;
 /* battement de cœur : ping de l'hôte, détection côté client, hôte isolé qui se découvre remplacé */
 setInterval(()=>{
  if(!st)return;
- if(!isHost){if(!migrating&&hostConn&&hostConn.open&&Date.now()-lastSeen>9000)migrate();return}
+ if(!isHost){if(document.hidden){lastSeen=Date.now();return}if(!migrating&&hostConn&&hostConn.open&&Date.now()-lastSeen>9000)migrate();return}
  broadcast({t:'ping'});
  if(Object.keys(conns).length||st.players.length<2){aloneSince=0;return}
  aloneSince=aloneSince||Date.now();
@@ -1778,6 +1815,9 @@ setInterval(()=>{
    /* quelqu'un a pris la suite : on redevient client */
    isHost=false;conns={};dropBeacon();peer=null;try{hp.destroy()}catch(x){}st.epoch=e-1;migrate(null,e)})}},3000);
 window.addEventListener('pagehide',()=>{if(isHost&&st)handoff()});
+/* retour sur l'onglet (téléphone) : on ne se croit pas abandonné ; si le lien est tombé, on rejoint l'hôte actuel au lieu de prendre sa place */
+document.addEventListener('visibilitychange',()=>{if(document.hidden||!st||isHost)return;lastSeen=Date.now();
+ if(!migrating&&(!hostConn||!hostConn.open))migrate()});
 
 function leave(){const ho=isHost&&st&&handoff();migSeq++;migrating=false;onUnavail=null;dropBeacon();if(location.hash)history.replaceState(null,'',location.pathname+location.search);$('#modal').textContent='';lastPhaseKey='';app.classList.remove('still');const p=peer;st=null;peer=null;hostConn=null;conns={};isHost=false;chatLog=[];try{p&&(ho?setTimeout(()=>p.destroy(),400):p.destroy())}catch(e){}render()}
 function lostScreen(code){st=null;app.innerHTML=`<div class="banner"><p class="serif">${T('lostT')}</p><p class="mut" style="margin-top:8px">${T('lostD')}</p>
@@ -1882,13 +1922,16 @@ function hostRecv(c,d){
   let name=qaCut(chTidy(d.name),20);if(!name)return;
   if((st.banned||[]).includes(name)){c.send({t:'err',k:'kicked'});setTimeout(()=>c.close(),400);return}
   let p=P(name),renamed=false;
+  const dev=typeof d.dev=='string'?d.dev.slice(0,40):'';
+  /* même appareil qui revient (onglet changé, réseau coupé) : l'ancien lien est remplacé */
+  if(p&&dev&&DEV[name]===dev&&name!=me.name){for(const id in conns)if(conns[id]!==c&&conns[id].pname==name){const o=conns[id];delete conns[id];o.pname=null;try{o.close()}catch(e){}}}
   if(p&&p.online&&isLinked(name)){if(st.phase!='lobby'){c.send({t:'err',k:'errTaken',m:T('errTaken')});setTimeout(()=>c.close(),400);return}
    let k=2;while(P(qaCut(name,17)+' '+k))k++;name=qaCut(name,17)+' '+k;p=null;renamed=true}
   if(!p){if(st.phase!='lobby'){g2Ask(c,name,d);return}
    if(st.players.length>=8){c.send({t:'err',k:'errFull',m:T('errFull')});setTimeout(()=>c.close(),400);return}
    let color=PAL.includes(d.color)?d.color:PAL[0];if(st.players.some(x=>x.color==color))color=PAL.find(x=>!st.players.some(y=>y.color==x))||color;
-   p={name,color,online:true,peer:c.peer};st.players.push(p);toast(T('joined',{n:name}))}
-  else{p.online=true;p.peer=c.peer;if(Date.now()-hostSince>15000)toast(T('back',{n:name}))}
+   p={name,color,online:true,peer:c.peer};DEV[name]=dev;st.players.push(p);toast(T('joined',{n:name}))}
+  else{p.online=true;p.peer=c.peer;if(dev&&!DEV[name])DEV[name]=dev;if(Date.now()-hostSince>15000)toast(T('back',{n:name}))}
   if(renamed)c.send({t:'renamed',name});conns[c.peer]=c;c.pname=name;clientSaves[name]=d.saves||{};if(d.pend&&window.gRestore)gRestore(name,d.pend);bump();try{c.send({t:'chatlog',log:chatLog})}catch(e){}return}
  if(!c.pname)return;
  if(d.t=='act')act(c.pname,d.a);
@@ -1933,8 +1976,8 @@ function checkAll(force){const c=st.cur;if(!c||c.type=='ecoute'||st.phase!='ques
 function inkMark(c,n){if(!c.q.custom&&(c.type=='choix'||c.type=='echelle'))return {ref:{id:c.q.id,a:c.answer}};return {name:String(c.guesses[n]).slice(0,140)}}
 function land(mode){const c=st.cur,now=Date.now(),gs=others(c.terr);c.kind=mode;
  if(mode=='door')gs.forEach(n=>mapOf(n,c.terr,1).push({r:c.r,kind:'door',date:now}));
- else if(mode=='ear')gs.forEach(n=>mapOf(n,c.terr,1).push(c.q.custom?{r:c.r,kind:'ear',name:c.q.q,date:now}:{r:c.r,kind:'ear',ref:{id:c.q.id},date:now}));
- else{const rb=gByName(c);for(const n in rb.res)if(P(n))mapOf(n,c.terr,1).push(rb.res[n]?{r:c.r,kind:'ink',...inkMark({...c,guesses:rb.g},n),date:now}:{r:c.r,kind:'sur',name:c.placeName,date:now})}
+ else if(mode=='ear')gs.forEach(n=>mapOf(n,c.terr,1).push(c.q.custom?{r:c.r,kind:'ear',name:c.q.q,kw:c.kw||'',date:now}:{r:c.r,kind:'ear',ref:{id:c.q.id},kw:c.kw||'',date:now}));
+ else{const rb=gByName(c);for(const n in rb.res)if(P(n))mapOf(n,c.terr,1).push(rb.res[n]?{r:c.r,kind:'ink',...inkMark({...c,guesses:rb.g},n),kw:c.kw||'',date:now}:{r:c.r,kind:'sur',name:c.placeName,kw:c.kw||'',date:now})}
  if(!c.q.custom){st.used[c.terr]=st.used[c.terr]||[];if(!st.used[c.terr].includes(c.q.id))st.used[c.terr].push(c.q.id)}
  gHist(c);st.phase='landed'}
 function loadBestSave(){const k=saveKey(st.order);const cands=[LS.get(k,null)];for(const n in clientSaves)cands.push(clientSaves[n][k]);
@@ -2049,7 +2092,8 @@ function tmDur(){const s=st,f=TF();let k=s.phase,soft=false;
  if(k=='pfiche')return {d:20,soft:false};if(!f)return null;
  if(k=='question'){if(s.cur.grace)return {d:15,soft:false};k=s.cur.type;soft=k=='ecoute'}else if(k=='judge')soft=true;
  let d=TB[k];if(d==null)return null;if(MODE()=='esc'&&(k=='reveal'||k=='landed'))d/=2;return {d:d*f,soft,calm:!!TCALM[k]&&!s.cur?.grace}}
-function tmSync(){const s=st;if(!s||!isHost)return false;let ch=false;if(s.phase!='lobby'&&g2Track(s))ch=true;
+function tmSync(){const s=st;if(!s||!isHost)return false;let ch=false;
+ if(s.anon&&s.phase=='map'&&s.order.filter(n=>P(n)&&P(n).online).length<3){s.anon=false;ch=true}if(s.phase!='lobby'&&g2Track(s))ch=true;
  if(s.phase!='lobby'&&s.tt!=null&&s.turn!==s.tTurn){if(s.tTurn!=null&&s.turn>s.tTurn){(s.td=s.td||[]).push(Date.now()-s.tt);if(s.td.length>30)s.td.shift()}s.tTurn=s.turn;s.tt=Date.now();ch=true}
  if(s.phase=='end'&&MODE()=='esc'){gFinish(s);ch=true}
  if(MODE()=='por'&&s.phase=='map'&&s.turn>0&&s.turn%(s.L||s.length)==0&&s.pf!==s.turn){s.pf=s.turn;s.phase='pfiche';ch=true}
@@ -2197,7 +2241,7 @@ function g2Moments(e){const H=(e.hist||[]).filter(h=>h.lk&&h.lk.length).sort((a,
  return `<div class="card g2top"><h3>❤️ ${T('g2Top')}</h3><ul class="gfacts">${H.map(h=>`<li>${regionBadge(h.r,26)}<div><span class="mut">${esc(h.terr)} · ${esc(gQ(h))}</span><br>${esc(h.placeName?'✨ '+h.placeName:gA(h)||'·')}</div><span class="g2n">❤️ ${h.lk.length}</span></li>`).join('')}</ul></div>`}
 /* souvenirs sur une personne, juste au-dessus de son drapeau */
 function g2Mem(n){const H=(st.hist||[]).filter(h=>h.terr==n&&h.kind!='door'),out=[];
- for(const h of H){const a=h.placeName?'✨ '+h.placeName:gA(h);if(a)out.push([h.r,a,gQ(h)]);if(h.kw&&!String(a).includes(h.kw))out.push([h.r,'🗝️ '+h.kw,gQ(h)])}
+ for(const h of H){const a=h.placeName?'✨ '+h.placeName:gA(h);if(a)out.push([h.r,a,gQ(h)]);if(h.kw&&!String(a).includes(h.kw))out.push([h.r,'📌 '+h.kw,gQ(h)])}
  for(const h of H)if(h.q&&h.q.c)out.push(['bouteille','🍾 '+h.q.c,'']);
  if(!out.length)return '';return `<div class="g2mem">${out.slice(0,10).map(([r,a,q])=>`<div class="g2mc"${q?` data-tip="${esc(short(q))}"`:''}>${regionBadge(r,20)}<span>${esc(a)}</span></div>`).join('')}</div>`}
 /* carnet : la carte d'une ancienne expédition, en souvenir */
@@ -2218,7 +2262,10 @@ function g2BindTone(){$$('[data-tone]').forEach(b=>b.onclick=()=>{const v=+b.dat
 function captureFocus(){const a=document.activeElement;if(a&&a.dataset&&a.dataset.d)return{d:a.dataset.d,s:a.selectionStart,e:a.selectionEnd};return null}
 function restoreFocus(f){if(!f)return;const el=$(`[data-d="${CSS.escape(f.d)}"]`);if(el){qaRF=1;el.focus();qaRF=0;try{el.setSelectionRange(f.s,f.e)}catch(e){}}}
 /* jauge de caractères : on voit la place qui reste, la réponse sera affichée en entier */
-function gauges(){$$('textarea[maxlength],input[data-d][maxlength]').forEach(el=>{if(el._g&&el._g.isConnected)return;const max=+el.maxLength;if(!(max>=20))return;
+/* hauteur automatique des zones de texte (repli pour les navigateurs sans field-sizing) */
+function autoGrow(t){if(window.CSS&&CSS.supports&&CSS.supports('field-sizing','content'))return;t.style.height='auto';t.style.height=(t.scrollHeight+2)+'px'}
+document.addEventListener('input',e=>{if(e.target&&e.target.tagName=='TEXTAREA')autoGrow(e.target)});
+function gauges(){$$('textarea').forEach(autoGrow);$$('textarea[maxlength],input[data-d][maxlength]').forEach(el=>{if(el._g&&el._g.isConnected)return;const max=+el.maxLength;if(!(max>=20))return;
  const g=document.createElement('div');g.className='gauge';g.setAttribute('aria-hidden','true');g.innerHTML='<i><b></b></i><span></span>';el.after(g);el._g=g;
  const up=()=>{const n=el.value.length,p=Math.min(1,n/max);g.style.setProperty('--p',p.toFixed(3));g.classList.toggle('on',n>0);g.classList.toggle('mid',p>=.7);g.classList.toggle('full',p>=.97);g.querySelector('span').textContent=p>=.7?max-n:''};
  el.addEventListener('input',up);up()})}
@@ -2242,6 +2289,8 @@ const err=m=>{const e=$('.err');if(e)e.textContent=m};
 const B=n=>`<b style="color:${col(n)}">${esc(n)}</b>`;
 const BW=n=>`<b style="color:${col(n)};font-weight:500">${esc(n)}</b>`;
 const NS=n=>`<span style="color:${col(n)}">${esc(n)}</span>`;
+/* symbole de l'hôte : le phare (guide l'expédition dans la brume) */
+const LIGHT='<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M9.6 4.1 15.2 2.6v3z M6.4 4.1.8 2.6v3z" fill="#ffd56b" opacity=".6"/><path d="M6.1 14 7 5.2h2L9.9 14z" fill="#fff6e8" stroke="#b8502c" stroke-width=".9" stroke-linejoin="round"/><path d="M6.75 8.6h2.5M6.45 11.4h3.1" stroke="#e2603e" stroke-width="1.4"/><rect x="6.5" y="3" width="3" height="2.3" rx=".6" fill="#ffd56b" stroke="#b8502c" stroke-width=".8"/><path d="M6.2 3.1 8 1.3l1.8 1.8z" fill="#b8502c"/><path d="M4.4 14.6h7.2" stroke="#b8502c" stroke-width="1.4" stroke-linecap="round"/></svg>';
 const DOT=n=>`<span class="dot" style="background:${grad(col(n))}"></span>`;
 
 function render(){
@@ -2281,7 +2330,7 @@ function topbar(){
  const list=(st.order.length&&st.phase!='lobby'?st.order.map(P):st.players).filter(Boolean);
  return `<div class="top"><div class="brand" id="homebtn" role="button" tabindex="0" data-tip="${esc(T('home'))}" aria-label="${esc(T('home'))}">${LOGO(40,'t')}<span>Terra <i>Incognita</i></span>${SIG}</div><button class="code" id="codebtn" data-tip="${esc(T('copyInv'))}" aria-label="${esc(T('copyInv'))}">${st.code}</button>
  <button class="icon" id="mute" data-tip="${esc(T('sound'))}" aria-label="${esc(T('sound'))}">${muted?'🔇':'🔊'}</button>${thmBtn()}<button class="icon" id="help" data-tip="${esc(T('help'))}" aria-label="${esc(T('help'))}">?</button></div>
- <div class="players">${list.map(p=>`<span data-p="${esc(p.name)}" class="chip ${p.name==me.name?'me':''} ${p.online?'':'off'} ${p.name==ex?'turn':''}"><span class="dot" style="background:${grad(p.color)}"></span>${esc(p.name)}${p.name==ex?` <span class="role" data-tip="${esc(T('explores'))}" aria-label="${esc(T('explores'))}">⛵</span>`:''}${p.name==tr?` <span class="role" data-tip="${esc(T('explored'))}" aria-label="${esc(T('explored'))}">🏝️</span>`:''}${p.name==st.host&&st.phase=='lobby'?` <span class="mut">${T('host')}</span>`:''}${isHost&&p.name!=me.name?`<button class="kick" data-kick="${esc(p.name)}" aria-label="${esc(T('kick'))} ${esc(p.name)}"></button>`:''}</span>`).join('')}</div>`}
+ <div class="players">${list.map(p=>`<span data-p="${esc(p.name)}" class="chip pc ${p.name==me.name?'me':''} ${p.online?'':'off'} ${p.name==ex?'turn':''}" style="--pc:${p.color}">${esc(p.name)}${p.name==ex?` <span class="role" data-tip="${esc(T('explores'))}" aria-label="${esc(T('explores'))}">⛵</span>`:''}${p.name==tr?` <span class="role" data-tip="${esc(T('explored'))}" aria-label="${esc(T('explored'))}">🏝️</span>`:''}${p.name==st.host?` <span class="role hostico" data-tip="${esc(T('host'))}" aria-label="${esc(T('host'))}">${LIGHT}</span>`:''}${isHost&&p.name!=me.name?`<button class="kick" data-kick="${esc(p.name)}" aria-label="${esc(T('kick'))} ${esc(p.name)}"></button>`:''}</span>`).join('')}</div>`}
 
 function view(){
  switch(st.phase){
@@ -2322,7 +2371,7 @@ function gLobbyBody(host,my,on){
  const seg=(items,cur,attr)=>`<div class="gseg">${items.map(([v,l])=>`<button ${attr}="${v}" class="${cur==v?'sel':''}">${l}</button>`).join('')}</div>`;
  return `<div class="card"><h3>${T('modeT')}</h3><div class="gtiles">${host?['exp','esc','por','mir'].map(tile).join(''):tile(md)}</div>${by}</div>
  <div class="card"><h3>${T('meteoT')}</h3>
-  <div class="gmets">${[0,1,2].map(i=>`<button data-vote="${i}" class="gmet ${my==i?'sel':''}"><span class="gmh"><b>${MN(i)}</b><span class="gauge" aria-hidden="true">${[0,1,2].map(j=>`<i class="${j<=i?'on':''}"></i>`).join('')}</span></span><span class="gline">${T('mq'+i)}</span><span class="gbad">${ORDER.map(r=>`<span class="${(R[r].lvl||0)<=i?'':'off'}" data-tip="${esc(RN(r)+' · '+RT(r,1))}">${regionBadge(r,22)}</span>`).join('')}</span></button>`).join('')}</div>
+  <div class="gmets">${[0,1,2].map(i=>`<button data-vote="${i}" class="gmet ${my==i?'sel':''}"><span class="gmh"><b>${MN(i)}</b><span class="wbars" aria-hidden="true">${[0,1,2].map(j=>`<i class="${j<=i?'on':''}"></i>`).join('')}</span></span><span class="gline">${T('mq'+i)}</span><span class="gbad">${ORDER.map(r=>`<span class="${(R[r].lvl||0)<=i?'':'off'}" data-tip="${esc(RN(r)+' · '+RT(r,1))}">${regionBadge(r,22)}</span>`).join('')}</span></button>`).join('')}</div>
   <div class="status">${st.players.map(p=>`<span class="chip"><span class="dot" style="background:${grad(p.color)}"></span>${esc(p.name)} · ${MN(st.votes[p.name]??1)}</span>`).join('')}</div>
   <p class="gby">${T('tonight',{m:`<b>${MN(mt)}</b>`})}</p></div>
  <div class="card"><h3>${T('lenT')}</h3>
@@ -2502,7 +2551,8 @@ function vCarnet(){const host=me.name==st.host;
 function gWho(c,k){const card=(c.cards||[]).find(x=>x.k==k),n=c.anonR?null:card?card.n:(c.cards?null:k),mine=myPend.cid==c.id&&myPend.k==k;
  if(n&&P(n))return `${DOT(n)}<div class="v"><span class="mut">${esc(n)}</span><br>`;
  return `<span class="dot ganon"></span><div class="v">${mine?`<span class="mut">${T('you2')}</span><br>`:''}`}
-const kwField=c=>`<label class="gkw">🗝️ ${T('kwLbl')}</label><input data-d="${c.id}:kw" maxlength="40" placeholder="${esc(T('kwPh'))}">`;
+/* « ta réponse en bref » : la personne qui répond à voix haute résume en quelques mots, pour que ça ne s'oublie pas (revient sur la carte et dans le bilan) */
+const kwField=c=>`<div class="kwbox"><div class="kwh"><span class="kwi" aria-hidden="true">📌</span><div><b>${T('kwT')}</b><p>${T('kwD')}</p></div></div><input data-d="${c.id}:kw" maxlength="40" placeholder="${esc(T('kwPh2'))}" aria-label="${esc(T('kwT'))}"></div>`;
 const gRematchBtns=()=>`<div class="grm"><button class="pri" id="rmSame"><b>⛵ ${T('sameCap')}</b><span>${T('sameCapD')}</span></button><button id="rmNew"><b>🧭 ${T('newCap')}</b><span>${T('newCapD')}</span></button></div>`;
 function bindRematch(){$('#rmSame')&&($('#rmSame').onclick=()=>send({t:'rematch',same:true}));$('#rmNew')&&($('#rmNew').onclick=()=>send({t:'rematch',same:false}))}
 // timer : anneau dans la barre d'aide
@@ -2529,11 +2579,11 @@ function gAfter(){if(!st)return;g2After();
 // bilan : textes lisibles d'une entrée d'historique
 function gQ(h){if(h.q.c)return h.q.c;const q=QBY[h.q.id];return q?trimQ(LQ(q).q).replaceAll('{Y}',h.terr):''}
 function gA(h){if(h.answer!=null&&QBY[h.q.id]){const q=LQ(QBY[h.q.id]);return h.type=='choix'?(q.o||[])[h.answer]||'':h.answer+' / 10'}
- if(h.rv&&h.rv.length)return h.rv.map(v=>typeof v=='string'?QQ(v):QQ(v.v)+' — '+v.n).join(' · ');return h.kw?'🗝️ '+h.kw:''}
+ if(h.rv&&h.rv.length)return h.rv.map(v=>typeof v=='string'?QQ(v):QQ(v.v)+' — '+v.n).join(' · ');return h.kw?'📌 '+h.kw:''}
 const gN=x=>Array.isArray(x)?x.length:+x||0;
 function gRecapData(e){const H=e.hist||[],out={};
  for(const p of e.players||[]){const mine=H.filter(h=>h.terr==p&&h.kind!='door'),it=(h,a)=>({r:h.r,q:gQ(h),a});
-  const full=h=>[gA(h),h.kw&&!gA(h).includes(h.kw)?'🗝️ '+h.kw:'',h.placeName?'✨ '+h.placeName:''].filter(Boolean).join(' · ')||'✨ '+T('surprise');
+  const full=h=>[gA(h),h.kw&&!gA(h).includes(h.kw)?'📌 '+h.kw:'',h.placeName?'✨ '+h.placeName:''].filter(Boolean).join(' · ')||'✨ '+T('surprise');
   const top=[...new Set([...mine.filter(h=>h.placeName),...mine.filter(h=>h.kw),...mine.filter(h=>gN(h.ko)&&h.answer!=null)])].slice(0,3),rest=mine.filter(h=>!top.includes(h));
   const three=top.map(h=>it(h,full(h))),surp=rest.filter(h=>gN(h.ko)).map(h=>it(h,full(h))),ans=rest.filter(h=>!gN(h.ko)&&gA(h)).map(h=>it(h,full(h)));
   const bots=H.filter(h=>h.terr==p&&h.q.c).map(h=>({r:'bouteille',q:h.q.c,a:h.q.by&&!e.anon?'🍾 '+h.q.by:'🍾'}));
