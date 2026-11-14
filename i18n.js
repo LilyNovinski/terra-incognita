@@ -469,6 +469,17 @@ ru:{fxAll:"Все вместе {e}!",fxGroup:"Вместе {e}!",fxGold:"✨ {n}
 zh:{fxAll:"大家一起 {e}！",fxGroup:"一起 {e}！",fxGold:"✨ {n}：金色反应！",fxTip:"提示：长按表情可发送超级表情，双击卡片可送出 ❤️"},
 he:{fxAll:"כולם {e}!",fxGroup:"ביחד {e}!",fxGold:"✨ {n}: תגובה זהובה!",fxTip:"טיפ: להחזיק אימוג'י לאימוג'י־על, הקשה כפולה על כרטיס ל־❤️"},
 pt:{fxAll:"Todo mundo {e}!",fxGroup:"Juntos {e}!",fxGold:"✨ {n}: reação dourada!",fxTip:"Dica: manter um emoji pressionado para um super emoji, toque duplo num cartão para um ❤️"}};for(const l in EXT_FUN)if(I18N[l])Object.assign(I18N[l].ui,EXT_FUN[l]);
+/* @i18n-theme */
+const EXT_THEME={fr:{thDark:"Mode nuit",thLight:"Mode jour"},
+en:{thDark:"Night mode",thLight:"Day mode"},
+es:{thDark:"Modo noche",thLight:"Modo día"},
+it:{thDark:"Modalità notte",thLight:"Modalità giorno"},
+de:{thDark:"Nachtmodus",thLight:"Tagmodus"},
+ru:{thDark:"Ночной режим",thLight:"Дневной режим"},
+zh:{thDark:"夜间模式",thLight:"日间模式"},
+he:{thDark:"מצב לילה",thLight:"מצב יום"},
+pt:{thDark:"Modo noite",thLight:"Modo dia"}};
+for(const l in EXT_THEME)if(I18N[l])Object.assign(I18N[l].ui,EXT_THEME[l]);
 
 /* @i18n-polish */
 const EXT_POL={fr:{timerD:"Le sablier laisse le temps de réfléchir et d'écrire, puis avance tout seul quand on regarde les réponses"},
