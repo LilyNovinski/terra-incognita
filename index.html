@@ -1249,11 +1249,12 @@ function clientPeer(cb){
   else console.warn(e)});
  p.on('disconnected',()=>{try{if(!p.destroyed)p.reconnect()}catch(e){}})}
 /* se connecter à un hôte ; onFail si l'ID n'existe pas, ne répond pas ou ferme avant l'état */
-function connectTo(id,onFail){
+function connectTo(id,onFail,ms=25000){
  let got=false,done=false;const fail=()=>{if(done||got)return;done=true;if(onUnavail===fail)onUnavail=null;try{c.close()}catch(e){}if(hostConn===c)hostConn=null;onFail&&onFail()};
  onUnavail=fail;
  const c=peer.connect(id,{reliable:true});hostConn=c;
- setTimeout(()=>{if(!c.open)fail()},6000);
+ /* WebRTC entre deux réseaux (4G, box) peut mettre >10 s à s'établir : ne pas couper trop tôt ; un code inexistant échoue tout de suite via peer-unavailable */
+ setTimeout(()=>{if(!c.open)fail()},ms);
  c.on('open',()=>{lastSeen=Date.now();c.send({t:'hello',name:me.name,color:me.color,saves:allSaves(),pend:window.gPend?gPend():null})});
  c.on('data',d=>{if(hostConn!==c)return;lastSeen=Date.now();
   if(d.t=='state'){got=true;migrating=false;onUnavail=null;const ph=st&&st.host;st=d.st;if(ph&&ph!=st.host)toast(T('newHost',{n:st.host}));persist();render();window.armTimer&&armTimer()}
@@ -1273,7 +1274,7 @@ function joinGame(code){
  isHost=false;migrating=false;migSeq++;joinCode=code;chatLog=[];if(peer)try{peer.destroy()}catch(e){}peer=null;
  app.innerHTML=`<div class="banner"><p class="serif">${T('rowing',{code:esc(code)})}</p><p class="mut" style="margin-top:8px">${T('joining')}</p></div>`;
  clientPeer(()=>{const mine=peer;let e=0;
-  setTimeout(()=>{if(peer===mine&&!st){toast(T('noReach'));leave()}},30000);
+  setTimeout(()=>{if(peer===mine&&!st){toast(T('noReach'));leave()}},45000);
   /* époque 0 (le code), puis 1..4 si l'hôte a changé et que le phare n'est pas encore là */
   const tryE=()=>{if(peer!==mine||st)return;connectTo(hid(code,e),()=>{if(peer!==mine||st)return;if(++e<=4)tryE();else{toast(T('noGame',{code}));leave()}})};
   tryE()})}
