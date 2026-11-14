@@ -415,6 +415,87 @@ button:focus-visible,.reg:focus-visible,select:focus-visible{outline:3px solid #
 .bex button{width:auto;padding:7px 12px;border-radius:99px;font:600 13px Nunito,Rubik,sans-serif;background:#fffdf7;border:2px dashed var(--edge2);box-shadow:none;color:var(--txt);text-align:start;transition:border-color .2s,background .2s,transform .15s}
 .bex button:hover{border-style:solid;border-color:var(--acc2);background:#fff4e8}
 .bex button:active{transform:scale(.97)}
+/* @css-map */
+
+
+
+
+/* @css-net */
+
+
+
+
+/* @css-game */
+.gtiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.gtile{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:start;padding:12px 14px;border-radius:18px;background:#fff;border:2px solid var(--edge);box-shadow:0 4px 0 var(--edge2);font:600 15px Nunito,sans-serif;color:var(--txt)}
+div.gtile{grid-column:1/-1}
+.gtile .gi{font-size:26px;line-height:1.1}
+.gtile .gt{display:flex;flex-direction:column}.gtile .gt b{font:600 17px Fredoka,Nunito,sans-serif}.gtile .gt .mut{font-size:13px;line-height:1.3}
+.gtile .gmin{margin-top:4px;font:700 12px Nunito;color:var(--deep);background:#e3f6f4;border-radius:99px;padding:2px 9px}
+.gtile.sel .gmin{background:#ffe2c6;color:var(--acc-d)}
+.gby{margin-top:10px;font-size:13px;color:var(--mut)}
+.gmets{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.gmet[data-vote]{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:6px;text-align:start;padding:12px;font:600 14px Nunito,sans-serif}
+.gmh{display:flex;align-items:center;justify-content:space-between;gap:6px}.gmh b{font:600 17px Fredoka,Nunito,sans-serif}
+.gauge{display:inline-flex;gap:2px;align-items:flex-end}.gauge i{width:5px;border-radius:2px;background:var(--edge)}.gauge i:nth-child(1){height:7px}.gauge i:nth-child(2){height:11px}.gauge i:nth-child(3){height:15px}.gauge i.on{background:#3aa7b5}
+.gline{font-size:13px;line-height:1.3;color:var(--mut);font-weight:700;min-height:34px}
+.gbad{display:flex;flex-wrap:wrap;gap:2px}.gbad>span{display:inline-flex;transition:opacity .2s}.gbad>span.off{opacity:.22;filter:grayscale(1)}
+.gbad .badge,.gbad svg{width:22px;height:22px;box-shadow:none;animation:none}
+.gseg{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}.gseg>button{flex:1;padding:9px 8px;font-size:15px;min-width:64px}
+.gsub{margin-top:8px;font-size:13px;color:var(--mut);font-weight:700}
+.gval{margin-top:8px;font:600 16px Fredoka,Nunito,sans-serif}
+h3.gh{margin-top:18px;font-size:17px}
+.gsw{display:flex;align-items:center;gap:12px;width:100%;margin-top:10px;text-align:start;font:600 14px Nunito,sans-serif;padding:10px 14px}
+.gsw i{flex:none;width:44px;height:26px;border-radius:99px;background:var(--edge);position:relative;transition:background .25s}
+.gsw i::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0003;transition:inset-inline-start .25s cubic-bezier(.3,1.4,.5,1)}
+.gsw.on{border-color:var(--acc);background:#fff4e8}.gsw.on i{background:var(--acc)}.gsw.on i::after{inset-inline-start:21px}
+.grecap{text-align:center;margin:16px 0 10px;font:700 14px Nunito;color:var(--deep)}
+.gnote{margin-top:10px;font-size:13px;font-weight:700;color:var(--deep)}
+.gkw{margin-top:14px}
+.gcount{border-style:dashed}
+.dot.ganon{background:repeating-linear-gradient(45deg,#d8bd88 0 3px,#ead6ae 3px 6px)}
+/* barre de progression */
+#gprog{display:flex;align-items:center;gap:12px;margin:-4px 4px 10px;padding:5px 12px 5px 16px;border-radius:99px;background:#fffaf0cc;font:700 12px Nunito;color:var(--deep)}
+#gprog .wake{flex:1;position:relative;height:6px;border-radius:99px;background:#d9eeee}
+#gprog .wake i{position:absolute;inset-block:0;inset-inline-start:0;border-radius:99px;background:linear-gradient(90deg,#7deac6,#13a983);transition:width .8s var(--e,ease)}
+#gprog .boat{position:absolute;top:50%;transform:translate(-50%,-58%);font-size:17px;transition:inset-inline-start .8s var(--e,ease);text-shadow:none}
+[dir=rtl] #gprog .boat{transform:translate(50%,-58%) scaleX(-1)}
+#gprog b{white-space:nowrap}
+#gprog.last .wake i{background:linear-gradient(90deg,var(--acc2),var(--acc))}
+#gprog.last b{color:var(--acc-d)}
+/* sablier */
+.tmr{display:inline-flex;align-items:center;gap:4px;flex:none}
+.tring{position:relative;width:42px;height:42px;padding:0;border-radius:50%;display:grid;place-items:center;background:#fff;box-shadow:none;border:none}
+.tring:active{transform:scale(.94);box-shadow:none}
+.tring svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.tring circle{fill:none;stroke-width:4}.tring .tbk{stroke:var(--edge)}.tring .tfg{stroke:#13a983;stroke-linecap:round;transition:stroke-dasharray .25s linear,stroke .3s}
+.tring b{position:relative;font:700 13px Nunito;color:var(--txt)}
+.tmr.low .tfg{stroke:var(--acc)}.tmr.low b{color:var(--acc-d)}
+.tmr.soft .tfg{stroke:#a9b8d6}.tmr.pz .tfg{stroke:var(--edge2)}
+.tplus{padding:4px 8px!important;font:700 12px Nunito!important;border-radius:99px;box-shadow:0 2px 0 var(--edge2)}
+/* fiches du bilan */
+.gfacts{list-style:none;margin:8px 0 0;padding:0}
+.gfacts li{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px dashed var(--edge)}
+.gfacts li:last-child{border-bottom:none}
+.gfacts li>div{flex:1;min-width:0;overflow-wrap:anywhere;font-weight:600}
+.gfacts .badge,.gfacts svg{flex:none;width:26px;height:26px;animation:none}
+.g3 li{background:#fff7ea;border:none;border-radius:14px;padding:10px 12px;margin-bottom:6px}
+.grc h3.gh:first-child{margin-top:0}
+.grm{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.grm button{display:flex;flex-direction:column;gap:2px;align-items:center;text-align:center}
+.grm button span{font:600 12px Nunito;opacity:.85}
+.grev{max-width:560px!important;text-align:start!important;max-height:86vh;overflow:auto}
+@media (max-width:480px){
+ .gmets{grid-template-columns:1fr}
+ .gline{min-height:0}
+ .gtile{padding:10px 12px}.gtile .gi{font-size:22px}
+ .grm{grid-template-columns:1fr}
+ .tring{width:38px;height:38px}
+}
+
+
+
+
 /* téléphone */
 @media (max-width:480px){
  .row:has(>[data-vote]){flex-direction:column}
@@ -588,14 +669,14 @@ let muted=LS.get('terra:mute',false);
 /* ---------- Helpers de jeu ---------- */
 const P=n=>st.players.find(p=>p.name==n);
 const col=n=>(P(n)||{}).color||'#888';
-const explorer=()=>st.order[st.turn%st.order.length];
+const explorer=()=>st.cur&&st.cur.explorer||gNextEx();
 const others=n=>st.order.filter(x=>x!=n);
 function mapOf(c,t,create){const m=st.maps[c]||(create?(st.maps[c]={}):{});return m[t]||(create?(m[t]=[]):[])}
 const isOld=l=>Date.now()-l.date>60*864e5;
 function status(c,t){const s={};ORDER.forEach(r=>s[r]={n:0,door:0,old:0});
  for(const l of mapOf(c,t)){const x=s[l.r];if(l.kind=='door')x.door++;else{x.n++;if(isOld(l))x.old++}}return s}
 function openSet(c,t){const s=status(c,t),o={};
- for(const r of ORDER){const d=R[r];o[r]=(d.lvl||0)<=st.meteo&&(!d.need.length||d.need.some(x=>s[x].n>0))}return o}
+ for(const r of ORDER){const d=R[r];o[r]=(d.lvl||0)<=st.meteo&&(!d.need.length||st.mode=='esc'||d.need.some(x=>s[x].n>0))}return o}
 function lockWhy(c,t,r){const d=R[r];if((d.lvl||0)>st.meteo)return T('lockMeteo');
  return T('lockNeed',{list:d.need.map(RN).join(T('or'))})}
 const saveKey=names=>'terra:save:'+[...names].map(s=>s.toLowerCase()).sort().join('|');
@@ -751,7 +832,7 @@ function tutorial(){const TU=D().tuto;let i=0,busy=false;
 const PREFIX='terra-incognita-v1-';
 function genCode(){const A='ABCDEFGHJKMNPQRSTUVWXYZ';let s='';for(let i=0;i<4;i++)s+=A[Math.floor(Math.random()*A.length)];return s}
 function allSaves(){const o={};try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k.startsWith('terra:save:'))o[k]=LS.get(k)}}catch(e){}return o}
-function persist(){if(!st||!st.order||!st.order.length)return;if(!['map','landed','end','carnet'].includes(st.phase))return;
+function persist(){if(!st||!st.order||!st.order.length)return;if(!['map','landed','end','recap','carnet'].includes(st.phase))return;
  const k=saveKey(st.order),cur=LS.get(k,null);if(cur&&cur.updatedAt>st.updatedAt)return;
  LS.set(k,{maps:st.maps,used:st.used,log:st.log,updatedAt:st.updatedAt})}
 
@@ -833,19 +914,20 @@ function send(a){if(isHost)act(me.name,a);else if(hostConn&&hostConn.open)hostCo
    ========================================================= */
 function pickQ(r,t){const used=st.used[t]||[];const pool=Q[r].filter(q=>!used.includes(q.id));const l=pool.length?pool:Q[r];return l[Math.floor(Math.random()*l.length)]}
 function guessers(){return st.order.filter(n=>n!=st.cur.terr&&P(n)&&P(n).online)}
-function checkAll(){const c=st.cur;if(!c||c.type=='ecoute')return;const gs=guessers();
- if(!gs.length||!gs.every(n=>c.guesses[n]!=null))return;
- if(c.type=='libre'){st.phase='judge';return}
- if(c.answer==null)return;
- c.result={};gs.forEach(n=>{const v=c.guesses[n];c.result[n]=c.type=='echelle'?Math.abs(v-c.answer)<=1:v==c.answer});
- st.phase='reveal'}
+function checkAll(force){const c=st.cur;if(!c||c.type=='ecoute'||st.phase!='question')return;const S=gSec(c),gs=guessers(),got=gs.filter(n=>S.g[n]!==undefined);
+ if(!force&&(!gs.length||got.length<gs.length))return;
+ if(!got.length){if(force)land('ear');return}
+ if(c.type=='libre'){c.cards=shuf(got.map(n=>{S.kn[S.k[n]]=n;return st.anon?{k:S.k[n],v:S.g[n]}:{k:S.k[n],v:S.g[n],n}}));st.phase='judge';return}
+ if(S.ans===undefined)return;
+ const res={};got.forEach(n=>{const v=S.g[n];res[n]=c.type=='echelle'?Math.abs(v-S.ans)<=1:v==S.ans});
+ gReveal(c,res,S)}
 function inkMark(c,n){if(!c.q.custom&&(c.type=='choix'||c.type=='echelle'))return {ref:{id:c.q.id,a:c.answer}};return {name:String(c.guesses[n]).slice(0,70)}}
 function land(mode){const c=st.cur,now=Date.now(),gs=others(c.terr);c.kind=mode;
  if(mode=='door')gs.forEach(n=>mapOf(n,c.terr,1).push({r:c.r,kind:'door',date:now}));
  else if(mode=='ear')gs.forEach(n=>mapOf(n,c.terr,1).push(c.q.custom?{r:c.r,kind:'ear',name:c.q.q,date:now}:{r:c.r,kind:'ear',ref:{id:c.q.id},date:now}));
- else for(const n in c.result)mapOf(n,c.terr,1).push(c.result[n]?{r:c.r,kind:'ink',...inkMark(c,n),date:now}:{r:c.r,kind:'sur',name:c.placeName,date:now});
+ else{const rb=gByName(c);for(const n in rb.res)if(P(n))mapOf(n,c.terr,1).push(rb.res[n]?{r:c.r,kind:'ink',...inkMark({...c,guesses:rb.g},n),date:now}:{r:c.r,kind:'sur',name:c.placeName,date:now})}
  if(!c.q.custom){st.used[c.terr]=st.used[c.terr]||[];if(!st.used[c.terr].includes(c.q.id))st.used[c.terr].push(c.q.id)}
- st.phase='landed'}
+ gHist(c);st.phase='landed'}
 function loadBestSave(){const k=saveKey(st.order);const cands=[LS.get(k,null)];for(const n in clientSaves)cands.push(clientSaves[n][k]);
  const best=cands.filter(x=>x&&x.maps).sort((a,b)=>b.updatedAt-a.updatedAt)[0];
  if(best){st.maps=best.maps;st.used=best.used||{};st.log=best.log||[]}else{st.maps={};st.used={};st.log=[]}}
@@ -854,27 +936,143 @@ function act(from,a){const s=st;if(!P(from))return;
  case 'vote':if(s.phase=='lobby'&&[0,1,2].includes(a.v))s.votes[from]=a.v;break;
  case 'length':if(from==s.host&&s.phase=='lobby'&&[3,5,7].includes(a.v))s.length=a.v;break;
  case 'start':{if(from!=s.host||s.phase!='lobby')return;const on=s.players.filter(p=>p.online);if(on.length<2)return;
-  s.order=on.map(p=>p.name);s.meteo=Math.min(...s.order.map(n=>s.votes[n]??1));s.turn=0;s.total=s.length*s.order.length;
+  s.order=on.map(p=>p.name);s.meteo=Math.min(...s.order.map(n=>s.votes[n]??1));s.turn=0;gStartX(s);s.total=s.L*s.order.length;
   loadBestSave();s.bottles={};s.order.forEach(n=>s.bottles[n]=1);s.flags={};s.cur=null;s.phase='map';break}
- case 'pick':{if(s.phase!='map'||from!=explorer())return;const t=a.terr;if(!s.order.includes(t)||t==from||!R[a.r])return;
+ case 'pick':{if(s.phase!='map'||from!=explorer())return;const t=a.terr;if(!s.order.includes(t)||t==from||!R[a.r]||(s.mode=='por'&&t!=pSub()))return;
   if(!openSet(from,t)[a.r])return;let q,type=R[a.r].t;
-  if(a.bottle&&s.bottles[from]>0){q={id:'b'+Date.now(),q:unQ(tidy(a.bottle).slice(0,200)),custom:from};type='libre';s.bottles[from]--}else q=pickQ(a.r,t);
-  s.cur={id:'c'+Date.now(),explorer:from,terr:t,r:a.r,q,type,answer:null,guesses:{},result:null,placeName:''};s.phase='question';break}
- case 'answer':if(s.phase!='question'||from!=s.cur.terr||!['choix','echelle'].includes(s.cur.type))return;s.cur.answer=a.v;checkAll();break;
- case 'guess':if(s.phase!='question'||from==s.cur.terr||s.cur.type=='ecoute')return;s.cur.guesses[from]=typeof a.v=='string'?tidy(a.v).slice(0,140):a.v;checkAll();break;
- case 'judge':if(s.phase!='judge'||from!=s.cur.terr)return;s.cur.result={};for(const n in s.cur.guesses)s.cur.result[n]=!!(a.v||{})[n];s.phase='reveal';break;
+  if(a.bottle&&s.bottles[from]>0){q={id:'b'+Date.now(),q:unQ(tidy(a.bottle).slice(0,200)),custom:from,...(s.anon?{anon:1}:{})};type='libre';s.bottles[from]--}else q=pickQ(a.r,t);
+  s.lp=from;s.cur={id:'c'+Date.now(),explorer:from,terr:t,r:a.r,q,type,answer:null,guesses:{},result:null,placeName:'',answered:false,sent:[],wind:WIND};s.phase='question';break}
+ case 'answer':if(s.phase!='question'||from!=s.cur.terr||!['choix','echelle'].includes(s.cur.type)||!gValid(s.cur,a.v))return;gSec(s.cur).ans=a.v;s.cur.answered=true;checkAll();break;
+ case 'guess':if(s.phase!='question'||from==s.cur.terr||s.cur.type=='ecoute')return;gGuess(s.cur,from,a);break;
+ case 'judge':if(s.phase!='judge'||from!=s.cur.terr)return;gJudge(s.cur,a);break;
  case 'door':if(!['question','judge'].includes(s.phase)||from!=s.cur.terr)return;land('door');break;
- case 'listened':if(s.phase!='question'||s.cur.type!='ecoute'||from!=s.cur.terr)return;land('ear');break;
+ case 'listened':if(s.phase!='question'||s.cur.type!='ecoute'||from!=s.cur.terr)return;s.cur.kw=gKw(a.kw);land('ear');break;
  case 'toName':if(s.phase!='reveal'||(from!=s.cur.explorer&&from!=s.host))return;if(Object.values(s.cur.result).some(x=>!x))s.phase='name';else land('ink');break;
  case 'name':if(s.phase!='name'||from!=s.cur.terr)return;s.cur.placeName=tidy(a.v).replace(/[\s.,;:。、]+$/u,'').slice(0,50);land('named');break;
- case 'next':if(s.phase!='landed'||(from!=s.cur.explorer&&from!=s.host))return;s.turn++;s.cur=null;s.phase=s.turn>=s.total?'end':'map';break;
- case 'skip':if(from!=s.host||s.phase=='lobby'||s.phase=='end'||s.phase=='carnet')return;s.turn++;s.cur=null;s.phase=s.turn>=s.total?'end':'map';break;
+ case 'next':if(s.phase!='landed'||(from!=s.cur.explorer&&from!=s.host))return;if(gMirror(s))break;s.turn++;s.cur=null;s.phase=s.turn>=s.total?'end':'map';break;
+ case 'skip':if(from!=s.host||s.phase=='lobby'||s.phase=='end'||s.phase=='carnet')return;if(s.mode=='mir')s.lp=s.cur&&!s.cur.mir?s.cur.explorer:explorer();s.turn++;s.cur=null;s.phase=s.turn>=s.total?'end':'map';break;
  case 'finish':if(from!=s.host)return;s.cur=null;s.phase='end';break;
- case 'flags':if(s.phase!='end')return;const fv={};for(const n in (a.v||{}))fv[n]=tidy(a.v[n]).slice(0,240);s.flags[from]=fv;
-  if(s.order.filter(n=>P(n).online).every(n=>s.flags[n])){s.log.push({date:Date.now(),meteo:s.meteo,players:[...s.order],flags:s.flags});s.phase='carnet'}break;
+ case 'flags':if(s.phase!='end')return;const fv={};for(const n in (a.v||{}))fv[n]=tidy(a.v[n]).slice(0,240);if(s.anon){if(SECF.gid!==s.gid)SECF={gid:s.gid,f:{}};SECF.f[from]=fv;s.flags[from]=true}else s.flags[from]=fv;
+  if(s.order.filter(n=>P(n).online).every(n=>s.flags[n]))gFinish(s);break;
  case 'again':if(from!=s.host)return;s.phase='lobby';s.votes={};s.cur=null;s.players=s.players.filter(p=>p.online);break;
+ case 'mode':if(from!=s.host||s.phase!='lobby'||!['exp','esc','por','mir'].includes(a.v))return;s.mode=a.v;break;
+ case 'timer':if(from!=s.host||s.phase!='lobby'||!TIM.includes(a.v))return;s.timer=a.v;break;
+ case 'anon':if(from!=s.host||s.phase!='lobby')return;s.anon=!!a.v;break;
+ case 'pause':{if(['lobby','recap','carnet'].includes(s.phase))return;const now=Date.now();
+  if(s.paused!=null){s.dl=now+s.paused;s.paused=null}else if(s.dl){s.paused=Math.max(0,s.dl-now);s.dl=null}else return;s.pby=from;break}
+ case 'plus30':if(from!=s.host)return;if(s.paused!=null)s.paused+=3e4;else if(s.dl)s.dl=Math.max(s.dl,Date.now())+3e4;else return;s.dlT=Math.max(s.dlT||0,(s.paused??(s.dl-Date.now())));break;
+ case 'pfDone':if(s.phase!='pfiche'||(from!=s.host&&from!=explorer()))return;s.phase='map';break;
+ case 'recapDone':if(from!=s.host||s.phase!='recap')return;s.phase='carnet';break;
+ case 'rematch':if(from!=s.host||!['end','recap','carnet'].includes(s.phase))return;gReset(s);s.phase='lobby';s.players=s.players.filter(p=>p.online);
+  if(a.same){act(from,{t:'start'});if(st.phase=='lobby'){tmSync();bump()}return}break;
  default:return}
- bump()}
+ tmSync();bump()}
+
+/* === game : règles (timer, modes, anonymat, bilan) === */
+const MODE=()=>st&&st.mode||'exp';
+const TIM=[0,1.5,1,.7],EF={0:1.15,1.5:1.05,1:1,0.7:.8};
+const TF=()=>MODE()=='esc'?.7:(st.timer??1);
+const rnd=n=>crypto.getRandomValues(new Uint32Array(1))[0]%n;
+const shuf=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
+const gSlot=()=>[...crypto.getRandomValues(new Uint8Array(6))].map(b=>b.toString(16).padStart(2,'0')).join('');
+const gKw=s=>tidy(s||'').slice(0,60);
+const gValid=(c,v)=>c.type=='libre'?typeof v=='string'&&!!tidy(v):Number.isInteger(v)&&v>=0&&v<=(c.type=='choix'?9:10);
+// secret de l'hôte, JAMAIS dans st : réponses en attente, slot ↔ auteur
+let SEC={cid:null},SECF={gid:null,f:{}},myPend={cid:null},TK='',RCV=0,RCVV=-1,GID,WIND=0,PZ=null;
+function gSec(c){if(SEC.cid!==c.id){SEC={cid:c.id,g:{},k:{},kn:{},ans:undefined,res:null};
+  if(myPend.cid===c.id){if(myPend.ans!==undefined&&c.terr==me.name)SEC.ans=myPend.ans;if(myPend.g!==undefined&&c.terr!=me.name){SEC.g[me.name]=myPend.g;SEC.k[me.name]=myPend.k;SEC.kn[myPend.k]=me.name}}
+  if(c.sent)c.sent=c.sent.filter(n=>SEC.g[n]!==undefined);if(c.answered!=null)c.answered=SEC.ans!==undefined;
+  (c.cards||[]).forEach(cd=>{if(cd.n)SEC.kn[cd.k]=cd.n})}
+ return SEC}
+// nouvel hôte : un client peut renvoyer ce qu'il avait envoyé (myPend), pour ne rien perdre
+window.gPend=()=>myPend;
+window.gRestore=(name,p)=>{try{const c=st&&st.cur;if(!isHost||!c||!p||p.cid!==c.id||st.phase!='question')return;const S=gSec(c);
+ if(name==c.terr&&p.ans!==undefined&&gValid(c,p.ans)){S.ans=p.ans;c.answered=true}
+ else if(name!=c.terr&&p.g!==undefined&&gValid(c,p.g)){gGuess(c,name,{v:p.g,k:p.k});return}checkAll()}catch(e){}};
+function gK(c,v,terr){if(myPend.cid!==c.id)myPend={cid:c.id,k:gSlot()};if(terr)myPend.ans=v;else myPend.g=v;return myPend.k}
+function gGuess(c,from,a){const S=gSec(c);let v=a.v;if(typeof v=='string')v=tidy(v).slice(0,140);if(!gValid(c,v))return;
+ let k=typeof a.k=='string'&&/^[0-9a-f]{12}$/.test(a.k)&&(!S.kn[a.k]||S.kn[a.k]==from)?a.k:gSlot();
+ if(S.k[from]&&S.k[from]!==k)delete S.kn[S.k[from]];
+ S.g[from]=v;S.k[from]=k;S.kn[k]=from;c.sent=c.sent||[];if(!c.sent.includes(from))c.sent.push(from);checkAll()}
+function gReveal(c,res,S){S.res=res;c.answer=S.ans??null;c.guesses={};c.result={};
+ for(const n of shuf(Object.keys(res))){const key=st.anon?(S.k[n]||gSlot()):n;c.guesses[key]=S.g[n];c.result[key]=res[n]}
+ c.anonR=!!st.anon;delete c.cards;st.phase='reveal'}
+function gJudge(c,a){const S=gSec(c),v=a.v||{},gs=others(c.terr),res={},cards=c.cards||[],used=new Set();
+ cards.forEach(cd=>{const n=S.kn[cd.k]||cd.n;if(n&&gs.includes(n))used.add(n)});
+ const free=gs.filter(x=>!used.has(x));// secret perdu (changement d'hôte) : on répartit sans rien révéler
+ for(const cd of cards){let n=S.kn[cd.k]||cd.n;if(!n||!gs.includes(n))n=free.shift();if(!n||res[n]!==undefined)continue;res[n]=!!v[cd.k];S.g[n]=cd.v;S.k[n]=cd.k}
+ c.kw=gKw(a.kw);gReveal(c,res,S)}
+function gByName(c){if(SEC.cid===c.id&&SEC.res)return {res:SEC.res,g:SEC.g};
+ if(!c.anonR)return {res:c.result||{},g:c.guesses||{}};
+ const gs=others(c.terr),res={},g={};Object.keys(c.result||{}).forEach((k,i)=>{if(gs[i]){res[gs[i]]=c.result[k];g[gs[i]]=c.guesses[k]}});return {res,g}}
+function gHist(c){if(!st.hist)st.hist=[];const ok=[],ko=[],rv=[];
+ if(c.kind=='ink'||c.kind=='named'){const rb=gByName(c);for(const n in rb.res){(rb.res[n]?ok:ko).push(n);if(rb.res[n]&&c.type=='libre')rv.push(String(rb.g[n]).slice(0,140))}}
+ st.hist.push({terr:c.terr,ex:c.explorer,r:c.r,q:c.q.custom?{c:c.q.q,by:st.anon?null:c.explorer}:{id:c.q.id},type:c.type,answer:c.answer??null,placeName:c.placeName||'',kind:c.kind,
+  ok:st.anon?ok.length:ok,ko:st.anon?ko.length:ko,kw:c.kw||'',rv:shuf(rv)});if(st.hist.length>200)st.hist.shift()}
+function gFinish(s){if(['recap','carnet'].includes(s.phase))return;let fl=s.flags;
+ if(s.anon){fl={};const F=SECF.gid===s.gid?SECF.f:{};for(const [to,t] of shuf(Object.values(F).flatMap(o=>Object.entries(o))))fl[gSlot()]={[to]:t}}
+ s.log.push({date:Date.now(),meteo:s.meteo,players:[...s.order],flags:fl,hist:s.hist||[],mode:MODE(),anon:!!s.anon,gid:s.gid});s.cur=null;s.phase='recap'}
+function gStartX(s){if(s.mode=='mir'&&s.order.length!=2)s.mode='exp';if(s.order.length<3)s.anon=false;
+ s.L=MODE()=='esc'?2:s.length;s.hist=[];s.td=[];s.gid=Date.now().toString(36);s.tt=Date.now();s.tTurn=0;s.lp=null;s.pf=null;s.dl=null;s.paused=null;
+ SEC={cid:null};SECF={gid:s.gid,f:{}}}
+function gReset(s){s.turn=0;s.total=0;s.cur=null;s.flags={};s.bottles={};s.hist=[];s.td=[];s.dl=null;s.paused=null;s.pf=null;s.lp=null;SEC={cid:null};SECF={gid:null,f:{}}}
+// Portrait : tout le monde explore la même île ; Miroir : la question revient en face
+const pSub=()=>st.order[Math.floor(st.turn/(st.L||st.length))%st.order.length];
+function gNextEx(){const o=st.order;if(!o.length)return null;
+ if(st.mode=='por'){const s=pSub(),x=others(s);return x[(st.turn%(st.L||st.length))%x.length]}
+ if(st.mode=='mir'&&st.lp&&o.includes(st.lp))return o.find(n=>n!=st.lp);
+ return o[st.turn%o.length]}
+function gMirror(s){const c=s.cur;if(s.mode!='mir'||!c||c.mir||c.kind=='door'||s.turn+1>=s.total)return false;
+ if(!s.order.includes(c.explorer)||!s.order.includes(c.terr)||!openSet(c.terr,c.explorer)[c.r])return false;
+ s.turn++;s.cur={id:'c'+Date.now(),explorer:c.terr,terr:c.explorer,r:c.r,q:c.q,type:c.type,answer:null,guesses:{},result:null,placeName:'',answered:false,sent:[],mir:true};s.phase='question';return true}
+// Timer : durées de base (Normal), multipliées par le facteur
+const TB={map:45,choix:40,echelle:40,libre:75,ecoute:120,judge:60,reveal:20,name:40,landed:8,end:120,pfiche:20};
+const gKey=s=>s.phase+'|'+(s.cur&&s.cur.id)+'|'+s.turn+'|'+(s.cur&&s.cur.grace||0);
+function tmDur(){const s=st,f=TF();let k=s.phase,soft=false;
+ if(k=='pfiche')return {d:20,soft:false};if(!f)return null;
+ if(k=='question'){if(s.cur.grace)return {d:15,soft:false};k=s.cur.type;soft=k=='ecoute'}else if(k=='judge')soft=true;
+ let d=TB[k];if(d==null)return null;if(MODE()=='esc'&&(k=='reveal'||k=='landed'))d/=2;return {d:d*f,soft}}
+function tmSync(){const s=st;if(!s||!isHost)return false;let ch=false;
+ if(s.phase!='lobby'&&s.tt!=null&&s.turn!==s.tTurn){if(s.tTurn!=null&&s.turn>s.tTurn){(s.td=s.td||[]).push(Date.now()-s.tt);if(s.td.length>30)s.td.shift()}s.tTurn=s.turn;s.tt=Date.now();ch=true}
+ if(s.phase=='end'&&MODE()=='esc'){gFinish(s);ch=true}
+ if(MODE()=='por'&&s.phase=='map'&&s.turn>0&&s.turn%(s.L||s.length)==0&&s.pf!==s.turn){s.pf=s.turn;s.phase='pfiche';ch=true}
+ if(s.cur&&s.phase=='question'&&SEC.cid!==s.cur.id){const a=(s.cur.sent||[]).length+(s.cur.answered?1:0);gSec(s.cur);if((s.cur.sent||[]).length+(s.cur.answered?1:0)!==a)ch=true}
+ const key=gKey(s);if(!TK&&(s.dl||s.paused!=null))armTimer();
+ if(key!==TK){TK=key;const t=tmDur();s.dl=t?Date.now()+t.d*1000:null;s.dlT=t?t.d*1000:0;s.tsoft=!!(t&&t.soft);s.paused=null;ch=true}
+ return ch}
+function armTimer(){if(!st)return;TK=gKey(st);if(st.dl){const r=tmRem();if(r!=null)st.dl=Date.now()+r}}
+window.armTimer=armTimer;
+function tmRem(){if(!st)return null;if(st.paused!=null)return st.paused;if(!st.dl)return null;return st.dl-(st.updatedAt+(Date.now()-(RCV||Date.now())))}
+function gExpire(){const s=st,c=s.cur;
+ switch(s.phase){
+ case 'map':{const ex=explorer();if(!ex||!P(ex))return;
+  const isl=MODE()=='por'?[pSub()]:shuf(others(ex)).sort((a,b)=>mapOf(ex,a).filter(l=>l.kind!='door').length-mapOf(ex,b).filter(l=>l.kind!='door').length);
+  for(const t of isl){const op=openSet(ex,t),rs=ORDER.filter(r=>op[r]);if(rs.length){WIND=1;try{act(ex,{t:'pick',terr:t,r:rs[rnd(rs.length)]})}finally{WIND=0}return}}
+  act(s.host,{t:'skip'});return}
+ case 'question':if(c.type=='ecoute')return;
+  if(c.type!='libre'&&gSec(c).ans===undefined){if(!c.grace){c.grace=1;return}land('door');return}
+  checkAll(true);return;
+ case 'reveal':act(s.host,{t:'toName'});return;
+ case 'name':act(c.terr,{t:'name',v:''});return;
+ case 'landed':act(s.host,{t:'next'});return;
+ case 'end':gFinish(s);return;
+ case 'pfiche':s.phase='map';return}}
+function gTick(){if(!st)return;gRing();if(!isHost)return;let ch=tmSync();
+ if(st.dl&&!st.tsoft&&st.paused==null&&Date.now()>=st.dl){st.dl=null;gExpire();tmSync();ch=true}
+ if(ch)bump()}
+setInterval(gTick,250);
+// Estimation : on simule les tours (glouton sur openSet) pour connaître leur type
+function gSim(meteo,L,esc){const cnt={};ORDER.forEach(r=>cnt[r]=0);const out=[];
+ for(let i=0;i<L;i++){const op=ORDER.filter(r=>(R[r].lvl||0)<=meteo&&(esc||!R[r].need.length||R[r].need.some(x=>cnt[x]>0)));
+  let b=op[0];for(const r of op)if(cnt[r]<cnt[b])b=r;cnt[b]++;out.push(R[b].t)}return out}
+const gTurnS=(t,k)=>t=='ecoute'?155:t=='libre'?173+15*k:110+5*k;
+function gEst(o){const n=Math.max(2,o.n),esc=o.mode=='esc',L=esc?2:o.len,f=EF[esc?.7:o.tf]??1,k=n-1;
+ const per=gSim(o.meteo,L,esc).reduce((a,t)=>a+gTurnS(t,k),0)*f,endS=(esc?0:20*n)+90;
+ return {min:Math.max(5,Math.round((per*n+60+endS)/300)*5),perTurn:per/L,endS}}
+function gProg(){const s=st,w={question:.25,judge:.5,reveal:.65,name:.75,landed:.9}[s.phase]||0,done=Math.min(s.total,s.turn+w);
+ const E=gEst({n:s.order.length,mode:MODE(),meteo:s.meteo,len:s.L||s.length,tf:s.timer??1}),td=s.td||[];
+ const avg=td.length>=2?td.reduce((a,b)=>a+b,0)/td.length/1000:E.perTurn;
+ return {pct:s.total?Math.round(90*done/s.total):0,min:Math.max(1,Math.round(((s.total-done)*avg+E.endS)/60)),last:s.turn>=s.total-1}}
 
 /* =========================================================
    RENDU
@@ -910,6 +1108,7 @@ function render(){
  $$('[data-kick]').forEach(b=>b.onclick=()=>{const n=b.dataset.kick;ask(T('kickAsk',{n:B(n)}),T('kick')).then(v=>v&&kick(n))});
  const hb=$('#homebtn');if(hb){hb.onclick=()=>ask(T('leaveAsk'),T('home')).then(v=>v&&leave());hb.onkeydown=e=>{if(e.key=='Enter'||e.key==' '){e.preventDefault();hb.onclick()}}}
  v.bind&&v.bind();
+ gAfter();
  if(key!=lastPhaseKey){lastPhaseKey=key;
 
   if(st.phase=='reveal'){SFX.reveal();const res=st.cur.result||{};if(Object.values(res).some(x=>x))setTimeout(()=>confetti(res[me.name]?46:22),700)}
@@ -918,7 +1117,7 @@ function render(){
 function copyInvite(){const url=/^https?:/.test(location.protocol)?'\n'+location.origin+location.pathname+'#'+st.code:'';const t=T('invite',{code:st.code})+url;
  try{navigator.clipboard.writeText(t).then(()=>toast(T('copied')),()=>toast(T('codeIs',{code:st.code})))}catch(e){toast(T('codeIs',{code:st.code}))}}
 function topbar(){
- const ex=st.order.length&&!['lobby','end','carnet'].includes(st.phase)?explorer():null,tr=st.cur&&st.cur.terr;
+ const ex=st.order.length&&!['lobby','end','recap','carnet'].includes(st.phase)?explorer():null,tr=st.cur&&st.cur.terr;
  const list=(st.order.length&&st.phase!='lobby'?st.order.map(P):st.players).filter(Boolean);
  return `<div class="top"><div class="brand" id="homebtn" role="button" tabindex="0" data-tip="${esc(T('home'))}" aria-label="${esc(T('home'))}">${ASSETS.logo?`<img src="${ASSETS.logo}" alt="">`:LOGO(30,'t')}<span>Terra <i>Incognita</i></span>${SIG}</div><button class="code" id="codebtn" data-tip="${esc(T('copyInv'))}" aria-label="${esc(T('copyInv'))}">${st.code}</button>
  <button class="icon" id="mute" data-tip="${esc(T('sound'))}" aria-label="${esc(T('sound'))}">${muted?'🔇':'🔊'}</button><button class="icon" id="help" data-tip="${esc(T('help'))}" aria-label="${esc(T('help'))}">?</button></div>
@@ -934,6 +1133,8 @@ function view(){
  case 'name':return vName();
  case 'landed':return vLanded();
  case 'end':return vEnd();
+ case 'pfiche':return vPfiche();
+ case 'recap':return vRecap();
  case 'carnet':return vCarnet()}
  return {html:''}}
 
@@ -943,21 +1144,42 @@ function vLobby(){
  return {mine:host&&on>=2,
  hint:host?T(on<2?'hostShare':'hostReady'):T('waitHost',{n:`<b>${esc(st.host)}</b>`}),
  html:`<div class="card c"><p class="mut">${T('islandCode')}</p><div class="bigcode">${[...st.code].map((ch,i)=>`<span style="animation-delay:${i*.08}s">${ch}</span>`).join('')}</div><p class="mut" style="margin-bottom:12px">${on>=3?T('archipel',{n:on}):on==2?T('duo'):T('waitOther')}</p><button id="copy">${T('copyInv')}</button></div>
- <div class="card"><h3>${T('meteoT')}</h3><p class="mut" style="margin-top:4px">${T('meteoD')}</p>
-  <div class="row" style="margin-top:12px">${[0,1,2].map(i=>`<button data-vote="${i}" class="${my==i?'sel':''}"><b style="font-weight:500">${MN(i)}</b><br><span class="mut">${T('m'+i+'d')}</span></button>`).join('')}</div>
-  <div class="status">${st.players.map(p=>`<span class="chip"><span class="dot" style="background:${grad(p.color)}"></span>${esc(p.name)} · ${MN(st.votes[p.name]??1)}</span>`).join('')}</div></div>
- <div class="card"><h3>${T('lenT')}</h3><p class="mut" style="margin-top:4px">${T('lenD')}</p>
-  <div class="row" style="margin-top:12px">${[3,5,7].map(v=>`<button data-len="${v}" class="${st.length==v?'sel':''}" ${host?'':'disabled'}>${T('len'+v)} · ${v}</button>`).join('')}</div></div>
- ${host?`<button class="pri wide" id="start" ${on<2?'disabled':''}>${T('start')}</button>`:''}
+ ${gLobbyBody(host,my,on)}
  <button class="ghost wide" id="quit">${T('quit')}</button>`,
  bind(){$('#copy').onclick=copyInvite;$$('[data-vote]').forEach(b=>b.onclick=()=>send({t:'vote',v:+b.dataset.vote}));
   $$('[data-len]').forEach(b=>b.onclick=()=>send({t:'length',v:+b.dataset.len}));
+  $$('[data-mode]').forEach(b=>b.onclick=()=>send({t:'mode',v:b.dataset.mode}));
+  $$('[data-tm]').forEach(b=>b.onclick=()=>send({t:'timer',v:TIM[+b.dataset.tm]}));
+  $('#anon')&&($('#anon').onclick=()=>send({t:'anon',v:!st.anon}));
   $('#start')&&($('#start').onclick=()=>send({t:'start'}));$('#quit').onclick=leave}}}
+/* === game : salon === */
+const GMI={exp:'⛵',esc:'⚡',por:'🎯',mir:'🪞'};
+function gLobbyBody(host,my,on){
+ const onl=st.players.filter(p=>p.online),md=st.mode=='mir'&&on!=2?'exp':MODE(),isEsc=md=='esc',mt=Math.min(2,...onl.map(p=>st.votes[p.name]??1));
+ const tf=st.timer??1,an=!!st.anon&&on>=3,L=isEsc?2:st.length,est=o=>gEst({n:on,mode:md,meteo:mt,len:st.length,tf,...o}).min,E=est();
+ const by=host?'':`<p class="gby">${T('chosenBy',{n:B(st.host)})}</p>`;
+ const tile=m=>{const dis=m=='mir'&&on!=2,tag=host?'button':'div';return `<${tag} class="gtile ${md==m?'sel':''}" ${host?`data-mode="${m}" ${dis?'disabled':''}`:''}><span class="gi">${GMI[m]}</span><span class="gt"><b>${T('mo_'+m)}</b><span class="mut">${T(dis?'mirOnly':'mo_'+m+'D')}</span></span><span class="gmin">≈ ${est({mode:m})} min</span></${tag}>`};
+ const seg=(items,cur,attr)=>`<div class="gseg">${items.map(([v,l])=>`<button ${attr}="${v}" class="${cur==v?'sel':''}">${l}</button>`).join('')}</div>`;
+ return `<div class="card"><h3>${T('modeT')}</h3><div class="gtiles">${host?['exp','esc','por','mir'].map(tile).join(''):tile(md)}</div>${by}</div>
+ <div class="card"><h3>${T('meteoT')}</h3>
+  <div class="gmets">${[0,1,2].map(i=>`<button data-vote="${i}" class="gmet ${my==i?'sel':''}"><span class="gmh"><b>${MN(i)}</b><span class="gauge" aria-hidden="true">${[0,1,2].map(j=>`<i class="${j<=i?'on':''}"></i>`).join('')}</span></span><span class="gline">${T('mq'+i)}</span><span class="gbad">${ORDER.map(r=>`<span class="${(R[r].lvl||0)<=i?'':'off'}" data-tip="${esc(RN(r)+' · '+RT(r,1))}">${regionBadge(r,22)}</span>`).join('')}</span></button>`).join('')}</div>
+  <div class="status">${st.players.map(p=>`<span class="chip"><span class="dot" style="background:${grad(p.color)}"></span>${esc(p.name)} · ${MN(st.votes[p.name]??1)}</span>`).join('')}</div>
+  <p class="gby">${T('tonight',{m:`<b>${MN(mt)}</b>`})}</p></div>
+ <div class="card"><h3>${T('lenT')}</h3>
+  ${isEsc?'':host?seg([3,5,7].map(v=>[v,T('len'+v)]),st.length,'data-len'):`<p class="gval">${T('len'+st.length)}</p>`}
+  <p class="gsub">${isEsc?'⚡ ':''}${T('zonesPP',{z:L})} · ≈ ${E} min</p>
+  <h3 class="gh">⏳ ${T('timerT')}</h3>
+  ${isEsc?`<p class="gval">⚡ ${T('tm3')}</p>`:host?seg(TIM.map((v,i)=>[i,T('tm'+i)]),TIM.indexOf(tf),'data-tm'):`<p class="gval">${T('tm'+TIM.indexOf(tf))}</p>`}
+  <p class="gsub">${T(isEsc||tf?'timerD':'timer0D')}</p>
+  ${on>=3?`<h3 class="gh">🎭 ${T('anonT')}</h3>${host?`<button class="gsw ${an?'on':''}" id="anon" role="switch" aria-checked="${an}"><i></i><span>${T('anonD')}</span></button>`:`<p class="gval">${an?'✓ '+T('anonD'):T('anonOff')}</p>`}`:''}
+  ${by}</div>
+ <p class="grecap">${[GMI[md]+' '+T('mo_'+md),MN(mt),T('tm'+TIM.indexOf(isEsc?.7:tf)),T('people',{n:on})].join(' · ')}${an?' · 🎭':''}${host?'':` · ⏱ ≈ ${E} min`}</p>
+ ${host?`<button class="pri wide" id="start" ${on<2?'disabled':''}>${T('startEst',{t:E})}</button>`:''}`}
 
 /* ---------- Carte ---------- */
 function vMap(){
  const ex=explorer(),mine=ex==me.name,round=Math.floor(st.turn/st.order.length)+1,total=st.total/st.order.length;
- const head=`<p class="mut c">${T('expHead',{e:st.log.length+1,m:MN(st.meteo),r:round,t:total})}</p>`;
+ const head='';
  const hostBtn=me.name==st.host&&!mine?`<button class="ghost" id="skip" style="padding:4px 8px">${T('skip')}</button>`:'';
  const finBtn=me.name==st.host?`<button class="ghost wide" id="finish">${T('finishNow')}</button>`:'';
  const bindFin=()=>{$('#finish')&&($('#finish').onclick=()=>ask(T('finishAsk'),T('finishYes')).then(v=>v&&send({t:'finish'})))};
@@ -970,7 +1192,7 @@ function vMap(){
   <div class="map">${svgMap(me.name,ui.mapTab)}</div><div style="margin-top:10px">${lmList(mapOf(me.name,ui.mapTab))}</div></div>
   ${finBtn}`,
   bind(){$$('[data-tab]').forEach(b=>b.onclick=()=>{ui.mapTab=b.dataset.tab;render()});$('#skip')&&($('#skip').onclick=()=>send({t:'skip'}));bindFin()}}}
- const tabs=others(me.name);if(!tabs.includes(ui.terr)){ui.terr=tabs[0];ui.region=null}
+ const tabs=st.mode=='por'?[pSub()]:others(me.name);if(!tabs.includes(ui.terr)){ui.terr=tabs[0];ui.region=null}
  const t=ui.terr,op=openSet(me.name,t),r=ui.region,bottles=st.bottles[me.name]||0;
  let sheet='';
  if(r){const ok=op[r],s=status(me.name,t)[r];
@@ -996,16 +1218,17 @@ function vMap(){
 
 /* ---------- Question ---------- */
 function qHead(c){const q=LQ(c.q);return `<div class="card sheet"><div class="rhead">${regionBadge(c.r)}<div><p class="mut">${T('exploresIsland',{a:BW(c.explorer),b:BW(c.terr)})}</p><h3>${RN(c.r)} <span class="mut">· ${RT(c.r,1)}</span></h3></div></div>
- ${c.q.custom?`<p class="mut" style="margin-top:12px">${T('bottleFrom',{n:esc(c.q.custom)})}</p>`:''}<p class="q" style="margin-top:12px">${fy(q.q,c.terr)}</p></div>`}
+ ${c.wind||c.mir?`<p class="gnote">${T(c.mir?'mirLine':'wind')}</p>`:''}${c.q.custom?`<p class="mut" style="margin-top:12px">${c.q.anon?T('bottleAnon'):T('bottleFrom',{n:esc(c.q.custom)})}</p>`:''}<p class="q" style="margin-top:12px">${fy(q.q,c.terr)}</p></div>`}
 function choiceInput(c,key){
  const sel=drafts[key],q=LQ(c.q);
  if(c.type=='choix')return q.o.map((o,i)=>`<button class="opt ${sel==i?'sel':''}" data-opt="${i}">${esc(o)}</button>`).join('');
  const v=sel??5;return `<div class="val" id="vv">${v}</div><input type="range" min="0" max="10" value="${v}" id="rg" style="--p:${v*10}%"><div class="scale"><span>${esc(q.a)}</span><span>${esc(q.b)}</span></div>`}
 function bindChoice(c,key){$$('[data-opt]').forEach(b=>b.onclick=()=>{drafts[key]=+b.dataset.opt;$$('[data-opt]').forEach(x=>x.classList.toggle('sel',x==b));err('')});
  $('#rg')&&($('#rg').oninput=e=>{drafts[key]=+e.target.value;$('#vv').textContent=e.target.value;e.target.style.setProperty('--p',e.target.value*10+'%')});if(c.type=='echelle'&&drafts[key]==null)drafts[key]=5}
-function progress(c){const gs=others(c.terr);const items=[];
- if(c.type=='choix'||c.type=='echelle')items.push([c.terr,c.answer!=null,T('answering')]);
- gs.forEach(n=>items.push([n,c.guesses[n]!=null,T('guessing')]));
+function progress(c){const gs=others(c.terr);const items=[],sent=c.sent||[];
+ if(c.type=='choix'||c.type=='echelle')items.push([c.terr,!!c.answered,T('answering')]);
+ if(st.anon){const on=gs.filter(n=>P(n)&&P(n).online);return `<div class="status">${items.map(([n,ok,w])=>`<span class="chip">${DOT(n)}${esc(n)} ${ok?'✓':'<span class="mut">'+w+'…</span>'}</span>`).join('')}<span class="chip gcount">🎭 ${T('sentN',{a:on.filter(n=>sent.includes(n)).length,b:on.length})}</span></div>`}
+ gs.forEach(n=>items.push([n,sent.includes(n),T('guessing')]));
  return `<div class="status">${items.map(([n,ok,w])=>`<span class="chip ${P(n).online?'':'off'}">${DOT(n)}${esc(n)} ${ok?'✓':'<span class="mut">'+w+'…</span>'}</span>`).join('')}</div>`}
 function vQuestion(){const c=st.cur,terr=c.terr==me.name,key=c.id+':'+me.name;
  const doorBtn=terr?`<button class="ghost wide" id="door">${T('door')}</button>`:'';
@@ -1013,35 +1236,35 @@ function vQuestion(){const c=st.cur,terr=c.terr==me.name,key=c.id+':'+me.name;
  if(c.type=='ecoute'){
   return terr?{mine:true,hint:T('tellHint'),
    html:qHead(c)+`<div class="card"><p>${T('takeTime')}</p>${R[c.r].curio?`<p class="mut" style="margin-top:6px">${T('curioAfter',{n:esc(c.explorer)})}</p>`:''}
-   <button class="pri wide" style="margin-top:14px" id="done">${T('doneTell')}</button>${reactBar()}</div>${doorBtn}`,
-   bind(){$('#done').onclick=()=>send({t:'listened'});bindDoor()}}
+   ${kwField(c)}<button class="pri wide" style="margin-top:14px" id="done">${T('doneTell')}</button>${reactBar()}</div>${doorBtn}`,
+   bind(){$('#done').onclick=()=>send({t:'listened',kw:drafts[c.id+':kw']||''});bindDoor()}}
   :{mine:false,hint:T('listenHint',{n:B(c.terr)}),
    html:qHead(c)+`<div class="card c"><p class="serif" style="font-size:20px">${T('listenT',{n:esc(c.terr)})}</p><p class="mut" style="margin-top:6px">${c.r=='grottes'?T('fearLine'):c.explorer==me.name?T('curioYou'):T('pastLine')}</p>${reactBar()}</div>`}}
- const done=terr?(c.type=='libre'||c.answer!=null):c.guesses[me.name]!=null;
+ const done=terr?(c.type=='libre'||!!c.answered):(c.sent||[]).includes(me.name);
  if(c.type=='libre'){
   if(terr)return {mine:false,hint:T('imagHint'),html:qHead(c)+`<div class="card c"><p class="serif" style="font-size:20px">${T('imagT')}</p><p class="mut" style="margin-top:6px">${T('prepReal')}</p>${progress(c)}</div>${doorBtn}`,bind:bindDoor};
-  if(done)return {mine:false,hint:T('predSent'),html:qHead(c)+`<div class="card"><p class="mut">${T('yourPred')}</p><p class="q">${QQ(esc(c.guesses[me.name]))}</p>${progress(c)}</div>`};
+  if(done)return {mine:false,hint:T('predSent'),html:qHead(c)+`<div class="card"><p class="mut">${T('yourPred')}</p><p class="q">${QQ(esc(myPend.cid==c.id&&myPend.g!=null?myPend.g:drafts[key]||''))}</p>${progress(c)}</div>`};
   return {mine:true,hint:T('writeHint',{n:B(c.terr)}),
    html:qHead(c)+`<div class="card"><label style="margin-top:0">${T('imagine')}</label><textarea data-d="${key}" placeholder="${esc(T('predPh'))}"></textarea><p class="err"></p><button class="pri wide" id="ok">${T('send')}</button>${progress(c)}</div>`,
-   bind(){$('#ok').onclick=()=>{const v=(drafts[key]||'').trim();if(!v)return err(T('writeSth'));send({t:'guess',v})}}}}
+   bind(){$('#ok').onclick=()=>{const v=(drafts[key]||'').trim();if(!v)return err(T('writeSth'));send({t:'guess',v,k:gK(c,tidy(v).slice(0,140))})}}}}
  if(done)return {mine:false,hint:T('sentHint'),html:qHead(c)+`<div class="card c"><p class="serif" style="font-size:20px">${T(terr?'secretKept':'sealed')} ✓</p>${progress(c)}</div>${doorBtn}`,bind:bindDoor};
  return {mine:true,hint:terr?T('secretHint'):T('guessHint',{n:B(c.terr)}),
   html:qHead(c)+`<div class="card"><p class="mut">${terr?T('yourSecret'):T('whatThink',{n:esc(c.terr)})}</p>${choiceInput(c,key)}<p class="err"></p><button class="pri wide" id="ok">${T(terr?'validate':'seal')}</button>${progress(c)}</div>${doorBtn}`,
-  bind(){bindChoice(c,key);$('#ok').onclick=()=>{const v=drafts[key];if(v==null)return err(T('chooseAns'));send({t:terr?'answer':'guess',v})};bindDoor()}}}
+  bind(){bindChoice(c,key);$('#ok').onclick=()=>{const v=drafts[key];if(v==null)return err(T('chooseAns'));send({t:terr?'answer':'guess',v,k:gK(c,v,terr)})};bindDoor()}}}
 
 /* ---------- Jugement (questions libres) ---------- */
 function vJudge(){const c=st.cur,terr=c.terr==me.name,key=c.id+':judge';
  const verdicts=drafts[key]||(drafts[key]={});
- const list=Object.entries(c.guesses);
+ const list=(c.cards||[]).map(x=>[x.k,x.v]);
  if(!terr)return {mine:false,hint:T('judgeWait',{n:B(c.terr)}),
-  html:qHead(c)+`<div class="card"><p class="mut">${T('preds')}</p>${list.map(([n,g])=>`<div class="guess">${DOT(n)}<div class="v"><span class="mut">${esc(n)}</span><br>${QQ(esc(g))}</div></div>`).join('')}${reactBar()}</div>`};
+  html:qHead(c)+`<div class="card"><p class="mut">${T('preds')}${st.anon?` · 🎭 ${T('anonCards')}`:''}</p>${list.map(([n,g])=>`<div class="guess">${gWho(c,n)}${QQ(esc(g))}</div></div>`).join('')}${reactBar()}</div>`};
  return {mine:true,hint:T('judgeHint'),
-  html:qHead(c)+`<div class="card"><p class="mut">${T('judgeD')}</p>
-  ${list.map(([n,g])=>`<div class="guess">${DOT(n)}<div class="v"><span class="mut">${esc(n)}</span><br>${QQ(esc(g))}</div>
+  html:qHead(c)+`<div class="card"><p class="mut">${T('judgeD')}${st.anon?` · 🎭 ${T('anonCards')}`:''}</p>
+  ${list.map(([n,g])=>`<div class="guess">${gWho(c,n)}${QQ(esc(g))}</div>
    <div class="row" style="flex:none;gap:6px"><button data-j="${esc(n)}" data-v="1" class="${verdicts[n]===true?'sel':''}" style="padding:8px 10px">${T('right')}</button><button data-j="${esc(n)}" data-v="0" class="${verdicts[n]===false?'sel':''}" style="padding:8px 10px">${T('surprise')}</button></div></div>`).join('')}
-  <p class="err"></p><button class="pri wide" id="ok">${T('reveal')}</button></div><button class="ghost wide" id="door">${T('door')}</button>`,
+  ${kwField(c)}<p class="err"></p><button class="pri wide" id="ok">${T('reveal')}</button></div><button class="ghost wide" id="door">${T('door')}</button>`,
   bind(){$$('[data-j]').forEach(b=>b.onclick=()=>{verdicts[b.dataset.j]=b.dataset.v=='1';render()});
-   $('#ok').onclick=()=>{if(list.some(([n])=>verdicts[n]==null))return err(T('judgeEach'));send({t:'judge',v:verdicts})};
+   $('#ok').onclick=()=>{if(list.some(([n])=>verdicts[n]==null))return err(T('judgeEach'));send({t:'judge',v:verdicts,kw:drafts[c.id+':kw']||''})};
    $('#door').onclick=()=>send({t:'door'})}}}
 
 /* ---------- Révélation ---------- */
@@ -1051,7 +1274,7 @@ function vReveal(){const c=st.cur,can=me.name==c.explorer||me.name==st.host,q=LQ
  return {mine:can,hint:can?T('contHint'):T('savor',{n:B(c.explorer)}),
   hintBtn:can?`<button class="pri" id="go2" style="padding:8px 14px">${T('cont')}</button>`:'',
   html:qHead(c)+`<div class="card">${c.type!='libre'?`<p class="mut c">${T('answered',{n:esc(c.terr)})}</p><div class="big-ans flip"><div>${show(c.answer)}</div></div>`:''}
-  <div class="flip">${Object.entries(c.result).map(([n,ok],i)=>`<div class="guess ${ok?'ok':'no'}" style="animation-delay:${.25+i*.25}s">${DOT(n)}<div class="v"><span class="mut">${esc(n)}</span><br>${show(c.guesses[n])}</div><span class="verdict" style="color:${ok?'var(--ink)':'var(--sur)'}">${T(ok?'spotOn':'surprise')}</span></div>`).join('')}</div>
+  <div class="flip">${Object.entries(c.result).map(([n,ok],i)=>`<div class="guess ${ok?'ok':'no'}" style="animation-delay:${.25+i*.25}s">${gWho(c,n)}${show(c.guesses[n])}</div><span class="verdict" style="color:${ok?'var(--ink)':'var(--sur)'}">${T(ok?'spotOn':'surprise')}</span></div>`).join('')}</div>
   <p class="mut c" style="margin-top:10px">${anyWrong?T('surpLine',{n:esc(c.terr)}):T('allRight')}</p>${reactBar()}</div>`,
   bind(){$('#go2')&&($('#go2').onclick=()=>send({t:'toName'}))}}}
 
@@ -1103,9 +1326,77 @@ function vCarnet(){const host=me.name==st.host;
   html:`<div class="banner"><p class="serif">${T('logbook')}</p><p class="mut" style="margin-top:6px">${T('expCount',{c:st.log.length})}</p></div>
   <div class="card"><p class="mut c">${T('thread')}</p>${constellation()}</div>
   ${st.log.slice().reverse().map((e,i)=>`<div class="card flat"><p class="mut">${T('expLine',{i:st.log.length-i,d:new Date(e.date).toLocaleDateString(D().loc,{day:'numeric',month:'long',year:'numeric'}),m:MN(e.meteo)})}</p>
-   ${Object.entries(e.flags).flatMap(([from,to])=>Object.entries(to).filter(([n])=>n==me.name||from==me.name).map(([n,txt])=>`<p style="margin-top:10px;font-size:14px"><span class="mut"><span style="color:${col(from)}">${esc(from)}</span> → <span style="color:${col(n)}">${esc(n)}</span></span><br>${QQ(esc(txt))}</p>`)).join('')}</div>`).join('')}
-  ${host?`<button class="pri wide" id="again">${T('again')}</button>`:''}<button class="ghost wide" id="quit">${T('quit')}</button>`,
-  bind(){$('#again')&&($('#again').onclick=()=>send({t:'again'}));$('#quit').onclick=leave}}}
+   ${Object.entries(e.flags).flatMap(([from,to])=>Object.entries(to).filter(([n])=>n==me.name||from==me.name).map(([n,txt])=>`<p style="margin-top:10px;font-size:14px"><span class="mut">${e.anon?'✉️':`<span style="color:${col(from)}">${esc(from)}</span>`} →<span style="color:${col(n)}">${esc(n)}</span></span><br>${QQ(esc(txt))}</p>`)).join('')}${e.hist&&e.hist.length?`<button class="ghost" data-rev="${st.log.length-1-i}" style="margin-top:6px">${T('review')}</button>`:''}</div>`).join('')}
+  ${host?gRematchBtns():''}<button class="ghost wide" id="quit">${T('quit')}</button>`,
+  bind(){bindRematch();$$('[data-rev]').forEach(b=>b.onclick=()=>gReview(+b.dataset.rev));$('#quit').onclick=leave}}}
+
+/* === game : vues (timer, progression, anonymat, portrait, bilan, rejouer) === */
+function gWho(c,k){const card=(c.cards||[]).find(x=>x.k==k),n=c.anonR?null:card?card.n:(c.cards?null:k),mine=myPend.cid==c.id&&myPend.k==k;
+ if(n&&P(n))return `${DOT(n)}<div class="v"><span class="mut">${esc(n)}</span><br>`;
+ return `<span class="dot ganon"></span><div class="v">${mine?`<span class="mut">${T('you2')}</span><br>`:''}`}
+const kwField=c=>`<label class="gkw">🗝️ ${T('kwLbl')}</label><input data-d="${c.id}:kw" maxlength="60" placeholder="${esc(T('kwPh'))}">`;
+const gRematchBtns=()=>`<div class="grm"><button class="pri" id="rmSame"><b>⛵ ${T('sameCap')}</b><span>${T('sameCapD')}</span></button><button id="rmNew"><b>🧭 ${T('newCap')}</b><span>${T('newCapD')}</span></button></div>`;
+function bindRematch(){$('#rmSame')&&($('#rmSame').onclick=()=>send({t:'rematch',same:true}));$('#rmNew')&&($('#rmNew').onclick=()=>send({t:'rematch',same:false}))}
+// timer : anneau dans la barre d'aide
+const TMR=document.createElement('span');TMR.className='tmr';
+TMR.innerHTML='<button type="button" class="tring"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" class="tbk"/><circle cx="18" cy="18" r="15" class="tfg" pathLength="100"/></svg><b></b></button><button type="button" class="tplus">+30</button>';
+TMR.querySelector('.tring').onclick=()=>send({t:'pause'});TMR.querySelector('.tplus').onclick=()=>send({t:'plus30'});
+function gRing(){if(!TMR.isConnected||!st)return;const r=tmRem();if(r==null){TMR.remove();return}
+ const s=Math.max(0,Math.ceil(r/1000)),fr=st.dlT?Math.max(0,Math.min(1,r/st.dlT)):0,pz=st.paused!=null;
+ TMR.querySelector('.tfg').style.strokeDasharray=`${(fr*100).toFixed(1)} 100`;
+ TMR.querySelector('b').textContent=pz?'⏸':s>=60?Math.floor(s/60)+':'+String(s%60).padStart(2,'0'):s;
+ TMR.classList.toggle('low',s<10&&!st.tsoft&&!pz);TMR.classList.toggle('soft',!!st.tsoft);TMR.classList.toggle('pz',pz);
+ const b=TMR.querySelector('.tring');b.setAttribute('aria-label',T(pz?'resume':'pauseTip'));TMR.querySelector('.tplus').hidden=me.name!=st.host}
+function gAfter(){if(!st)return;
+ if(st.v!==RCVV){RCVV=st.v;RCV=Date.now()}
+ if(!isHost)TK=gKey(st);
+ if(st.gid!==GID){if(GID!==undefined&&st.gid){drafts={};Object.assign(ui,{terr:null,region:null,bottle:false,mapTab:null,endTab:null,rcTab:null});myPend={cid:null}}GID=st.gid}
+ const pz=st.paused!=null;if(PZ!==null&&pz!==PZ)toast(pz?T('paused',{n:st.pby||''}):T('resumed'));PZ=pz;
+ const hd=$('.hint>div');if(hd&&(st.dl||pz)&&!['lobby','recap','carnet'].includes(st.phase)){hd.children[1]?hd.children[1].after(TMR):hd.appendChild(TMR);gRing()}else TMR.remove();
+ const tb=$('#tb');if(!tb)return;let pb=$('#gprog');
+ if(['lobby','end','recap','carnet'].includes(st.phase)||!st.total){pb&&pb.remove();return}
+ if(!pb||pb.parentNode!==tb){pb=document.createElement('div');pb.id='gprog';pb.innerHTML='<div class="wake"><i></i><span class="boat">⛵</span></div><b></b>';const top=tb.querySelector('.top');top?top.after(pb):tb.prepend(pb)}
+ const g=gProg(),f=Math.min(100,g.pct/.9);pb.classList.toggle('last',g.last);pb.querySelector('i').style.width=f+'%';pb.querySelector('.boat').style.insetInlineStart=f+'%';
+ pb.querySelector('b').textContent=`${g.pct}${LANG=='fr'?' ':''}% · ≈ ${g.min} min`}
+// bilan : textes lisibles d'une entrée d'historique
+function gQ(h){if(h.q.c)return h.q.c;const q=QBY[h.q.id];return q?trimQ(LQ(q).q).replaceAll('{Y}',h.terr):''}
+function gA(h){if(h.answer!=null&&QBY[h.q.id]){const q=LQ(QBY[h.q.id]);return h.type=='choix'?(q.o||[])[h.answer]||'':h.answer+' / 10'}
+ if(h.rv&&h.rv.length)return h.rv.map(v=>QQ(v)).join(' · ');return h.kw?'🗝️ '+h.kw:''}
+const gN=x=>Array.isArray(x)?x.length:+x||0;
+function gRecapData(e){const H=e.hist||[],out={};
+ for(const p of e.players||[]){const mine=H.filter(h=>h.terr==p&&h.kind!='door'),it=(h,a)=>({r:h.r,q:gQ(h),a});
+  const full=h=>[gA(h),h.kw&&!gA(h).includes(h.kw)?'🗝️ '+h.kw:'',h.placeName?'✨ '+h.placeName:''].filter(Boolean).join(' · ')||'✨ '+T('surprise');
+  const top=[...new Set([...mine.filter(h=>h.placeName),...mine.filter(h=>h.kw),...mine.filter(h=>gN(h.ko)&&h.answer!=null)])].slice(0,3),rest=mine.filter(h=>!top.includes(h));
+  const three=top.map(h=>it(h,full(h))),surp=rest.filter(h=>gN(h.ko)).map(h=>it(h,full(h))),ans=rest.filter(h=>!gN(h.ko)&&gA(h)).map(h=>it(h,full(h)));
+  const bots=H.filter(h=>h.terr==p&&h.q.c).map(h=>({r:'bouteille',q:h.q.c,a:h.q.by&&!e.anon?'🍾 '+h.q.by:'🍾'}));
+  const flags=[];if(p==me.name)for(const from in e.flags||{}){const t=(e.flags[from]||{})[p];if(t)flags.push({r:'',q:e.anon?'✉️':from,a:QQ(t)})}
+  out[p]={three,ans,surp,bots,flags}}
+ return out}
+const GSEC=[['three','r3','⭐'],['ans','rAns','💬'],['surp','rSurp','✨'],['bots','rBot','🍾'],['flags','rFlags','🚩']];
+function gRecapBody(e,id){const ppl=e.players||[],d=gRecapData(e);let t=ui[id+'Tab'];if(!ppl.includes(t))t=ui[id+'Tab']=ppl.find(n=>n!=me.name)||ppl[0];const x=d[t]||{};
+ const li=o=>`<li>${o.r?regionBadge(o.r,26):''}<div><span class="mut">${esc(o.q)}</span><br>${esc(o.a)}</div></li>`;
+ const secs=GSEC.filter(([k])=>x[k]&&x[k].length).map(([k,l,ic])=>`<h3 class="gh">${ic} ${T(l)}</h3><ul class="gfacts ${k=='three'?'g3':''}">${x[k].map(li).join('')}</ul>`).join('');
+ return `<div class="tabs" style="justify-content:center">${ppl.map(n=>`<button data-rt="${esc(n)}" class="${t==n?'sel':''}">${DOT(n)}${esc(n)}</button>`).join('')}</div>
+ <div class="card grc">${secs||`<p class="mut c">${T('rEmpty')}</p>`}</div>`}
+function gRecapText(e){const d=gRecapData(e),L=[`Terra Incognita · ${T('recapT')} · ${new Date(e.date||Date.now()).toLocaleDateString(D().loc)}`];
+ for(const p of e.players||[]){L.push('','== '+p+' ==');if(!GSEC.some(([k])=>d[p][k].length))L.push(T('rEmpty'));for(const [k,l] of GSEC)if(d[p][k].length){L.push(T(l));d[p][k].forEach(o=>L.push(' • '+(o.q?o.q+' — ':'')+o.a))}}
+ return L.join('\n').replace(/<[^>]+>/g,'')}
+function gSaveTxt(e){const txt=gRecapText(e);
+ if(navigator.share&&matchMedia('(pointer:coarse)').matches){navigator.share({title:'Terra Incognita',text:txt}).catch(()=>{});return}
+ try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain;charset=utf-8'}));a.download='terra-incognita-'+new Date(e.date||Date.now()).toISOString().slice(0,10)+'.txt';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},800);toast(T('saved'))}catch(x){}}
+function gBindRecap(id,e,re){$$('[data-rt]').forEach(b=>b.onclick=()=>{ui[id+'Tab']=b.dataset.rt;re()});$('#gsave')&&($('#gsave').onclick=()=>gSaveTxt(e))}
+function vRecap(){const e=st.log.at(-1)||{players:st.order,hist:st.hist||[],flags:{}},host=me.name==st.host;
+ return {mine:host,hint:host?T('recapHint'):T('recapWait',{n:B(st.host)}),hintBtn:host?`<button class="pri" id="go2" style="padding:8px 14px">${T('toLog')}</button>`:'',
+  html:`<div class="banner"><p class="serif">${T('recapT')}</p><p class="mut" style="margin-top:6px">${T('recapD')}</p></div>${gRecapBody(e,'rc')}<button class="wide" id="gsave">💾 ${T('saveTxt')}</button>`,
+  bind(){gBindRecap('rc',e,render);$('#go2')&&($('#go2').onclick=()=>send({t:'recapDone'}))}}}
+function gReview(i){const e=st&&st.log[i];if(!e)return;
+ $('#modal').innerHTML=`<div class="modal"><div class="card grev"><p class="serif c" style="font-size:21px">${T('recapT')}</p>${gRecapBody(e,'rv')}<div class="row"><button class="ghost" id="rvx">${T('cont')}</button><button id="gsave">💾 ${T('saveTxt')}</button></div></div></div>`;
+ const m=$('.modal');gBindRecap('rv',e,()=>gReview(i));const close=()=>{m.classList.add('closing');setTimeout(()=>{$('#modal').textContent=''},240)};$('#rvx').onclick=close;m.onclick=x=>{if(x.target==m)close()}}
+function vPfiche(){const L=st.L||st.length,sub=st.order[Math.floor((st.turn-1)/L)%st.order.length],H=(st.hist||[]).filter(h=>h.terr==sub&&h.kind!='door'),nx=explorer(),can=me.name==st.host||me.name==nx;
+ return {mine:can,hint:can?T('contHint'):T('savor',{n:B(nx)}),hintBtn:can?`<button class="pri" id="go2" style="padding:8px 14px">${T('cont')}</button>`:'',
+  html:`<div class="banner sheet"><p class="serif">${T('pfT',{n:NS(sub)})}</p><p class="mut" style="margin-top:6px">${T('pfD')}</p></div>
+  <div class="card grc">${H.length?`<ul class="gfacts">${H.map(h=>`<li>${regionBadge(h.r,26)}<div><span class="mut">${esc(gQ(h))}</span><br>${esc(h.placeName?'✨ '+h.placeName:gA(h)||'·')}</div></li>`).join('')}</ul>`:`<p class="mut c">${T('pfEmpty')}</p>`}${reactBar()}</div>`,
+  bind(){$('#go2')&&($('#go2').onclick=()=>send({t:'pfDone'}))}}}
 
 /* ---------- Accueil ---------- */
 function langSel(){return `<div class="langbar"><div class="dd" id="lang"><button class="dd-b" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="${esc(T('lang'))}"><span aria-hidden="true">🌐</span><span>${I18N[LANG].name}</span><i class="chev"></i></button><ul class="dd-l" role="listbox">${Object.keys(I18N).map(k=>`<li role="option" tabindex="-1" data-v="${k}" lang="${k}" aria-selected="${k==LANG}">${I18N[k].name}</li>`).join('')}</ul></div></div>`}
