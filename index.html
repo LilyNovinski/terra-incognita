@@ -179,8 +179,22 @@ input[type=range]{padding:0;accent-color:var(--acc);height:32px;border:none;back
 @keyframes fi{from{opacity:0}}
 .modal>.card{max-width:440px;width:100%;margin:0;text-align:center;animation:up .35s}
 .steps{display:flex;gap:7px;justify-content:center;margin:16px 0}
-.steps i{width:9px;height:9px;border-radius:50%;background:var(--edge)}
-.steps i.on{background:var(--acc);width:22px;border-radius:9px}
+.steps i{width:9px;height:9px;border-radius:9px;background:var(--edge);cursor:pointer;transition:width .45s cubic-bezier(.3,1.6,.5,1),background .3s,transform .3s}
+.steps i:hover{transform:scale(1.25)}
+.steps i.done{background:#ffc999}
+.steps i.on{background:linear-gradient(90deg,var(--acc2),var(--acc));width:24px;box-shadow:0 2px 6px #ff8a3d66}
+.tbody{animation:tin .45s cubic-bezier(.2,.9,.3,1.1) both}
+.tbody.back{animation-name:tinb}
+@keyframes tin{from{opacity:0;transform:translateX(34px)}}
+@keyframes tinb{from{opacity:0;transform:translateX(-34px)}}
+[dir=rtl] .tbody{animation-name:tinb}[dir=rtl] .tbody.back{animation-name:tin}
+.tbody.tout{animation:tout .2s ease-in forwards}
+@keyframes tout{to{opacity:0;transform:translateX(-26px)}}
+.tbody.tout.back{animation-name:toutb}
+@keyframes toutb{to{opacity:0;transform:translateX(26px)}}
+[dir=rtl] .tbody.tout{animation-name:toutb}[dir=rtl] .tbody.tout.back{animation-name:tout}
+.modal.closing{animation:fo .25s forwards}.modal.closing>.card{animation:dn .25s forwards}
+@keyframes fo{to{opacity:0}}@keyframes dn{to{transform:translateY(20px) scale(.96)}}
 .banner{text-align:center;padding:22px 10px 8px}
 .banner .serif{font-size:32px;color:var(--deep);text-shadow:0 2px 0 #fff}
 .banner .mut{color:var(--deep);opacity:.85;font-weight:600}
@@ -555,12 +569,19 @@ const reactBar=()=>`<div class="reacts">${EMO.map(e=>`<button data-e="${e}">${e}
 
 /* ---------- Tutoriel ---------- */
 const TUTO_R=['rivage','plaines','source','grottes','horizon'];
-function tutorial(i=0){const TU=D().tuto,r=TUTO_R[i],[t,d]=TU[i];
- $('#modal').innerHTML=`<div class="modal"><div class="card">${regionBadge(r,64)}<h2 style="margin-top:12px">${t}</h2><p class="mut" style="margin-top:8px;font-size:14px">${d}</p>
- <div class="steps">${TU.map((_,j)=>`<i class="${j==i?'on':''}"></i>`).join('')}</div>
- <div class="row"><button class="ghost" id="tskip">${T('skip')}</button><button class="pri" id="tnext">${T(i<TU.length-1?'next':'go')}</button></div></div></div>`;
- $('#tskip').onclick=()=>{$('#modal').innerHTML='';LS.set('terra:tuto',1)};
- $('#tnext').onclick=()=>i<TU.length-1?tutorial(i+1):$('#tskip').onclick()}
+function tutorial(){const TU=D().tuto;let i=0,busy=false;
+ const body=j=>{const [t,d]=TU[j];return `${regionBadge(TUTO_R[j],64)}<h2 style="margin-top:12px">${t}</h2><p class="mut" style="margin-top:8px;font-size:14px">${d}</p>`};
+ $('#modal').innerHTML=`<div class="modal"><div class="card"><div class="tbody">${body(0)}</div>
+ <div class="steps">${TU.map((_,j)=>`<i data-s="${j}"></i>`).join('')}</div>
+ <div class="row"><button class="ghost" id="tskip">${T('skip')}</button><button class="pri" id="tnext"></button></div></div></div>`;
+ const sync=()=>{$$('.steps i').forEach((el,j)=>{el.className=j==i?'on':j<i?'done':''});$('#tnext').textContent=T(i<TU.length-1?'next':'go')};
+ const go=j=>{if(busy||j==i||j<0||j>=TU.length)return;const back=j<i,el=$('.tbody');i=j;sync();busy=true;
+  el.className='tbody tout'+(back?' back':'');setTimeout(()=>{el.className='tbody'+(back?' back':'');el.innerHTML=body(i);busy=false},190)};
+ const close=()=>{LS.set('terra:tuto',1);const m=$('.modal');if(!m)return;m.classList.add('closing');setTimeout(()=>{$('#modal').textContent=''},240)};
+ sync();
+ $$('.steps i').forEach(el=>el.onclick=()=>go(+el.dataset.s));
+ $('#tskip').onclick=close;
+ $('#tnext').onclick=()=>i<TU.length-1?go(i+1):close()}
 
 /* =========================================================
    RÉSEAU
