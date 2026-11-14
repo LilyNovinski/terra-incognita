@@ -457,6 +457,8 @@ for(const l in EXT_GAME)if(I18N[l])Object.assign(I18N[l].ui,EXT_GAME[l]);
 
 
 
+/* @i18n-qa : formulation neutre (« découverts » était accordé) */
+const EXT_QA={fr:{thread:"Plus le fil est épais, plus la découverte a été belle."}};for(const l in EXT_QA)if(I18N[l])Object.assign(I18N[l].ui,EXT_QA[l]);
 /* @i18n-polish */
 const EXT_POL={fr:{timerD:"Le sablier laisse le temps de réfléchir et d'écrire, puis avance tout seul quand on regarde les réponses"},
 en:{timerD:"The hourglass leaves plenty of time to think and write, then moves on by itself while you look at the answers"},
