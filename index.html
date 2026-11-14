@@ -568,7 +568,7 @@ function tone(notes){if(muted)return;try{actx=actx||new (window.AudioContext||wi
 const SFX={turn:()=>tone([[523,0],[784,.12]]),reveal:()=>tone([[392,0],[523,.1],[659,.2,.6]]),land:()=>tone([[659,0],[880,.1,.5]]),join:()=>tone([[440,0,.2]])};
 
 /* ---------- UI utilitaires ---------- */
-function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),3200)}
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),Math.max(3200,m.length*70))}
 function floatReact(from,e){const d=document.createElement('div');d.className='flo';d.style.left=(10+Math.random()*80)+'%';
  d.innerHTML=`${esc(e)}<i style="color:${col(from)}">${esc(from)}</i>`;$('#fx').appendChild(d);setTimeout(()=>d.remove(),2700)}
 function react(e){if(isHost)relayReact(me.name,e);else hostConn&&hostConn.open&&hostConn.send({t:'react',e})}
@@ -617,7 +617,8 @@ function createGame(){
 
 function joinGame(code){
  if(typeof Peer=='undefined')return toast(T('noNet'));
- isHost=false;peer=new Peer({debug:0});
+ isHost=false;peer=new Peer({debug:0});const mine=peer;
+ setTimeout(()=>{if(peer===mine&&!st){toast(T('noReach'));leave()}},20000);
  app.innerHTML=`<div class="banner"><p class="serif">${T('rowing',{code:esc(code)})}</p><p class="mut" style="margin-top:8px">${T('joining')}</p></div>`;
  peer.on('open',()=>{
   hostConn=peer.connect(PREFIX+code,{reliable:true});
@@ -625,6 +626,7 @@ function joinGame(code){
   hostConn.on('data',d=>{
    if(d.t=='state'){st=d.st;persist();render()}
    else if(d.t=='react')floatReact(d.from,d.e)
+   else if(d.t=='renamed'){me.name=d.name;setTimeout(()=>toast(T('renamed',{n:d.name})),300)}
    else if(d.t=='err'){toast(d.k?T(d.k):d.m);leave()}});
   hostConn.on('close',()=>{if(st){toast(T('lostHost'));lostScreen(code)}})});
  peer.on('error',e=>{if(e.type=='peer-unavailable'){toast(T('noGame',{code}));leave()}else if(e.type=='network'||e.type=='server-error'||e.type=='socket-error'){toast(T('srvDown'));leave()}else console.warn(e)})}
@@ -639,15 +641,16 @@ function bump(){st.v++;st.updatedAt=Date.now();broadcast({t:'state',st});persist
 function relayReact(from,e){if(!EMO.includes(e))return;broadcast({t:'react',from,e});floatReact(from,e)}
 function hostRecv(c,d){
  if(d.t=='hello'){
-  const name=String(d.name||'').trim().slice(0,20);if(!name)return;
-  let p=P(name);
-  if(p&&p.online){c.send({t:'err',k:'errTaken',m:T('errTaken')});setTimeout(()=>c.close(),400);return}
+  let name=String(d.name||'').trim().slice(0,20);if(!name)return;
+  let p=P(name),renamed=false;
+  if(p&&p.online){if(st.phase!='lobby'){c.send({t:'err',k:'errTaken',m:T('errTaken')});setTimeout(()=>c.close(),400);return}
+   let k=2;while(P(name.slice(0,17)+' '+k))k++;name=name.slice(0,17)+' '+k;p=null;renamed=true}
   if(!p){if(st.phase!='lobby'){c.send({t:'err',k:'errStarted',m:T('errStarted')});setTimeout(()=>c.close(),400);return}
    if(st.players.length>=8){c.send({t:'err',k:'errFull',m:T('errFull')});setTimeout(()=>c.close(),400);return}
    let color=PAL.includes(d.color)?d.color:PAL[0];if(st.players.some(x=>x.color==color))color=PAL.find(x=>!st.players.some(y=>y.color==x))||color;
    p={name,color,online:true,peer:c.peer};st.players.push(p);toast(T('joined',{n:name}))}
   else{p.online=true;p.peer=c.peer;toast(T('back',{n:name}))}
-  conns[c.peer]=c;c.pname=name;clientSaves[name]=d.saves||{};SFX.join();bump();return}
+  if(renamed)c.send({t:'renamed',name});conns[c.peer]=c;c.pname=name;clientSaves[name]=d.saves||{};SFX.join();bump();return}
  if(!c.pname)return;
  if(d.t=='act')act(c.pname,d.a);
  else if(d.t=='react')relayReact(c.pname,d.e)}
@@ -937,9 +940,9 @@ function home(){
  <div class="card"><label style="margin-top:0" for="nm">${T('yourName')}</label><input id="nm" maxlength="20" value="${esc(me.name)}" placeholder="${esc(T('namePh'))}">
  <label>${T('yourColor')}</label><div class="sw">${PAL.map(c=>`<button data-c="${c}" style="--c:${c};--c2:${GRAD[c]}" class="${me.color==c?'on':''}" aria-label="${esc(T('colorAria'))}"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`).join('')}</div>
  <div class="me-prev">${T('preview')} <span class="chip"><span class="dot" id="mydot" style="background:${grad(me.color)}"></span><span id="myname">${esc(me.name||T('you'))}</span></span></div></div>
- <div class="card"><button class="pri wide" id="create">${T('create')}</button>
- <div style="display:flex;gap:8px;margin-top:12px"><input id="code" class="codein" maxlength="4" placeholder="${esc(T('codePh'))}" value="${esc(code)}" style="flex:1" autocapitalize="characters" autocomplete="off"><button id="join" style="flex:none">${T('join')}</button></div>
- <p class="err c"></p></div>
+ <div class="card">${code?'':`<button class="pri wide" id="create">${T('create')}</button>`}
+ <div style="display:flex;gap:8px;${code?'':'margin-top:12px'}"><input id="code" class="codein" maxlength="4" placeholder="${esc(T('codePh'))}" value="${esc(code)}" style="flex:1" autocapitalize="characters" autocomplete="off"><button id="join" class="${code?'pri':''}" style="flex:none">${T('join')}</button></div>
+ <p class="err c"></p>${code?`<button class="ghost wide" id="create" style="margin-top:4px">${T('create')}</button>`:''}</div>
  <button class="ghost wide" id="how">${T('how')}</button>`;
  $('#lang').onchange=e=>{setLang(e.target.value);render()};
  $$('[data-c]').forEach(b=>b.onclick=()=>{me.color=b.dataset.c;$$('[data-c]').forEach(x=>x.classList.toggle('on',x==b));const d=$('#mydot');d.style.background=grad(me.color);d.animate([{transform:'scale(.4)'},{transform:'scale(1.4)'},{transform:'scale(1)'}],{duration:450,easing:'cubic-bezier(.3,1.6,.5,1)'})});
@@ -950,6 +953,7 @@ function home(){
  $('#code').oninput=e=>{e.target.value=e.target.value.toUpperCase().replace(/[^A-Z]/g,'');err('')};
  $('#code').onkeydown=e=>{if(e.key=='Enter')$('#join').click()};
  $('#how').onclick=()=>tutorial();
+ if(code&&!me.name)$('#nm').focus();
  if(!LS.get('terra:tuto',0)&&!$('.modal'))tutorial()}
 
 window.addEventListener('beforeunload',e=>{if(isHost&&st&&st.phase!='lobby'&&st.phase!='carnet'){e.preventDefault();e.returnValue=''}});
