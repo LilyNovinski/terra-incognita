@@ -313,6 +313,10 @@ button{background:linear-gradient(180deg,#ffffff,#fff6e6)}
 .still section>*,.still .opt,.still .chip,.still .bigcode span,.still .banner .serif,.still .sheet,.still .flip>div,.still .verdict,.still .guess.ok,.still .lbl,.still .pin circle{animation:none}
 .still .chip.turn{animation:turn 2.4s ease-in-out infinite}
 .still .rhead .badge{animation:float 4.5s ease-in-out infinite}
+/* pas de sélection parasite */
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea,.bigcode,.bigcode span{-webkit-user-select:text;user-select:text}
+img,svg{-webkit-user-drag:none;user-drag:none}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
 </head>
