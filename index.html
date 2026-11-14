@@ -401,6 +401,9 @@ button:focus-visible,.reg:focus-visible,select:focus-visible{outline:3px solid #
  [data-tip]:hover::after{content:attr(data-tip);position:absolute;top:calc(100% + 9px);left:50%;transform:translateX(-50%);background:#0b4f5c;color:#fff;font:700 12px Nunito,Rubik,sans-serif;padding:6px 11px;border-radius:10px;white-space:nowrap;pointer-events:none;z-index:60;box-shadow:0 6px 16px #0a465244;animation:tipIn .2s .35s both}
  @keyframes tipIn{from{opacity:0;transform:translate(-50%,-4px)}}
 }
+.brand[role=button]{cursor:pointer;border-radius:14px;transition:opacity .2s}
+.brand[role=button]:hover{opacity:.85}
+.brand[role=button]:focus-visible{outline:3px solid #ffffff88;outline-offset:3px}
 /* téléphone */
 @media (max-width:480px){
  .row:has(>[data-vote]){flex-direction:column}
@@ -772,7 +775,7 @@ function joinGame(code){
   hostConn.on('close',()=>{if(st){toast(T('lostHost'));lostScreen(code)}})});
  peer.on('error',e=>{if(e.type=='peer-unavailable'){toast(T('noGame',{code}));leave()}else if(e.type=='network'||e.type=='server-error'||e.type=='socket-error'){toast(T('srvDown'));leave()}else console.warn(e)})}
 
-function leave(){lastPhaseKey='';app.classList.remove('still');const p=peer;st=null;peer=null;hostConn=null;conns={};isHost=false;try{p&&p.destroy()}catch(e){}render()}
+function leave(){if(location.hash)history.replaceState(null,'',location.pathname+location.search);$('#modal').textContent='';lastPhaseKey='';app.classList.remove('still');const p=peer;st=null;peer=null;hostConn=null;conns={};isHost=false;try{p&&p.destroy()}catch(e){}render()}
 function lostScreen(code){st=null;app.innerHTML=`<div class="banner"><p class="serif">${T('lostT')}</p><p class="mut" style="margin-top:8px">${T('lostD')}</p>
  <div class="row" style="margin-top:20px"><button id="re">${T('retry')}</button><button class="ghost" id="home">${T('home')}</button></div></div>`;
  $('#re').onclick=()=>{try{peer.destroy()}catch(e){}joinGame(code)};$('#home').onclick=leave}
@@ -880,6 +883,7 @@ function render(){
  $('#help')&&($('#help').onclick=()=>tutorial());
  $('#mute')&&($('#mute').onclick=()=>{muted=!muted;LS.set('terra:mute',muted);render()});
  $('#codebtn')&&($('#codebtn').onclick=copyInvite);
+ const hb=$('#homebtn');if(hb){hb.onclick=()=>ask(T('leaveAsk'),T('home')).then(v=>v&&leave());hb.onkeydown=e=>{if(e.key=='Enter'||e.key==' '){e.preventDefault();hb.onclick()}}}
  v.bind&&v.bind();
  if(key!=lastPhaseKey){lastPhaseKey=key;
   if(st.phase=='map'&&explorer()==me.name)SFX.turn();
@@ -891,7 +895,7 @@ function copyInvite(){const url=/^https?:/.test(location.protocol)?'\n'+location
 function topbar(){
  const ex=st.order.length&&!['lobby','end','carnet'].includes(st.phase)?explorer():null,tr=st.cur&&st.cur.terr;
  const list=(st.order.length&&st.phase!='lobby'?st.order.map(P):st.players).filter(Boolean);
- return `<div class="top"><div class="brand">${ASSETS.logo?`<img src="${ASSETS.logo}" alt="">`:LOGO(30,'t')}<span>Terra <i>Incognita</i></span>${SIG}</div><button class="code" id="codebtn" data-tip="${esc(T('copyInv'))}" aria-label="${esc(T('copyInv'))}">${st.code}</button>
+ return `<div class="top"><div class="brand" id="homebtn" role="button" tabindex="0" data-tip="${esc(T('home'))}" aria-label="${esc(T('home'))}">${ASSETS.logo?`<img src="${ASSETS.logo}" alt="">`:LOGO(30,'t')}<span>Terra <i>Incognita</i></span>${SIG}</div><button class="code" id="codebtn" data-tip="${esc(T('copyInv'))}" aria-label="${esc(T('copyInv'))}">${st.code}</button>
  <button class="icon" id="mute" data-tip="${esc(T('sound'))}" aria-label="${esc(T('sound'))}">${muted?'🔇':'🔊'}</button><button class="icon" id="help" data-tip="${esc(T('help'))}" aria-label="${esc(T('help'))}">?</button></div>
  <div class="players">${list.map(p=>`<span class="chip ${p.name==me.name?'me':''} ${p.online?'':'off'} ${p.name==ex?'turn':''}"><span class="dot" style="background:${grad(p.color)}"></span>${esc(p.name)}${p.name==ex?` <span class="role" data-tip="${esc(T('explores'))}" aria-label="${esc(T('explores'))}">⛵</span>`:''}${p.name==tr?` <span class="role" data-tip="${esc(T('explored'))}" aria-label="${esc(T('explored'))}">🏝️</span>`:''}${p.name==st.host&&st.phase=='lobby'?` <span class="mut">${T('host')}</span>`:''}</span>`).join('')}</div>`}
 
@@ -1095,7 +1099,7 @@ function ask(msg,ok){return new Promise(res=>{
 function home(){
  const h=$('.hint');h&&h.remove();
  const code=(location.hash||'').replace('#','').toUpperCase().replace(/[^A-Z]/g,'').slice(0,4);
- app.innerHTML=`${langSel()}<div class="hero">${ASSETS.logo?`<img class="logo-img" src="${ASSETS.logo}" alt="Terra Incognita">`:LOGO(96,'h')}<h1 style="margin-top:18px"><span class="wave-t">${waveText('Terra',0)} <i>${waveText('Incognita',5)}</i></span>${SIG}</h1><p class="tagline">${T('tagline')}</p><p class="free">${T('free')}</p></div>
+ app.innerHTML=`${langSel()}<div class="hero">${ASSETS.logo?`<img class="logo-img" src="${ASSETS.logo}" alt="Terra Incognita">`:LOGO(96,'h')}<h1 style="margin-top:18px"><span class="wave-t">${waveText('Terra',0)} <i>${waveText('Incognita',5)}</i></span>${SIG}</h1><p class="tagline">${T('tagline')}</p></div>
  <div class="card"><label style="margin-top:0" for="nm">${T('yourName')}</label><input id="nm" maxlength="20" value="${esc(me.name)}" placeholder="${esc(T('namePh'))}">
  <label>${T('yourColor')}</label><div class="sw">${PAL.map(c=>`<button data-c="${c}" style="--c:${c};--c2:${GRAD[c]}" class="${me.color==c?'on':''}" aria-label="${esc(T('colorAria'))}"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`).join('')}</div>
  <div class="me-prev">${T('preview')} <span class="chip"><span class="dot" id="mydot" style="background:${grad(me.color)}"></span><span id="myname">${esc(me.name||T('you'))}</span></span></div></div>
