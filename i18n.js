@@ -567,6 +567,43 @@ he:["עוד מסע? מתחילים ממפות ריקות, והמפות האלה 
 pt:["Outra expedição? Começa com mapas em branco, estes ficam no diário.","Cada partida começa num mar desconhecido. Os mapas das expedições passadas ficam no diário, como lembrança."]};
 for(const l in G2NEW)if(I18N[l]){I18N[l].ui.againHint=G2NEW[l][0];const t=I18N[l].tuto;if(Array.isArray(t)&&Array.isArray(t.at(-1)))t[t.length-1]=[t.at(-1)[0],G2NEW[l][1]]}
 
+/* @i18n-gender : choix Femme / Homme / Neutre + accords. Syntaxe : {g:masc|fém|neutre} = la personne qui lit ; {g.n:…} {g.o:…} = la personne {n} / {o} ; {g.Y:…} (questions) = l'île explorée. Sans genre : forme neutre, identique à avant. */
+const EXT_GENDER={
+fr:{gT:"Genre",g_f:"Femme",g_m:"Homme",g_n:"Neutre",gD:"Les phrases s'accordent, et quelques questions rien que pour toi.",gD0:"Phrases neutres, questions pour tout le monde.",newHost:"{n} est maintenant {g.n:l'hôte|l'hôtesse|l'hôte}"},
+en:{gT:"Gender",g_f:"Woman",g_m:"Man",g_n:"Neutral",gD:"Sentences fit you, plus a few questions just for you.",gD0:"Neutral wording, questions for everyone."},
+es:{gT:"Género",g_f:"Mujer",g_m:"Hombre",g_n:"Neutro",gD:"Las frases se adaptan a ti, y algunas preguntas son solo para ti.",gD0:"Frases neutras, preguntas para todo el mundo.",newHost:"Ahora {n} {g.n:es el anfitrión|es la anfitriona|lleva la partida}"},
+it:{gT:"Genere",g_f:"Donna",g_m:"Uomo",g_n:"Neutro",gD:"Le frasi si accordano a te, più qualche domanda solo per te.",gD0:"Frasi neutre, domande per tutti.",back:"{n} è {g.n:tornato|tornata|di nuovo qui}."},
+de:{gT:"Geschlecht",g_f:"Frau",g_m:"Mann",g_n:"Neutral",gD:"Die Sätze passen sich dir an, dazu ein paar Fragen nur für dich.",gD0:"Neutrale Sätze, Fragen für alle.",newHost:"{n} ist jetzt {g.n:Gastgeber|Gastgeberin|Host}"},
+ru:{gT:"Пол",g_f:"Женщина",g_m:"Мужчина",g_n:"Нейтрально",gD:"Фразы согласуются с тобой, и есть несколько вопросов только для тебя.",gD0:"Нейтральные формулировки, вопросы для всех.",
+ joined:"{n} {g.n:высадился|высадилась|высаживается} на остров.",back:"{n} {g.n:вернулся|вернулась|снова здесь}.",left:"{n} {g.n:покинул|покинула|покидает} лодку.",
+ answered:"{n} {g.n:ответил|ответила|отвечает}",guessHint:"Угадай, что {g.n:ответил|ответила|отвечает} {n}.",whatThink:"Что, по-твоему, {g.n:ответил|ответила|отвечает} {n}"},
+zh:{gT:"性别",g_f:"女",g_m:"男",g_n:"中性",gD:"还会多出几道专属于你的问题。",gD0:"中性表述，问题人人通用。"},
+he:{gT:"מגדר",g_f:"אישה",g_m:"גבר",g_n:"ניטרלי",gD:"המשפטים מותאמים אליך, ויש גם כמה שאלות רק בשבילך.",gD0:"ניסוח ניטרלי, שאלות לכולם.",
+ joined:"{g.n:{n} הגיע לאי.|{n} הגיעה לאי.|{n} באי עכשיו.}",back:"{g.n:{n} חזר.|{n} חזרה.|{n} שוב כאן.}",left:"{g.n:{n} עזב את הסירה.|{n} עזבה את הסירה.|{n} כבר לא בסירה.}",
+ turnHint:"התור שלך לחקור: {g:גע|געי|לגעת} באזור מואר על האי של {n}.",tellHint:"{g:ספר|ספרי|לספר} בקול. האחרים מקשיבים.",prepReal:"{g:הכן|הכיני|להכין} את התשובה האמיתית: היא תיאמר בקול.",
+ writeHint:"{g:כתוב|כתבי|לכתוב} מה נראה לך לגבי {n}.",secretHint:"{g:ענה|עני|עונים} בסוד: אף אחד לא רואה את המסך שלך.",guessHint:"{g:נחש|נחשי|לנחש} מה התשובה של {n}.",
+ judgeHint:"{g:ענה|עני|לענות} בקול, ואז {g:שפוט|שפטי|לשפוט} כל ניחוש.",judgeD:"{g:ענה|עני|לענות} בקול, ואז {g:שפוט|שפטי|לשפוט} כל ניחוש.",nameHint:"{g:תן|תני|לתת} שם למקום הזה באי שלך.",
+ endHint:"{g:גלה|גלי|לגלות} את האי שלך כפי שהאחרים רואים אותו, ואז {g:נעץ|נעצי|לנעוץ} את הדגלים.",recapHint:"{g:עבור|עברי|לעבור} על הכרטיסים, ואז {g:פתח|פתחי|לפתוח} את היומן."},
+pt:{gT:"Gênero",g_f:"Mulher",g_m:"Homem",g_n:"Neutro",gD:"As frases se ajustam a você, e há algumas perguntas só para você.",gD0:"Frases neutras, perguntas para todo mundo.",newHost:"Agora {n} {g.n:é o anfitrião|é a anfitriã|conduz a partida}"}};
+for(const l in EXT_GENDER)if(I18N[l])Object.assign(I18N[l].ui,EXT_GENDER[l]);
+/* variantes à 2 joueurs ({o} = l'autre personne) */
+const EXT_GENDER2={he:{tellHint:"{g:ספר|ספרי|לספר} בקול ל־{o}.",judgeHint:"{g:ענה|עני|לענות} בקול, ואז {g:ציין|צייני|לציין} אם הניחוש של {o} קלע.",judgeD:"{g:ענה|עני|לענות} בקול, ואז {g:ציין|צייני|לציין} אם הניחוש של {o} קלע.",
+ endHint:"{g:גלה|גלי|לגלות} את האי שלך כפי ש{o} רואה אותו, ואז {g:נעץ|נעצי|לנעוץ} את הדגל.",flagEach:"{g:כתוב|כתבי|לכתוב} את הדגל ל־{o}."}};
+for(const l in EXT_GENDER2)if(I18N[l]&&I18N[l].ui2)Object.assign(I18N[l].ui2,EXT_GENDER2[l]);
+/* questions de base : accords selon l'île explorée ({g.Y:…}) ou la personne qui lit ({g:…}) */
+const EXT_GENDERQ={
+en:{ri4:"What part of {g.Y:himself|herself|themselves} does {Y} show first?",ho5:"What would {Y} like people to say about {g.Y:him|her|them} one day?"},
+es:{so6:["{g.Y:¿De qué estás más orgulloso?|¿De qué estás más orgullosa?|¿Qué te hace sentir más orgullo?}","Lo que he construido","Cómo trato a los demás","Lo que he atravesado","Lo que sé hacer"],
+ ho5:"¿Qué le gustaría a {Y} que dijeran {g.Y:de él|de ella|de su persona} algún día?"},
+it:{ri7:"Quale dettaglio di {Y} ti ha {g:colpito|colpita|colpito} per primo?",fo2:"Una persona che ti ha {g.Y:segnato|segnata|segnato}, e perché?",gr4:"Un momento di solitudine che ti ha {g.Y:segnato|segnata|segnato}.",
+ so6:["{g.Y:Di cosa sei più fiero?|Di cosa sei più fiera?|Cosa ti dà più orgoglio?}","Ciò che ho costruito","Come tratto gli altri","Ciò che ho attraversato","Ciò che so fare"]},
+pt:{ho5:"O que {Y} gostaria que dissessem sobre {g.Y:ele|ela|si} um dia?"},
+ru:{ho2:"{g.Y:Где {Y} хотел бы однажды жить?|Где {Y} хотела бы однажды жить?|{Y}: где хотелось бы однажды жить?}",ho3:"{g.Y:Чему {Y} хотел бы научиться?|Чему {Y} хотела бы научиться?|{Y}: чему хотелось бы научиться?}",
+ ho5:"{g.Y:Что {Y} хотел бы однажды услышать о себе?|Что {Y} хотела бы однажды услышать о себе?|{Y}: что хотелось бы однажды услышать о себе?}",
+ fo3:"{g.Y:Момент, когда ты изменил мнение о чём-то важном.|Момент, когда ты изменила мнение о чём-то важном.|Момент, когда твоё мнение о чём-то важном изменилось.}",
+ fo7:"{g.Y:Кем ты хотел стать в детстве, и что от этого осталось.|Кем ты хотела стать в детстве, и что от этого осталось.|Детская мечта о будущей профессии, и что от неё осталось.}"}};
+for(const l in EXT_GENDERQ)if(I18N[l]&&I18N[l].q)Object.assign(I18N[l].q,EXT_GENDERQ[l]);
+
 /* @i18n-polish */
 const EXT_POL={fr:{timerD:"Le sablier laisse le temps de réfléchir et d'écrire, puis avance tout seul quand on regarde les réponses"},
 en:{timerD:"The hourglass leaves plenty of time to think and write, then moves on by itself while you look at the answers"},
