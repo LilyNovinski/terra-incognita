@@ -50,6 +50,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sacramento&text=by&display=swap">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="i18n.js?v=20261114g"></script>
+<script src="decks.js?v=1"></script>
 <style>
 :root{--sea1:#bdeef0;--sea2:#69c9d3;--deep:#0e5866;--deep2:#0a4652;--paper:#fffaf0;--paper2:#fbf0d9;--edge:#ead6ae;--edge2:#d8bd88;--txt:#3b2a1b;--mut:#8a7660;--acc:#ff8a3d;--acc-d:#d9661f;--acc2:#ffb15c;--ink:#1d8e6c;--sur:#d9661f;--ear:#5869b5;--bad:#d64b3c;--gold:#f2b84b}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -631,6 +632,49 @@ h3.gh{margin-top:18px;font-size:17px}
 
 
 /* @css-game2 */
+/* demandes d'arrivée (hôte) */
+#g2req{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:8px;width:min(420px,calc(100vw - 32px))}
+.g2rq{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:18px;background:#fffaf0;border:2px solid var(--edge);box-shadow:0 4px 0 var(--edge2),0 12px 28px #0e586633;animation:g2in .35s cubic-bezier(.3,1.5,.5,1)}
+.g2rq .g2rt{flex:1;min-width:0;font:600 14px Nunito,sans-serif;overflow-wrap:anywhere}
+.g2rq button{flex:none;padding:7px 12px;font-size:14px}
+@keyframes g2in{from{opacity:0;transform:translateY(-14px) scale(.96)}}
+/* menu exclure / bannir */
+.g2km{position:fixed;z-index:61;display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:16px;background:#fffaf0;border:2px solid var(--edge);box-shadow:0 12px 28px #0e586640;animation:g2in .2s}
+.g2km button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:start;padding:8px 12px;font:600 14px Nunito,sans-serif;box-shadow:none}
+.g2km button span{font-size:12px;color:var(--mut);font-weight:700}
+.g2km button[data-k="1"]:hover{border-color:#e2603e}
+/* cœur « moment fort » */
+.g2heart{display:inline-flex;align-items:center;gap:6px;margin:12px auto 0;padding:7px 14px;border-radius:99px;font:700 14px Nunito,sans-serif;background:#fff;box-shadow:0 3px 0 var(--edge2)}
+.card .g2heart{display:flex}
+.g2heart .g2hi{font-size:18px;line-height:1;transition:transform .3s cubic-bezier(.3,1.8,.5,1)}
+.g2heart b{min-width:20px;padding:0 6px;border-radius:99px;background:#ffe2e8;color:#c2335e;font-size:12px}
+.g2heart.on{border-color:#ec4f93;background:#fff0f5}.g2heart.on .g2hi{transform:scale(1.15)}
+.g2heart.pop .g2hi{animation:g2pop .45s}
+@keyframes g2pop{40%{transform:scale(1.6)}}
+.g2top{border-color:#f3b6c9}.g2top h3{font-size:17px}.g2top li{align-items:center}
+.g2n{flex:none;font:800 13px Nunito;color:#c2335e}
+/* souvenirs au-dessus des drapeaux */
+.g2mem{display:flex;gap:6px;overflow-x:auto;padding:4px 2px 8px;margin:2px 0 4px;scrollbar-width:thin}
+.g2mc{flex:none;display:flex;align-items:center;gap:6px;max-width:220px;padding:5px 10px 5px 6px;border-radius:12px;background:#fff7ea;border:1.5px solid var(--edge);font:700 13px Nunito,sans-serif;color:var(--txt)}
+.g2mc span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.g2mc .badge,.g2mc svg{flex:none;width:20px;height:20px;box-shadow:none;animation:none}
+.g2lock{margin:6px 2px 4px;font:700 12px Nunito,sans-serif;color:var(--mut)}
+/* carte nette sur l'écran de fin et dans le carnet : pas de brume floue, les zones inconnues restent simplement voilées */
+.g2end .fog{animation:none!important;opacity:.55}
+.g2end .fog g,.g2end .fog path{filter:none!important}
+.g2end .fog image{display:none}
+/* carnet : légende du fil */
+.g2leg{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 14px;margin-top:6px;font:700 12px Nunito,sans-serif;color:var(--mut)}
+.g2leg span{display:inline-flex;align-items:center;gap:4px}
+/* lobby : ton */
+.g2tones .gmet{position:relative;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:6px;text-align:start;padding:12px;font:600 14px Nunito,sans-serif}
+.g2tones .gline{min-height:0}
+.g2_18{font:800 11px Nunito;color:#fff;background:#e2603e;border-radius:99px;padding:1px 7px}
+.g2off{opacity:.45}
+div.g2tone{display:flex;flex-direction:column;gap:6px;padding:12px;border-radius:18px;border:2px solid var(--edge);background:#fff}
+div.g2tone.sel{border-color:var(--acc)}
+.g2warn{margin-top:10px;font:700 13px Nunito,sans-serif;color:#c94a2a}
+@media (max-width:480px){.g2rq{flex-wrap:wrap}.g2rq .g2rt{flex:1 1 calc(100% - 30px)}.g2rq button{flex:1}}
 
 
 
@@ -787,6 +831,13 @@ const Q={
 };
 
 const LOGO=(s,id='a')=>`<svg class="logo" width="${s}" height="${s}" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="lbg${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d2c48"/><stop offset="1" stop-color="#0a111e"/></linearGradient><linearGradient id="lis${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6dca2"/><stop offset="1" stop-color="#d7953f"/></linearGradient><clipPath id="lcl${id}"><rect x="33" y="0" width="31" height="64"/></clipPath></defs><rect x=".5" y=".5" width="63" height="63" rx="15" fill="url(#lbg${id})" stroke="rgba(255,255,255,.13)"/><g fill="none" stroke="#2d4c72" stroke-width="1.6" stroke-linecap="round"><path d="M8 51q3-2.5 6 0t6 0"/><path d="M42 54q3-2.5 6 0t6 0"/><path d="M10 17q3-2.5 6 0t6 0"/></g><path d="M14 36c0-9 8-15 18-15s19 5 19 13-8 14-19 14-18-4-18-12z" fill="url(#lis${id})"/><path d="M22 34l5-7 4 5 3-3 5 6z" fill="#5f9e6e" opacity=".9"/><g clip-path="url(#lcl${id})"><ellipse cx="41" cy="30" rx="11" ry="7" fill="#dfe7f3" opacity=".82"/><ellipse cx="47" cy="38" rx="10" ry="7" fill="#dfe7f3" opacity=".72"/><ellipse cx="37" cy="42" rx="8" ry="5" fill="#dfe7f3" opacity=".62"/></g><path d="M19 42q7-1 12-6" fill="none" stroke="#2a1a08" stroke-width="1.6" stroke-dasharray="1.5 2.4" stroke-linecap="round"/><path d="M47 9l1.6 4.4L53 15l-4.4 1.6L47 21l-1.6-4.4L41 15l4.4-1.6z" fill="#f3d496"/></svg>`;
+/* === game2 : paquets de questions (decks.js, facultatif) === */
+(function g2Decks(){try{const X=Array.isArray(window.DECKS_EXTRA)?window.DECKS_EXTRA:[],ids=new Set(Object.values(Q).flat().map(q=>q.id));
+ for(const x of X){if(!x||typeof x.id!='string'||typeof x.q!='string'||!Q[x.r]||ids.has(x.id))continue;const t=R[x.r].t;
+  if(x.type&&x.type!=t)continue;if(t=='choix'&&!(Array.isArray(x.o)&&x.o.length>=2))continue;if(t=='echelle'&&(x.a==null||x.b==null))continue;
+  const q={id:x.id,q:x.q,deck:['coquin','trash'].includes(x.deck)?x.deck:'base'};if(t=='choix')q.o=x.o.slice(0,4);if(t=='echelle'){q.a=x.a;q.b=x.b}Q[x.r].push(q);ids.add(x.id)}
+ const TT=window.DECKS_T||{};for(const l in TT){if(!I18N[l])continue;const d=I18N[l].q=I18N[l].q||{};
+  for(const id in TT[l]){const v=TT[l][id];if(typeof v=='string')d[id]=v;else if(v&&typeof v.q=='string')d[id]=Array.isArray(v.o)?[v.q,...v.o]:v.a!=null?[v.q,v.a,v.b]:v.q}}}catch(e){}})();
 const QBY={};for(const r in Q)Q[r].forEach(q=>QBY[q.id]=q);
 const tidy=s=>String(s??'').replace(/\s+/g,' ').trim()
  .replace(/\s+([,.)…])/g,'$1').replace(/\(\s+/g,'(').replace(/,(?=\p{L})/gu,', ')
@@ -1029,7 +1080,7 @@ function genCode(){const A='ABCDEFGHJKMNPQRSTUVWXYZ';let s='';for(let i=0;i<4;i+
 function allSaves(){const o={};try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k.startsWith('terra:save:'))o[k]=LS.get(k)}}catch(e){}return o}
 function persist(){if(!st||!st.order||!st.order.length)return;if(!['map','landed','end','recap','carnet'].includes(st.phase))return;
  const k=saveKey(st.order),cur=LS.get(k,null);if(cur&&cur.updatedAt>st.updatedAt)return;
- LS.set(k,{maps:st.maps,used:st.used,log:st.log,updatedAt:st.updatedAt})}
+ LS.set(k,{maps:st.maps,used:st.used,qseen:st.qseen||{},log:st.log,updatedAt:st.updatedAt})}
 
 function createGame(){
  if(typeof Peer=='undefined')return toast(T('noNet'));
@@ -1077,6 +1128,7 @@ function connectTo(id,onFail){
   else if(d.t=='chat')chatAdd(d.m)
   else if(d.t=='chatlog')chatMerge(d.log)
   else if(d.t=='chatslow')toast(T('chSlow'))
+  else if(d.t=='g2wait')g2Waiting(d.host)
   else if(d.t=='moved'){done=true;hostConn=null;try{c.close()}catch(e){}connectTo(hid(joinCode,d.e),onFail)}
   else if(d.t=='handoff'){st=d.st;migrate(d.to)}
   else if(d.t=='closed'){st=null;toast(T('closed'));leave()}
@@ -1085,10 +1137,10 @@ function connectTo(id,onFail){
 
 function joinGame(code){
  if(typeof Peer=='undefined')return toast(T('noNet'));
- isHost=false;migrating=false;migSeq++;joinCode=code;chatLog=[];if(peer)try{peer.destroy()}catch(e){}peer=null;
+ isHost=false;migrating=false;migSeq++;joinCode=code;chatLog=[];g2Wait=false;if(peer)try{peer.destroy()}catch(e){}peer=null;
  app.innerHTML=`<div class="banner"><p class="serif">${T('rowing',{code:esc(code)})}</p><p class="mut" style="margin-top:8px">${T('joining')}</p></div>`;
  clientPeer(()=>{const mine=peer;let e=0;
-  setTimeout(()=>{if(peer===mine&&!st){toast(T('noReach'));leave()}},30000);
+  setTimeout(()=>{if(peer===mine&&!st&&!g2Wait){toast(T('noReach'));leave()}},30000);
   /* époque 0 (le code), puis 1..4 si l'hôte a changé et que le phare n'est pas encore là */
   const tryE=()=>{if(peer!==mine||st)return;connectTo(hid(code,e),()=>{if(peer!==mine||st)return;if(++e<=4)tryE();else{toast(T('noGame',{code}));leave()}})};
   tryE()})}
@@ -1261,7 +1313,7 @@ function hostRecv(c,d){
   let p=P(name),renamed=false;
   if(p&&p.online&&isLinked(name)){if(st.phase!='lobby'){c.send({t:'err',k:'errTaken',m:T('errTaken')});setTimeout(()=>c.close(),400);return}
    let k=2;while(P(name.slice(0,17)+' '+k))k++;name=name.slice(0,17)+' '+k;p=null;renamed=true}
-  if(!p){if(st.phase!='lobby'){c.send({t:'err',k:'errStarted',m:T('errStarted')});setTimeout(()=>c.close(),400);return}
+  if(!p){if(st.phase!='lobby'){g2Ask(c,name,d);return}
    if(st.players.length>=8){c.send({t:'err',k:'errFull',m:T('errFull')});setTimeout(()=>c.close(),400);return}
    let color=PAL.includes(d.color)?d.color:PAL[0];if(st.players.some(x=>x.color==color))color=PAL.find(x=>!st.players.some(y=>y.color==x))||color;
    p={name,color,online:true,peer:c.peer};st.players.push(p);toast(T('joined',{n:name}))}
@@ -1271,9 +1323,9 @@ function hostRecv(c,d){
  if(d.t=='act')act(c.pname,d.a);
  else if(d.t=='react')relayReact(c.pname,d.e)
  else if(d.t=='chat'){if(chatIn(c.pname,d.m)===false)try{c.send({t:'chatslow'})}catch(e){}}}
-function kick(name){const p=P(name);if(!isHost||!p||name==st.host)return;
- st.banned=st.banned||[];if(!st.banned.includes(name))st.banned.push(name);
- for(const id in conns){const c=conns[id];if(c.pname==name){try{c.send({t:'err',k:'kicked'})}catch(e){}delete conns[id];setTimeout(()=>{try{c.close()}catch(e){}},500)}}
+function kick(name,ban){const p=P(name);if(!isHost||!p||name==st.host)return;
+ if(ban){st.banned=st.banned||[];if(!st.banned.includes(name))st.banned.push(name)}
+ for(const id in conns){const c=conns[id];if(c.pname==name){try{c.send({t:'err',k:ban?'kicked':'g2Out'})}catch(e){}delete conns[id];setTimeout(()=>{try{c.close()}catch(e){}},500)}}
  st.players=st.players.filter(x=>x!=p);delete st.votes[name];
  if(st.phase!='lobby'&&st.order.includes(name)){const n=st.order.length,left=Math.max(0,st.total-st.turn);
   st.order=st.order.filter(x=>x!=name);st.total=st.turn+Math.round(left*(n-1)/n);
@@ -1281,7 +1333,7 @@ function kick(name){const p=P(name);if(!isHost||!p||name==st.host)return;
   if(st.order.length<2&&!['end','carnet'].includes(st.phase)){st.cur=null;st.phase='end'}
   else if(st.phase=='map'&&st.turn>=st.total)st.phase='end';
   if(st.phase=='question'&&st.cur)checkAll()}
- toast(T('kickedT',{n:name}));bump()}
+ toast(T(ban?'g2BanT':'kickedT',{n:name}));bump()}
 function hostDrop(c){if(!conns[c.peer])return;delete conns[c.peer];
  const p=st.players.find(x=>x.peer==c.peer);if(!p)return;
  if(st.phase=='lobby'){st.players=st.players.filter(x=>x!=p);delete st.votes[p.name]}else{p.online=false;if(st.phase=='question')checkAll()}
@@ -1291,7 +1343,14 @@ function send(a){if(isHost)act(me.name,a);else if(hostConn&&hostConn.open)hostCo
 /* =========================================================
    RÈGLES (exécutées par l'hôte uniquement)
    ========================================================= */
-function pickQ(r,t){const used=st.used[t]||[];const pool=Q[r].filter(q=>!used.includes(q.id));const l=pool.length?pool:Q[r];return l[Math.floor(Math.random()*l.length)]}
+function pickQ(r,t){const used=st.used[t]||[],seen=(st.qseen||{})[t]||[],tn=st.tone||0;
+ /* ton : tout public toujours ; coquin si tone>=1 ; trash si tone==2 ; environ 60 % de questions du ton choisi */
+ const ok=q=>!q.deck||q.deck=='base'||(q.deck=='coquin'&&tn>=1)||(q.deck=='trash'&&tn==2),all=Q[r].filter(ok);
+ const fresh=a=>{const f=a.filter(q=>!used.includes(q.id)),g=f.filter(q=>!seen.includes(q.id));return g.length?g:f};
+ const want=tn==2?['trash','coquin']:tn==1?['coquin']:[];let l=[];
+ if(want.length&&Math.random()<.6)for(const d of want){l=fresh(all.filter(q=>q.deck==d));if(l.length)break}
+ if(!l.length)l=fresh(all.filter(q=>!q.deck||q.deck=='base'));if(!l.length)l=fresh(all);if(!l.length)l=all.length?all:Q[r];
+ return l[Math.floor(Math.random()*l.length)]}
 function guessers(){return st.order.filter(n=>n!=st.cur.terr&&P(n)&&P(n).online)}
 function checkAll(force){const c=st.cur;if(!c||c.type=='ecoute'||st.phase!='question')return;const S=gSec(c),gs=guessers(),got=gs.filter(n=>S.g[n]!==undefined);
  if(!force&&(!gs.length||got.length<gs.length))return;
@@ -1309,8 +1368,10 @@ function land(mode){const c=st.cur,now=Date.now(),gs=others(c.terr);c.kind=mode;
  gHist(c);st.phase='landed'}
 function loadBestSave(){const k=saveKey(st.order);const cands=[LS.get(k,null)];for(const n in clientSaves)cands.push(clientSaves[n][k]);
  const best=cands.filter(x=>x&&x.maps).sort((a,b)=>b.updatedAt-a.updatedAt)[0];
- if(best){st.maps=best.maps;st.used=best.used||{};st.log=best.log||[]}else{st.maps={};st.used={};st.log=[]}}
-function act(from,a){const s=st;if(!P(from))return;
+ /* game2 : chaque partie repart de cartes vierges ; les anciennes restent dans le carnet (log), les questions déjà vues sont évitées */
+ const qs=st.qseen||{};for(const src of [best&&best.used,best&&best.qseen,st.used])for(const t in src||{})qs[t]=[...new Set([...(qs[t]||[]),...src[t]])].slice(-120);
+ st.qseen=qs;st.maps={};st.used={};const bl=best&&best.log||[];st.log=bl.length>(st.log||[]).length?bl:(st.log||[])}
+function act(from,a){const s=st;if(!P(from))return;g2Resp(from,a);
  switch(a.t){
  case 'vote':if(s.phase=='lobby'&&[0,1,2].includes(a.v))s.votes[from]=a.v;break;
  case 'length':if(from==s.host&&s.phase=='lobby'&&[3,5,7].includes(a.v))s.length=a.v;break;
@@ -1337,6 +1398,9 @@ function act(from,a){const s=st;if(!P(from))return;
  case 'mode':if(from!=s.host||s.phase!='lobby'||!['exp','esc','por','mir'].includes(a.v))return;s.mode=a.v;break;
  case 'timer':if(from!=s.host||s.phase!='lobby'||!TIM.includes(a.v))return;s.timer=a.v;break;
  case 'anon':if(from!=s.host||s.phase!='lobby')return;s.anon=!!a.v;break;
+ case 'tone':if(from!=s.host||s.phase!='lobby'||![0,1,2].includes(a.v))return;s.tone=a.v;break;
+ case 'heart':{const c=s.cur;if(!c||!['reveal','name','landed'].includes(s.phase)||c.kind=='door')return;const l=c.lk=c.lk||[],i=l.indexOf(from);if(i<0)l.push(from);else l.splice(i,1);
+  if(s.phase=='landed'){const h=(s.hist||[]).at(-1);if(h&&h.terr==c.terr&&h.r==c.r)h.lk=l.slice()}break}
  case 'pause':{if(['lobby','recap','carnet'].includes(s.phase))return;const now=Date.now();
   if(s.paused!=null){s.dl=now+s.paused;s.paused=null}else if(s.dl){s.paused=Math.max(0,s.dl-now);s.dl=null}else return;s.pby=from;break}
  case 'plus30':if(from!=s.host)return;if(s.paused!=null)s.paused+=3e4;else if(s.dl)s.dl=Math.max(s.dl,Date.now())+3e4;else return;s.dlT=Math.max(s.dlT||0,(s.paused??(s.dl-Date.now())));break;
@@ -1374,8 +1438,9 @@ function gGuess(c,from,a){const S=gSec(c);let v=a.v;if(typeof v=='string')v=tidy
  if(S.k[from]&&S.k[from]!==k)delete S.kn[S.k[from]];
  S.g[from]=v;S.k[from]=k;S.kn[k]=from;c.sent=c.sent||[];if(!c.sent.includes(from))c.sent.push(from);checkAll()}
 function gReveal(c,res,S){S.res=res;c.answer=S.ans??null;c.guesses={};c.result={};
- for(const n of shuf(Object.keys(res))){const key=st.anon?(S.k[n]||gSlot()):n;c.guesses[key]=S.g[n];c.result[key]=res[n]}
- c.anonR=!!st.anon;delete c.cards;st.phase='reveal'}
+ /* game2 : une fois le verdict rendu, l'anonymat tombe : les noms apparaissent à la révélation */
+ for(const n of shuf(Object.keys(res))){c.guesses[n]=S.g[n];c.result[n]=res[n]}
+ c.anonR=false;c.unveil=!!st.anon;delete c.cards;st.phase='reveal'}
 function gJudge(c,a){const S=gSec(c),v=a.v||{},gs=others(c.terr),res={},cards=c.cards||[],used=new Set();
  cards.forEach(cd=>{const n=S.kn[cd.k]||cd.n;if(n&&gs.includes(n))used.add(n)});
  const free=gs.filter(x=>!used.has(x));// secret perdu (changement d'hôte) : on répartit sans rien révéler
@@ -1385,12 +1450,13 @@ function gByName(c){if(SEC.cid===c.id&&SEC.res)return {res:SEC.res,g:SEC.g};
  if(!c.anonR)return {res:c.result||{},g:c.guesses||{}};
  const gs=others(c.terr),res={},g={};Object.keys(c.result||{}).forEach((k,i)=>{if(gs[i]){res[gs[i]]=c.result[k];g[gs[i]]=c.guesses[k]}});return {res,g}}
 function gHist(c){if(!st.hist)st.hist=[];const ok=[],ko=[],rv=[];
- if(c.kind=='ink'||c.kind=='named'){const rb=gByName(c);for(const n in rb.res){(rb.res[n]?ok:ko).push(n);if(rb.res[n]&&c.type=='libre')rv.push(String(rb.g[n]).slice(0,140))}}
+ if(c.kind=='ink'||c.kind=='named'){const rb=gByName(c);for(const n in rb.res){(rb.res[n]?ok:ko).push(n);if(rb.res[n]&&c.type=='libre')rv.push({v:String(rb.g[n]).slice(0,140),n})}}
  st.hist.push({terr:c.terr,ex:c.explorer,r:c.r,q:c.q.custom?{c:c.q.q,by:st.anon?null:c.explorer}:{id:c.q.id},type:c.type,answer:c.answer??null,placeName:c.placeName||'',kind:c.kind,
-  ok:st.anon?ok.length:ok,ko:st.anon?ko.length:ko,kw:c.kw||'',rv:shuf(rv)});if(st.hist.length>200)st.hist.shift()}
+  ok,ko,kw:c.kw||'',rv:shuf(rv),lk:(c.lk||[]).slice()});if(st.hist.length>200)st.hist.shift()}
 function gFinish(s){if(['recap','carnet'].includes(s.phase))return;let fl=s.flags;
  if(s.anon){fl={};const F=SECF.gid===s.gid?SECF.f:{};for(const [to,t] of shuf(Object.values(F).flatMap(o=>Object.entries(o))))fl[gSlot()]={[to]:t}}
- s.log.push({date:Date.now(),meteo:s.meteo,players:[...s.order],flags:fl,hist:s.hist||[],mode:MODE(),anon:!!s.anon,gid:s.gid});s.cur=null;s.phase='recap'}
+ s.log.push({date:Date.now(),meteo:s.meteo,players:[...s.order],flags:fl,hist:s.hist||[],mode:MODE(),anon:!!s.anon,gid:s.gid,tone:s.tone||0,maps:JSON.parse(JSON.stringify(s.maps||{}))});
+ s.log.slice(0,-5).forEach(e=>delete e.maps);s.cur=null;s.phase='recap'}
 function gStartX(s){if(s.mode=='mir'&&s.order.length!=2)s.mode='exp';if(s.order.length<3)s.anon=false;
  s.L=MODE()=='esc'?2:s.length;s.hist=[];s.td=[];s.gid=Date.now().toString(36);s.tt=Date.now();s.tTurn=0;s.lp=null;s.pf=null;s.dl=null;s.paused=null;
  SEC={cid:null};SECF={gid:s.gid,f:{}}}
@@ -1412,7 +1478,7 @@ function tmDur(){const s=st,f=TF();let k=s.phase,soft=false;
  if(k=='pfiche')return {d:20,soft:false};if(!f)return null;
  if(k=='question'){if(s.cur.grace)return {d:15,soft:false};k=s.cur.type;soft=k=='ecoute'}else if(k=='judge')soft=true;
  let d=TB[k];if(d==null)return null;if(MODE()=='esc'&&(k=='reveal'||k=='landed'))d/=2;return {d:d*f,soft,calm:!!TCALM[k]&&!s.cur?.grace}}
-function tmSync(){const s=st;if(!s||!isHost)return false;let ch=false;
+function tmSync(){const s=st;if(!s||!isHost)return false;let ch=false;if(s.phase!='lobby'&&g2Track(s))ch=true;
  if(s.phase!='lobby'&&s.tt!=null&&s.turn!==s.tTurn){if(s.tTurn!=null&&s.turn>s.tTurn){(s.td=s.td||[]).push(Date.now()-s.tt);if(s.td.length>30)s.td.shift()}s.tTurn=s.turn;s.tt=Date.now();ch=true}
  if(s.phase=='end'&&MODE()=='esc'){gFinish(s);ch=true}
  if(MODE()=='por'&&s.phase=='map'&&s.turn>0&&s.turn%(s.L||s.length)==0&&s.pf!==s.turn){s.pf=s.turn;s.phase='pfiche';ch=true}
@@ -1452,7 +1518,128 @@ function gEst(o){const n=Math.max(2,o.n),esc=o.mode=='esc',L=esc?2:o.len,f=EF[es
 function gProg(){const s=st,w={question:.25,judge:.5,reveal:.65,name:.75,landed:.9}[s.phase]||0,done=Math.min(s.total,s.turn+w);
  const E=gEst({n:s.order.length,mode:MODE(),meteo:s.meteo,len:s.L||s.length,tf:s.timer??1}),td=s.td||[];
  const avg=td.length>=2?td.reduce((a,b)=>a+b,0)/td.length/1000:E.perTurn;
- return {pct:s.total?Math.round(90*done/s.total):0,min:Math.max(1,Math.round(((s.total-done)*avg+E.endS)/60)),last:s.turn>=s.total-1}}
+ return {pct:s.total?Math.round(90*done/s.total):0,min:window.g2Min?g2Min():Math.max(1,Math.round(((s.total-done)*avg+E.endS)/60)),last:s.turn>=s.total-1}}
+
+/* === game2 : estimation du temps (rythme réel), arrivées en cours de partie, exclure / bannir, moments forts, ton === */
+let g2Wait=false,G2REQ={},G2L=0,G2D={v:null,t:0,m:null};
+const G2PH=['map','choix','echelle','libre','ecoute','judge','reveal','name','landed','pfiche'];
+const g2Type=s=>s.phase=='question'&&s.cur?s.cur.type:s.phase;
+/* hôte : chronomètre chaque phase (sans les pauses) et chaque réponse, par type et par personne */
+function g2Track(s){const now=Date.now(),pm=s.pm=s.pm||{ph:{},pp:{},nm:[0,0]},dt=G2L?now-G2L:0;G2L=now;
+ if(s.paused!=null&&pm.t0)pm.pz=(pm.pz||0)+dt;
+ const k=s.phase+'|'+(s.cur&&s.cur.id)+'|'+s.turn;if(k===pm.k)return false;
+ const pt=pm.tp;if(pm.t0&&G2PH.includes(pt)){const d=(now-pm.t0-(pm.pz||0))/1000;if(d>1&&d<900){const a=pm.ph[pt]=pm.ph[pt]||[0,0];a[0]+=d;a[1]++}
+  if(pt=='reveal'){pm.nm[1]++;if(s.phase=='name')pm.nm[0]++}}
+ pm.k=k;pm.tp=g2Type(s);pm.t0=now;pm.pz=0;return true}
+function g2Resp(from,a){const s=st,c=s.cur,pm=s.pm;if(!c||!pm||!pm.t0||!P(from))return;let T=null,len=0;
+ if(a.t=='guess'&&s.phase=='question'&&from!=c.terr&&c.type!='ecoute'&&!(c.sent||[]).includes(from)){T=c.type;if(T=='libre')len=tidy(a.v).length}
+ else if(a.t=='answer'&&s.phase=='question'&&from==c.terr&&!c.answered)T=c.type;
+ else if(a.t=='listened'&&s.phase=='question'&&c.type=='ecoute'&&from==c.terr)T='ecoute';
+ else if(a.t=='judge'&&s.phase=='judge'&&from==c.terr)T='judge';
+ else if(a.t=='name'&&s.phase=='name'&&from==c.terr)T='name';
+ if(!T)return;const d=(Date.now()-pm.t0-(pm.pz||0))/1000;if(!(d>.5&&d<900))return;
+ const p=pm.pp[from]=pm.pp[from]||{},x=p[T]=p[T]||[0,0];x[0]+=d;x[1]++;if(len>2){const ch=p.ch=p.ch||[0,0];ch[0]+=len;ch[1]+=d}}
+/* a priori (Normal) puis moyenne pondérée qui converge vers les mesures */
+const G2K=2;
+function g2Prior(T,k){return ({map:28,choix:35+3*k,echelle:35+3*k,libre:70+8*k,ecoute:115,judge:30+5*k,reveal:20+2*k,name:25,landed:12,pfiche:20}[T]||20)*(EF[TF()]??1)}
+function g2Model(){const s=st,pm=s.pm||{ph:{},pp:{},nm:[0,0]},on=s.order.filter(n=>P(n)&&P(n).online),k=Math.max(1,on.length-1),f=TF();
+ const base=T=>{const a=pm.ph[T]||[0,0],p=g2Prior(T,k);return (p*G2K+a[0])/(G2K+a[1])};
+ const pers=(n,T)=>{const a=(pm.pp[n]||{})[T];return a&&a[1]?(base(T)*G2K+a[0])/(G2K+a[1]):null};
+ const cap=T=>{if(!f||T=='ecoute'||T=='judge')return Infinity;let d=TB[T]*f;if(MODE()=='esc'&&(T=='reveal'||T=='landed'))d/=2;return d};
+ /* la plus lente des personnes en ligne fixe le rythme : on compare au plus lent déjà mesuré */
+ const ques=(T,t)=>{const b=base(T),who=s.order.filter(n=>n!=t||T!='libre'),all=who.map(n=>pers(n,T)).filter(x=>x!=null);if(!all.length)return b;
+  const nowM=Math.max(0,...on.filter(n=>who.includes(n)).map(n=>pers(n,T)??b)),allM=Math.max(...all,b*.5);return b*Math.min(1.25,Math.max(.6,nowM/allM))};
+ const one=(T,t)=>{const b=base(T),p=pers(t,T);return p==null?b:(b+p)/2};
+ const pn=(pm.nm[0]+.6*G2K)/(pm.nm[1]+G2K);
+ const ph=(T,t,X)=>Math.min(cap(X||T),X=='judge'||X=='name'||T=='ecoute'?one(X||T,t):ques(T,t));
+ const seq=(T,t)=>T=='ecoute'?[['map',()=>Math.min(cap('map'),base('map'))],['q',()=>one('ecoute',t)],['landed',()=>Math.min(cap('landed'),base('landed'))]]
+  :[['map',()=>Math.min(cap('map'),base('map'))],['q',()=>ph(T,t)],...(T=='libre'?[['judge',()=>one('judge',t)]]:[]),['reveal',()=>Math.min(cap('reveal'),base('reveal'))],['name',()=>pn*Math.min(cap('name'),one('name',t))],['landed',()=>Math.min(cap('landed'),base('landed'))]];
+ return {base,pers,seq,on,k,pm}}
+/* types probables des tours restants : on rejoue les choix gloutons sur les vraies cartes */
+function g2Sim(from,cnt0){const s=st,o=s.order,n=o.length,L=s.L||s.length,out=[],cnt={};if(n<2)return out;
+ const C=(ex,t)=>{const key=ex+'>'+t;if(!cnt[key]){cnt[key]={};const x=status(ex,t);ORDER.forEach(r=>cnt[key][r]=x[r].n)}return cnt[key]};
+ if(cnt0)C(cnt0[0],cnt0[1])[cnt0[2]]++;
+ for(let i=from;i<s.total;i++){let ex,t;
+  if(MODE()=='por'){t=o[Math.floor(i/L)%n];const x=o.filter(y=>y!=t);ex=x[(i%L)%x.length]}
+  else if(MODE()=='mir'){ex=o[i%2];t=o[(i+1)%2]}
+  else{ex=o[i%n];t=o.filter(y=>y!=ex).sort((a,b)=>Object.values(C(ex,a)).reduce((p,q)=>p+q,0)-Object.values(C(ex,b)).reduce((p,q)=>p+q,0))[0]}
+  const c=C(ex,t),op=ORDER.filter(r=>(R[r].lvl||0)<=s.meteo&&(MODE()=='esc'||!R[r].need.length||R[r].need.some(x=>c[x]>0)));
+  let b=op[0];for(const r of op)if(c[r]<c[b])b=r;if(!b)break;c[b]++;out.push([R[b].t,t])}
+ return out}
+function g2Rem(){const s=st;if(!s||!s.order||s.order.length<2||!s.total)return null;const M=g2Model(),pm=M.pm,n=s.order.length,L=s.L||s.length;
+ const el=pm.t0?Math.max(0,(s.updatedAt-pm.t0-(pm.pz||0))/1000+(s.paused!=null?0:(Date.now()-(RCV||Date.now()))/1000)):0;
+ let tot=0,turnSec=[];const c=s.cur,inTurn=c&&['question','judge','reveal','name','landed'].includes(s.phase);
+ if(inTurn){const sq=M.seq(c.type,c.terr),cur={question:'q',judge:'judge',reveal:'reveal',name:'name',landed:'landed'}[s.phase];let i=sq.findIndex(x=>x[0]==cur);if(i<0)i=0;
+  let e=sq[i][1]();if(s.phase=='name')e=e/Math.max(.2,(pm.nm[0]+.6*G2K)/(pm.nm[1]+G2K));let r=Math.max(e*.12,e-el);
+  const tr=tmRem();if(tr!=null&&!s.tsoft&&s.paused==null)r=Math.min(r,tr/1000+2);tot+=r;for(const x of sq.slice(i+1))tot+=x[1]()}
+ const sim=g2Sim(inTurn?s.turn+1:s.turn,inTurn&&c?[c.explorer,c.terr,c.r]:null);
+ sim.forEach(([T,t],j)=>{let d=M.seq(T,t).reduce((a,x)=>a+x[1](),0);if(j==0&&!inTurn&&s.phase=='map'){const m=M.seq(T,t)[0][1]();d-=Math.min(m*.88,el)}turnSec.push(d);tot+=d});
+ if(MODE()=='por'){for(let i=s.turn+1;i<s.total;i++)if(i%L==0)tot+=Math.min(20,M.base('pfiche'))}
+ if(s.phase=='pfiche')tot+=Math.max(2,20-el);
+ /* fin : drapeaux (vitesse d'écriture mesurée) puis bilan */
+ let endS=MODE()=='esc'?60:20*n+90;const cps=M.on.map(x=>(pm.pp[x]||{}).ch).filter(x=>x&&x[1]>3).map(x=>x[0]/x[1]);
+ if(cps.length&&MODE()!='esc'){const slow=Math.max(.4,Math.min(...cps)),len=Math.max(25,Math.min(90,cps.length?M.on.reduce((a,x)=>{const h=(pm.pp[x]||{}).ch;return h?[a[0]+h[0],a[1]+((pm.pp[x]||{}).libre||[0,1])[1]]:a},[0,0]).reduce((a,b)=>a/Math.max(1,b)):40));
+  endS=(endS+(30+(n-1)*(12+len/slow)+60))/2}
+ tot+=endS;const done=Object.values(pm.ph||{}).reduce((a,x)=>a+x[1],0);
+ return {sec:Math.max(30,tot),turns:sim.length+(inTurn?1:0),per:turnSec.length?turnSec.reduce((a,b)=>a+b,0)/turnSec.length:0,measured:done>=3}}
+/* affichage stable : compte à rebours naturel + rapprochement doux de la nouvelle estimation, hystérésis sur la minute */
+function g2Smooth(){const r=g2Rem();if(!r)return null;const now=Date.now();
+ if(G2D.v==null||G2D.gid!==st.gid){G2D={v:r.sec,t:now,m:null,gid:st.gid}}
+ else{if(st.paused==null)G2D.v-=(now-G2D.t)/1000;G2D.t=now;G2D.v+=(r.sec-G2D.v)*Math.min(.5,.08+(Math.abs(r.sec-G2D.v)>600?.3:0));G2D.v=Math.max(20,G2D.v)}
+ const m=G2D.v/60;if(G2D.m==null||Math.abs(m-G2D.m)>.8||(G2D.m>1&&m<1.5))G2D.m=Math.max(1,Math.round(m));G2D.r=r;return G2D}
+window.g2Min=()=>{const d=g2Smooth();return d?d.m:1};
+function g2Tip(){const r=G2D.r;if(!r)return '';return r.measured?T('estTip',{s:Math.round(r.per/5)*5||'–',q:r.turns}):T('estTip0')}
+setInterval(()=>{const pb=$('#gprog');if(!st||!pb||!pb.isConnected)return;const g=gProg();pb.querySelector('b').textContent=`${g.pct}${LANG=='fr'?' ':''}% · ≈ ${g.min} min`;pb.dataset.tip=g2Tip()},2000);
+/* hôte : demandes d'arrivée en cours de partie */
+function g2Ask(c,name,d){if(st.players.length>=8){c.send({t:'err',k:'errFull',m:T('errFull')});setTimeout(()=>c.close(),400);return}
+ const old=G2REQ[name];if(old&&old.c!==c)try{old.c.close()}catch(e){}
+ G2REQ[name]={c,color:d.color,saves:d.saves||{},t:Date.now()};try{c.send({t:'g2wait',host:st.host})}catch(e){}SFX.join();g2ReqDraw()}
+function g2Admit(name,yes){const r=G2REQ[name];delete G2REQ[name];g2ReqDraw();if(!r||!r.c.open||!st)return;const c=r.c;
+ if(!yes||P(name)||(st.banned||[]).includes(name)||st.players.length>=8){try{c.send({t:'err',k:yes&&P(name)?'errTaken':'g2Nope'})}catch(e){}setTimeout(()=>{try{c.close()}catch(e){}},400);return}
+ let color=PAL.includes(r.color)?r.color:PAL[0];if(st.players.some(x=>x.color==color))color=PAL.find(x=>!st.players.some(y=>y.color==x))||color;
+ st.players.push({name,color,online:true,peer:c.peer});conns[c.peer]=c;c.pname=name;clientSaves[name]=r.saves;
+ if(!['lobby','end','recap','carnet'].includes(st.phase)&&!st.order.includes(name)){const n=st.order.length,L=st.L||st.length;st.order.push(name);st.bottles[name]=1;
+  if(st.mode=='mir'&&st.order.length!=2)st.mode='exp';
+  st.total=MODE()=='por'?st.total+L:st.turn+Math.round(Math.max(0,st.total-st.turn)*(n+1)/n)}
+ toast(T('joined',{n:name}));bump();try{c.send({t:'chatlog',log:chatLog})}catch(e){}}
+function g2ReqDraw(){let w=$('#g2req');for(const n in G2REQ)if(!G2REQ[n].c.open)delete G2REQ[n];
+ const ks=isHost&&st?Object.keys(G2REQ):[];if(!ks.length){w&&w.remove();return}
+ if(!w){w=document.createElement('div');w.id='g2req';document.body.appendChild(w)}
+ const h=ks.map(n=>`<div class="g2rq"><span class="dot" style="background:${grad(PAL.includes(G2REQ[n].color)?G2REQ[n].color:PAL[0])}"></span><span class="g2rt">${T('g2Want',{n:`<b>${esc(n)}</b>`})}</span><button class="pri" data-g2y="${esc(n)}">${T('g2Yes')}</button><button class="ghost" data-g2n="${esc(n)}">${T('g2No')}</button></div>`).join('');
+ if(w._h!==h){w._h=h;w.innerHTML=h;w.querySelectorAll('[data-g2y]').forEach(b=>b.onclick=()=>g2Admit(b.dataset.g2y,true));w.querySelectorAll('[data-g2n]').forEach(b=>b.onclick=()=>g2Admit(b.dataset.g2n,false))}}
+setInterval(()=>{if(isHost&&Object.keys(G2REQ).length)g2ReqDraw()},1000);
+/* client : en attente de la réponse de l'hôte */
+function g2Waiting(host){g2Wait=true;if(st)return;
+ app.innerHTML=`<div class="banner"><p class="serif">${T('g2WaitT')}</p><p class="mut typing" style="margin-top:8px">${T('g2WaitD',{n:`<b>${esc(host||'')}</b>`})}<span><i></i><i></i><i></i></span></p><button class="ghost" id="g2cx" style="margin-top:16px">${T('cancel')}</button></div>`;
+ $('#g2cx').onclick=()=>{g2Wait=false;leave()}}
+/* hôte : menu de la pastille (exclure / bannir) */
+function g2KickMenu(btn,n){$('#g2km')&&$('#g2km').remove();const m=document.createElement('div');m.id='g2km';m.className='g2km';
+ m.innerHTML=`<button data-k="0"><b>🚪 ${T('kick')}</b><span>${T('g2KickD')}</span></button><button data-k="1"><b>⛔ ${T('g2Ban')}</b><span>${T('g2BanD')}</span></button>`;
+ document.body.appendChild(m);const r=btn.getBoundingClientRect(),w=m.offsetWidth;m.style.top=(r.bottom+8)+'px';m.style.left=Math.max(8,Math.min(innerWidth-w-8,r.left+r.width/2-w/2))+'px';
+ const off=e=>{if(!m.contains(e.target)){m.remove();document.removeEventListener('pointerdown',off,true)}};setTimeout(()=>document.addEventListener('pointerdown',off,true));
+ m.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const ban=b.dataset.k=='1';m.remove();document.removeEventListener('pointerdown',off,true);
+  ask(T(ban?'g2BanAsk':'kickAsk',{n:B(n)}),T(ban?'g2Ban':'kick')).then(v=>v&&kick(n,ban))})}
+/* moments forts : un cœur pendant la révélation */
+const g2HeartBtn=c=>{if(!c||c.kind=='door')return '';const l=c.lk||[],on=l.includes(me.name);return `<button type="button" class="g2heart ${on?'on':''}" id="g2h" aria-pressed="${on}" data-tip="${esc(T('g2HeartTip'))}"><span class="g2hi">${on?'❤️':'🤍'}</span><span>${T('g2Heart')}</span>${l.length?`<b>${l.length}</b>`:''}</button>`};
+function g2After(){const h=$('#g2h');if(h)h.onclick=()=>{h.classList.add('pop');send({t:'heart'})}}
+function g2Moments(e){const H=(e.hist||[]).filter(h=>h.lk&&h.lk.length).sort((a,b)=>b.lk.length-a.lk.length).slice(0,3);if(!H.length)return '';
+ return `<div class="card g2top"><h3>❤️ ${T('g2Top')}</h3><ul class="gfacts">${H.map(h=>`<li>${regionBadge(h.r,26)}<div><span class="mut">${esc(h.terr)} · ${esc(gQ(h))}</span><br>${esc(h.placeName?'✨ '+h.placeName:gA(h)||'·')}</div><span class="g2n">❤️ ${h.lk.length}</span></li>`).join('')}</ul></div>`}
+/* souvenirs sur une personne, juste au-dessus de son drapeau */
+function g2Mem(n){const H=(st.hist||[]).filter(h=>h.terr==n&&h.kind!='door'),out=[];
+ for(const h of H){const a=h.placeName?'✨ '+h.placeName:gA(h);if(a)out.push([h.r,a,gQ(h)]);if(h.kw&&!String(a).includes(h.kw))out.push([h.r,'🗝️ '+h.kw,gQ(h)])}
+ for(const h of H)if(h.q&&h.q.c)out.push(['bouteille','🍾 '+h.q.c,'']);
+ if(!out.length)return '';return `<div class="g2mem">${out.slice(0,10).map(([r,a,q])=>`<div class="g2mc"${q?` data-tip="${esc(short(q))}"`:''}>${regionBadge(r,20)}<span>${esc(a)}</span></div>`).join('')}</div>`}
+/* carnet : la carte d'une ancienne expédition, en souvenir */
+function g2OldMap(e){const t=ui.rvTab,l=e.maps&&e.maps[me.name]&&e.maps[me.name][t];if(!t||t==me.name||!l||!l.length)return '';
+ const k=me.name+'>'+t,sv=seenOpen[k],sm=st.maps;let h='';try{st.maps=e.maps;seenOpen[k]=undefined;h=svgMap(me.name,t)}finally{st.maps=sm;seenOpen[k]=sv}
+ return `<h3 class="gh">🗺️ ${T('g2OldMap',{n:esc(t)})}</h3><div class="map g2end" style="margin-top:8px">${h}</div>`}
+/* lobby : ton des questions */
+const G2TI=['🌿','🌶️','🔥'];
+function g2ToneCard(host){const tn=st.tone||0;
+ return `<div class="card"><h3>${T('toneT')}</h3><div class="gmets g2tones">${[0,1,2].map(i=>`<${host?'button':'div'} ${host?`data-tone="${i}"`:''} class="gmet g2tone ${tn==i?'sel':''} ${!host&&tn!=i?'g2off':''}"><span class="gmh"><b>${G2TI[i]} ${T('tone'+i)}</b>${i?'<span class="g2_18">18+</span>':''}</span><span class="gline">${T('tone'+i+'D')}</span></${host?'button':'div'}>`).join('')}</div>
+ ${tn?`<p class="g2warn">${T('tone18')}</p>`:''}</div>`}
+function g2BindTone(){$$('[data-tone]').forEach(b=>b.onclick=()=>{const v=+b.dataset.tone;if(v==(st.tone||0))return;
+ if(v>(st.tone||0))ask(T('toneAsk',{t:G2TI[v]+' '+T('tone'+v)}),T('toneOn')).then(ok=>ok&&send({t:'tone',v}));else send({t:'tone',v})})}
 
 /* =========================================================
    RENDU
@@ -1492,7 +1679,7 @@ function render(){
  $('#help')&&($('#help').onclick=()=>tutorial());
  $('#mute')&&($('#mute').onclick=()=>{muted=!muted;LS.set('terra:mute',muted);render()});
  $('#codebtn')&&($('#codebtn').onclick=copyInvite);
- $$('[data-kick]').forEach(b=>b.onclick=()=>{const n=b.dataset.kick;ask(T('kickAsk',{n:B(n)}),T('kick')).then(v=>v&&kick(n))});
+ $$('[data-kick]').forEach(b=>b.onclick=e=>{e.stopPropagation();g2KickMenu(b,b.dataset.kick)});
  const hb=$('#homebtn');if(hb){hb.onclick=()=>ask(T('leaveAsk'),T('home')).then(v=>v&&leave());hb.onkeydown=e=>{if(e.key=='Enter'||e.key==' '){e.preventDefault();hb.onclick()}}}
  v.bind&&v.bind();
  gAfter();
@@ -1537,7 +1724,7 @@ function vLobby(){
   $$('[data-len]').forEach(b=>b.onclick=()=>send({t:'length',v:+b.dataset.len}));
   $$('[data-mode]').forEach(b=>b.onclick=()=>send({t:'mode',v:b.dataset.mode}));
   $$('[data-tm]').forEach(b=>b.onclick=()=>send({t:'timer',v:TIM[+b.dataset.tm]}));
-  $('#anon')&&($('#anon').onclick=()=>send({t:'anon',v:!st.anon}));
+  $('#anon')&&($('#anon').onclick=()=>send({t:'anon',v:!st.anon}));g2BindTone();
   $('#start')&&($('#start').onclick=()=>send({t:'start'}));$('#quit').onclick=leave}}}
 /* === game : salon === */
 const GMI={exp:'⛵',esc:'⚡',por:'🎯',mir:'🪞'};
@@ -1560,7 +1747,8 @@ function gLobbyBody(host,my,on){
   <p class="gsub">${T(isEsc||tf?'timerD':'timer0D')}</p>
   ${on>=3?`<h3 class="gh">🎭 ${T('anonT')}</h3>${host?`<button class="gsw ${an?'on':''}" id="anon" role="switch" aria-checked="${an}"><i></i><span>${T('anonD')}</span></button>`:`<p class="gval">${an?'✓ '+T('anonD'):T('anonOff')}</p>`}`:''}
   ${by}</div>
- <p class="grecap">${[GMI[md]+' '+T('mo_'+md),MN(mt),T('tm'+TIM.indexOf(isEsc?.7:tf)),T('people',{n:on})].join(' · ')}${an?' · 🎭':''}${host?'':` · ⏱ ≈ ${E} min`}</p>
+ ${g2ToneCard(host)}
+ <p class="grecap">${[GMI[md]+' '+T('mo_'+md),MN(mt),T('tm'+TIM.indexOf(isEsc?.7:tf)),T('people',{n:on})].join(' · ')}${an?' · 🎭':''}${st.tone?' · '+G2TI[st.tone]+' '+T('tone'+st.tone):''}${host?'':` · ⏱ ≈ ${E} min`}</p>
  ${host?`<button class="pri wide" id="start" ${on<2?'disabled':''}>${T('startEst',{t:E})}</button>`:''}`}
 
 /* ---------- Carte ---------- */
@@ -1664,7 +1852,7 @@ function vReveal(){const c=st.cur,dv=driver(c),can=me.name==dv,q=LQ(c.q);
   hintBtn:can?`<button class="pri" id="go2" style="padding:8px 14px">${T('cont')}</button>`:'',
   html:qHead(c)+`<div class="card">${c.type!='libre'?`<p class="mut c">${T('answered',{n:esc(c.terr)})}</p><div class="big-ans flip"><div>${show(c.answer)}</div></div>`:''}
   <div class="flip">${Object.entries(c.result).map(([n,ok],i)=>`<div class="guess ${ok?'ok':'no'}" style="animation-delay:${.25+i*.25}s">${gWho(c,n)}${show(c.guesses[n])}</div><span class="verdict" style="color:${ok?'var(--ink)':'var(--sur)'}">${T(ok?'spotOn':'surprise')}</span></div>`).join('')}</div>
-  <p class="mut c" style="margin-top:10px">${anyWrong?T('surpLine',{n:esc(c.terr)}):T('allRight')}</p>${reactBar()}</div>`,
+  <p class="mut c" style="margin-top:10px">${anyWrong?T('surpLine',{n:esc(c.terr)}):T('allRight')}</p>${c.unveil?`<p class="gnote c">🎭 ${T('g2Unveil')}</p>`:''}${g2HeartBtn(c)}${reactBar()}</div>`,
   bind(){$('#go2')&&($('#go2').onclick=()=>send({t:'toName'}))}}}
 
 /* ---------- Nommer ---------- */
@@ -1683,19 +1871,20 @@ function vLanded(){const c=st.cur,dv=driver(c),can=me.name==dv,iAm=c.terr!=me.na
  const colr={door:'#aaa',ear:'var(--ear)',ink:'var(--ink)',named:'var(--sur)'}[c.kind];
  return {mine:can,hint:can?T('nextHint'):T('nextBy',{n:B(dv)}),hintBtn:can?`<button class="pri" id="go2" style="padding:8px 14px">${T('cont')}</button>`:'',
   html:`<div class="banner sheet"><p class="serif" style="color:${colr}">${title}</p><p class="mut" style="margin-top:8px">${sub}</p></div>
-  ${iAm?`<div class="card"><p class="mut" style="margin-bottom:8px">${T('yourMapOf',{n:tn})}</p><div class="map">${svgMap(me.name,c.terr)}</div></div>`:`<div class="card c"><p class="mut">${T('yourIsl')}</p></div>`}${reactBar()}`,
+  ${iAm?`<div class="card"><p class="mut" style="margin-bottom:8px">${T('yourMapOf',{n:tn})}</p><div class="map">${svgMap(me.name,c.terr)}</div></div>`:`<div class="card c"><p class="mut">${T('yourIsl')}</p></div>`}<div class="c">${g2HeartBtn(c)}</div>${reactBar()}`,
   bind(){$('#go2')&&($('#go2').onclick=()=>send({t:'next'}))}}}
 
 /* ---------- Échange des cartes ---------- */
 function vEnd(){const mine=st.flags[me.name],os=others(me.name);if(!os.includes(ui.endTab))ui.endTab=os[0];const o=ui.endTab;
  const waiting=st.order.filter(n=>!st.flags[n]&&P(n).online);
+ if(!st.order.includes(me.name))return {mine:false,hint:T('g2Spect'),html:`<div class="banner"><p class="serif">${T('exchange')}</p><p class="mut" style="margin-top:6px">${T('g2Spect')}</p></div>`};
  return {mine:!mine,hint:mine?T('waitFlags',{list:waiting.map(esc).join(', ')}):T('endHint'),
   html:`<div class="banner"><p class="serif">${T('exchange')}</p><p class="mut" style="margin-top:6px">${T('exchangeD')}</p></div>
   <div class="tabs" style="justify-content:center">${os.map(n=>`<button data-et="${esc(n)}" class="${o==n?'sel':''}">${DOT(n)}${T('seenBy',{n:esc(n)})}</button>`).join('')}</div>
-  <div class="card"><div class="map">${svgMap(o,me.name)}</div><div style="margin-top:10px">${lmList(mapOf(o,me.name))}</div></div>
+  <div class="card g2end"><div class="map">${svgMap(o,me.name)}</div><div style="margin-top:10px">${lmList(mapOf(o,me.name))}</div></div>
   ${mine?`<div class="card c"><p class="serif" style="font-size:20px">${T('flagsDone')}</p></div>`:
   `<div class="card"><h3>${T('plant')}</h3><p class="mut" style="margin-top:4px">${T('plantD')}</p>
-  ${os.map(n=>`<label>${DOT(n)} ${esc(n)}</label><textarea data-d="flag:${esc(n)}" maxlength="240" style="min-height:64px"></textarea>`).join('')}
+  ${os.map(n=>`<label>${DOT(n)} ${esc(n)}</label>${g2Mem(n)}<textarea data-d="flag:${esc(n)}" maxlength="240" style="min-height:64px"></textarea><p class="g2lock">${T(st.anon?'g2LockA':'g2Lock',{n:NS(n)})}</p>`).join('')}
   <p class="err"></p><button class="pri wide" id="ok">${T('plantBtn')}</button></div>`}`,
   bind(){$$('[data-et]').forEach(b=>b.onclick=()=>{ui.endTab=b.dataset.et;render()});
    $('#ok')&&($('#ok').onclick=()=>{const v={};for(const n of os){const x=(drafts['flag:'+n]||'').trim();if(!x)return err(T('flagEach'));v[n]=x.slice(0,240)}send({t:'flags',v})})}}}
@@ -1705,11 +1894,15 @@ function constellation(){const n=st.order.length,W=400,H=n>2?260:150,cx=200,cy=H
  const pos={};st.order.forEach((p,i)=>{const a=n>2?-Math.PI/2+i/n*Math.PI*2:Math.PI*i;pos[p]=[cx+Math.cos(a)*rad,cy+Math.sin(a)*(n>2?rad*.9:0)]});
  let s=`<svg viewBox="0 0 ${W} ${H}" style="width:100%">`;
  for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){const a=st.order[i],b=st.order[j];
-  const w=[...mapOf(a,b),...mapOf(b,a)].filter(l=>l.kind!='door').length;
-  if(!w)continue;const [x1,y1]=pos[a],[x2,y2]=pos[b];
-  s+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#ff8a3d" stroke-opacity="${Math.min(.9,.25+w*.04)}" stroke-width="${Math.min(10,1+w*.6)}" stroke-linecap="round"/>`}
+  /* game2 : fil = lieux découverts entre deux personnes (dans les deux sens) ; 3 épaisseurs nettes + le chiffre */
+  const w=[...mapOf(a,b),...mapOf(b,a)].filter(l=>l.kind!='door').length,[x1,y1]=pos[a],[x2,y2]=pos[b],ti=g2Tier(w);
+  if(!w){s+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#b9a68a" stroke-width="2" stroke-dasharray="2 7" stroke-linecap="round" opacity=".7"/>`;continue}
+  const mx=(x1+x2)/2,my=(y1+y2)/2;
+  s+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${G2TC[ti]}" stroke-width="${G2TW[ti]}" stroke-linecap="round"/><g class="g2pill"><circle cx="${mx}" cy="${my}" r="12" fill="#fffaf0" stroke="${G2TC[ti]}" stroke-width="2.5"/><text x="${mx}" y="${my+4.5}" text-anchor="middle" font-size="13" font-weight="800" font-family="Nunito,Rubik,sans-serif" fill="#3b2a1b">${w}</text></g>`}
  st.order.forEach(p=>{const [x,y]=pos[p];s+=`<circle cx="${x}" cy="${y}" r="14" fill="${col(p)}" stroke="#fff" stroke-width="5"/><text x="${x}" y="${y+30}" text-anchor="middle" font-size="14" font-weight="700" font-family="Nunito,Rubik,sans-serif" fill="#3b2a1b">${esc(p)}</text>`});
- return s+'</svg>'}
+ const lg=(ti,l)=>`<span><svg width="34" height="14" aria-hidden="true"><line x1="3" y1="7" x2="31" y2="7" stroke="${ti<0?'#b9a68a':G2TC[ti]}" stroke-width="${ti<0?2:G2TW[ti]}" ${ti<0?'stroke-dasharray="2 7"':''} stroke-linecap="round"/></svg>${l}</span>`;
+ return s+`</svg><div class="g2leg">${lg(0,T('g2L1'))}${lg(1,T('g2L2'))}${lg(2,T('g2L3'))}${lg(-1,T('g2L0'))}</div>`}
+const G2TW=[3,8,14],G2TC=['#f6b26b','#ff8a3d','#e2603e'],g2Tier=w=>w>=6?2:w>=3?1:0;
 function vCarnet(){const host=me.name==st.host;
  return {mine:host,hint:host?T('againHint'):T('bye',{n:esc(st.host)}),
   html:`<div class="banner"><p class="serif">${T('logbook')}</p><p class="mut" style="margin-top:6px">${T('expCount',{c:st.log.length})}</p></div>
@@ -1736,7 +1929,7 @@ function gRing(){if(!TMR.isConnected||!st)return;const r=tmRem();if(r==null){TMR
  TMR.querySelector('b').textContent=pz?'⏸':s>=60?Math.floor(s/60)+':'+String(s%60).padStart(2,'0'):s;
  TMR.classList.toggle('low',s<10&&!st.tsoft&&!pz);TMR.classList.toggle('soft',!!st.tsoft);TMR.classList.toggle('pz',pz);TMR.classList.toggle('calm',!!st.tcalm&&s>30&&!pz);
  const b=TMR.querySelector('.tring');b.setAttribute('aria-label',T(pz?'resume':'pauseTip'));TMR.querySelector('.tplus').hidden=me.name!=st.host}
-function gAfter(){if(!st)return;
+function gAfter(){if(!st)return;g2After();
  if(st.v!==RCVV){RCVV=st.v;RCV=Date.now()}
  if(!isHost)TK=gKey(st);
  if(st.gid!==GID){if(GID!==undefined&&st.gid){drafts={};Object.assign(ui,{terr:null,region:null,bottle:false,mapTab:null,endTab:null,rcTab:null});myPend={cid:null}}GID=st.gid}
@@ -1746,11 +1939,11 @@ function gAfter(){if(!st)return;
  if(['lobby','end','recap','carnet'].includes(st.phase)||!st.total){pb&&pb.remove();return}
  if(!pb||pb.parentNode!==tb){pb=document.createElement('div');pb.id='gprog';pb.innerHTML='<div class="wake"><i></i><span class="boat">⛵</span></div><b></b>';const top=tb.querySelector('.top');top?top.after(pb):tb.prepend(pb)}
  const g=gProg(),f=Math.min(100,g.pct/.9);pb.classList.toggle('last',g.last);pb.querySelector('i').style.width=f+'%';pb.querySelector('.boat').style.insetInlineStart=f+'%';
- pb.querySelector('b').textContent=`${g.pct}${LANG=='fr'?' ':''}% · ≈ ${g.min} min`}
+ pb.querySelector('b').textContent=`${g.pct}${LANG=='fr'?' ':''}% · ≈ ${g.min} min`;pb.dataset.tip=g2Tip()}
 // bilan : textes lisibles d'une entrée d'historique
 function gQ(h){if(h.q.c)return h.q.c;const q=QBY[h.q.id];return q?trimQ(LQ(q).q).replaceAll('{Y}',h.terr):''}
 function gA(h){if(h.answer!=null&&QBY[h.q.id]){const q=LQ(QBY[h.q.id]);return h.type=='choix'?(q.o||[])[h.answer]||'':h.answer+' / 10'}
- if(h.rv&&h.rv.length)return h.rv.map(v=>QQ(v)).join(' · ');return h.kw?'🗝️ '+h.kw:''}
+ if(h.rv&&h.rv.length)return h.rv.map(v=>typeof v=='string'?QQ(v):QQ(v.v)+' — '+v.n).join(' · ');return h.kw?'🗝️ '+h.kw:''}
 const gN=x=>Array.isArray(x)?x.length:+x||0;
 function gRecapData(e){const H=e.hist||[],out={};
  for(const p of e.players||[]){const mine=H.filter(h=>h.terr==p&&h.kind!='door'),it=(h,a)=>({r:h.r,q:gQ(h),a});
@@ -1765,9 +1958,10 @@ const GSEC=[['three','r3','⭐'],['ans','rAns','💬'],['surp','rSurp','✨'],['
 function gRecapBody(e,id){const ppl=e.players||[],d=gRecapData(e);let t=ui[id+'Tab'];if(!ppl.includes(t))t=ui[id+'Tab']=ppl.find(n=>n!=me.name)||ppl[0];const x=d[t]||{};
  const li=o=>`<li>${o.r?regionBadge(o.r,26):''}<div><span class="mut">${esc(o.q)}</span><br>${esc(o.a)}</div></li>`;
  const secs=GSEC.filter(([k])=>x[k]&&x[k].length).map(([k,l,ic])=>`<h3 class="gh">${ic} ${T(l)}</h3><ul class="gfacts ${k=='three'?'g3':''}">${x[k].map(li).join('')}</ul>`).join('');
- return `<div class="tabs" style="justify-content:center">${ppl.map(n=>`<button data-rt="${esc(n)}" class="${t==n?'sel':''}">${DOT(n)}${esc(n)}</button>`).join('')}</div>
+ return `${g2Moments(e)}<div class="tabs" style="justify-content:center">${ppl.map(n=>`<button data-rt="${esc(n)}" class="${t==n?'sel':''}">${DOT(n)}${esc(n)}</button>`).join('')}</div>
  <div class="card grc">${secs||`<p class="mut c">${T('rEmpty')}</p>`}</div>`}
 function gRecapText(e){const d=gRecapData(e),L=[`Terra Incognita · ${T('recapT')} · ${new Date(e.date||Date.now()).toLocaleDateString(D().loc)}`];
+ const top=(e.hist||[]).filter(h=>h.lk&&h.lk.length).sort((a,b)=>b.lk.length-a.lk.length).slice(0,3);if(top.length){L.push('','❤️ '+T('g2Top'));top.forEach(h=>L.push(' • '+h.terr+' · '+gQ(h)+' — '+(h.placeName||gA(h)||'·')+' (❤️ '+h.lk.length+')'))}
  for(const p of e.players||[]){L.push('','== '+p+' ==');if(!GSEC.some(([k])=>d[p][k].length))L.push(T('rEmpty'));for(const [k,l] of GSEC)if(d[p][k].length){L.push(T(l));d[p][k].forEach(o=>L.push(' • '+(o.q?o.q+' — ':'')+o.a))}}
  return L.join('\n').replace(/<[^>]+>/g,'')}
 function gSaveTxt(e){const txt=gRecapText(e);
@@ -1779,7 +1973,7 @@ function vRecap(){const e=st.log.at(-1)||{players:st.order,hist:st.hist||[],flag
   html:`<div class="banner"><p class="serif">${T('recapT')}</p><p class="mut" style="margin-top:6px">${T('recapD')}</p></div>${gRecapBody(e,'rc')}<button class="wide" id="gsave">💾 ${T('saveTxt')}</button>`,
   bind(){gBindRecap('rc',e,render);$('#go2')&&($('#go2').onclick=()=>send({t:'recapDone'}))}}}
 function gReview(i){const e=st&&st.log[i];if(!e)return;
- $('#modal').innerHTML=`<div class="modal"><div class="card grev"><p class="serif c" style="font-size:21px">${T('recapT')}</p>${gRecapBody(e,'rv')}<div class="row"><button class="ghost" id="rvx">${T('cont')}</button><button id="gsave">💾 ${T('saveTxt')}</button></div></div></div>`;
+ $('#modal').innerHTML=`<div class="modal"><div class="card grev"><p class="serif c" style="font-size:21px">${T('recapT')}</p>${gRecapBody(e,'rv')}${g2OldMap(e)}<div class="row"><button class="ghost" id="rvx">${T('cont')}</button><button id="gsave">💾 ${T('saveTxt')}</button></div></div></div>`;
  const m=$('.modal');gBindRecap('rv',e,()=>gReview(i));const close=()=>{m.classList.add('closing');setTimeout(()=>{$('#modal').textContent=''},240)};$('#rvx').onclick=close;m.onclick=x=>{if(x.target==m)close()}}
 function vPfiche(){const L=st.L||st.length,sub=st.order[Math.floor((st.turn-1)/L)%st.order.length],H=(st.hist||[]).filter(h=>h.terr==sub&&h.kind!='door'),nx=explorer(),can=me.name==st.host||me.name==nx;
  return {mine:can,hint:can?T('contHint'):T('savor',{n:B(nx)}),hintBtn:can?`<button class="pri" id="go2" style="padding:8px 14px">${T('cont')}</button>`:'',
