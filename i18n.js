@@ -457,6 +457,18 @@ for(const l in EXT_GAME)if(I18N[l])Object.assign(I18N[l].ui,EXT_GAME[l]);
 
 
 
+/* @i18n-theme */
+const EXT_THEME={fr:{thDark:"Mode nuit",thLight:"Mode jour"},
+en:{thDark:"Night mode",thLight:"Day mode"},
+es:{thDark:"Modo noche",thLight:"Modo día"},
+it:{thDark:"Modalità notte",thLight:"Modalità giorno"},
+de:{thDark:"Nachtmodus",thLight:"Tagmodus"},
+ru:{thDark:"Ночной режим",thLight:"Дневной режим"},
+zh:{thDark:"夜间模式",thLight:"日间模式"},
+he:{thDark:"מצב לילה",thLight:"מצב יום"},
+pt:{thDark:"Modo noite",thLight:"Modo dia"}};
+for(const l in EXT_THEME)if(I18N[l])Object.assign(I18N[l].ui,EXT_THEME[l]);
+
 /* @i18n-polish */
 const EXT_POL={fr:{timerD:"Le sablier laisse le temps de réfléchir et d'écrire, puis avance tout seul quand on regarde les réponses"},
 en:{timerD:"The hourglass leaves plenty of time to think and write, then moves on by itself while you look at the answers"},
