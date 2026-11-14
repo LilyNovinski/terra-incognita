@@ -49,7 +49,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Rubik:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sacramento&text=by&display=swap">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="i18n.js?v=20261114d"></script>
+<script src="i18n.js?v=20261114e"></script>
 <style>
 :root{--sea1:#bdeef0;--sea2:#69c9d3;--deep:#0e5866;--deep2:#0a4652;--paper:#fffaf0;--paper2:#fbf0d9;--edge:#ead6ae;--edge2:#d8bd88;--txt:#3b2a1b;--mut:#8a7660;--acc:#ff8a3d;--acc-d:#d9661f;--acc2:#ffb15c;--ink:#1d8e6c;--sur:#d9661f;--ear:#5869b5;--bad:#d64b3c;--gold:#f2b84b}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -410,6 +410,11 @@ button:focus-visible,.reg:focus-visible,select:focus-visible{outline:3px solid #
 .chip .kick:hover::after{background:#fff}
 .chip .kick:hover{background:#e2603e;transform:rotate(90deg)}
 .chip .kick:hover::before{background:#fff}
+.bhow{margin:12px 0 8px;padding:10px 14px;border-radius:14px;background:#eef8f6;color:#245a5e;font-size:14px;line-height:1.45}
+.bex{display:flex;flex-wrap:wrap;gap:6px}
+.bex button{width:auto;padding:7px 12px;border-radius:99px;font:600 13px Nunito,Rubik,sans-serif;background:#fffdf7;border:2px dashed var(--edge2);box-shadow:none;color:var(--txt);text-align:start;transition:border-color .2s,background .2s,transform .15s}
+.bex button:hover{border-style:solid;border-color:var(--acc2);background:#fff4e8}
+.bex button:active{transform:scale(.97)}
 /* téléphone */
 @media (max-width:480px){
  .row:has(>[data-vote]){flex-direction:column}
@@ -972,7 +977,8 @@ function vMap(){
   sheet=`<div class="card sheet"><div class="rhead">${regionBadge(r)}<div style="flex:1"><h3>${RN(r)}</h3><p class="mut">${RT(r,1)}${s.n?' · '+T('traced',{c:s.n}):''}</p></div></div>
   <p style="margin-top:12px;font-size:14px;color:var(--txt)">${RT(r,2)}</p>
   ${ok?`${bottles>0&&R[r].t!='ecoute'?`<label class="toggle"><input type="checkbox" id="bt" ${ui.bottle?'checked':''}>${regionBadge('bouteille',34)}<span>${T('bottleLbl')}</span></label>
-   ${ui.bottle?`<textarea data-d="bottle" placeholder="${esc(T('bottlePh',{n:t}))}"></textarea>`:''}`:''}
+   ${ui.bottle?`<p class="bhow">${T('bottleHow',{n:B(t)})}</p><textarea data-d="bottle" placeholder="${esc(T('bottlePh',{n:t}))}"></textarea>
+   <p class="mut" style="font-size:12px;font-weight:700;margin:10px 0 6px">${T('exLbl')}</p><div class="bex">${(()=>{const ex=T('bottleEx').split('|'),k=st.turn%ex.length;return [0,1,2].map(i=>ex[(k+i*2)%ex.length]).map(q=>`<button type="button" data-ex="${esc(q)}">${esc(q)}</button>`).join('')})()}</div>`:''}`:''}
    <p class="err"></p><button class="pri wide" id="go">${T(r=='horizon'?'exploreHorizon':'exploreZone')}</button>`
    :`<p class="mut" style="margin-top:12px">🔒 ${lockWhy(me.name,t,r)}</p>`}</div>`}
  return {mine:true,hint:r?T(op[r]?'readyHint':'outReach'):T('turnHint',{n:B(t)}),
@@ -1110,6 +1116,7 @@ function bindDD(el,cb){if(!el)return;const b=el.querySelector('.dd-b'),items=[..
   li.onkeydown=e=>{if(e.key=='ArrowDown'){e.preventDefault();(items[i+1]||items[0]).focus()}else if(e.key=='ArrowUp'){e.preventDefault();(items[i-1]||items.at(-1)).focus()}
    else if(e.key=='Enter'||e.key==' '){e.preventDefault();li.click()}else if(e.key=='Escape'||e.key=='Tab'){set(false);b.focus()}}});
  b.onkeydown=e=>{if(e.key=='ArrowDown'){e.preventDefault();set(true)}}}
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-ex]');if(!b)return;drafts.bottle=b.dataset.ex;const ta=$('textarea[data-d=bottle]');if(ta){ta.value=b.dataset.ex;ta.focus()}});
 document.addEventListener('pointerdown',e=>{document.querySelectorAll('.dd.open').forEach(d=>{if(!d.contains(e.target)){d.classList.remove('open');d.querySelector('.dd-b').setAttribute('aria-expanded',false)}})});
 /* fenêtre de confirmation sur mesure (au lieu de confirm()) */
 function ask(msg,ok){return new Promise(res=>{
