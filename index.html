@@ -896,8 +896,6 @@ div.g2tone.sel{border-color:var(--acc)}
 [data-theme=dark] .gsw.on i{background:var(--acc);box-shadow:none}
 /* sablier en pause : l'arc restant (var(--edge2), presque noir) disparaissait */
 [data-theme=dark] .tmr.pz .tfg{stroke:#8aa3b8}
-/* brume de la carte : moins éblouissante la nuit, les zones restent bien distinctes */
-[data-theme=dark] .map .fog{filter:brightness(.82)}
 /* cœur « moment fort » */
 [data-theme=dark] .g2heart{background:linear-gradient(180deg,#1a344d,#142b41);color:var(--txt)}
 [data-theme=dark] .g2heart b{background:#4a1f33;color:#ff9cc0}
@@ -925,6 +923,10 @@ div.g2tone.sel{border-color:var(--acc)}
 /* bandeau des effets de réaction */
 [data-theme=dark] #fxt{background:linear-gradient(180deg,#1a344d,#142b41);color:var(--txt);box-shadow:0 3px 0 #0006,0 10px 24px #000a}
 [data-theme=dark] #fxt.gold{color:#ffd76a;box-shadow:0 0 18px #ffd34d66,0 10px 24px #000a}
+/* pastilles de couleur de l'accueil : anneau crème adouci, placeholders et sous-titre de la porte close plus lisibles */
+[data-theme=dark] .sw button{border-color:#cfdce4}
+[data-theme=dark] ::placeholder{color:#7d96a8}
+[data-theme=dark] .dsub{color:#a9e2e6}
 /* barres de défilement : rail transparent, pouce arrondi turquoise doux qui s'éclaire au survol */
 html[data-theme=dark]{color-scheme:dark}
 @supports selector(::-webkit-scrollbar){
