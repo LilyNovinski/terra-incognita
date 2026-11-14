@@ -807,7 +807,7 @@ body::before{display:none}
 .fxp{position:fixed;left:0;top:0;opacity:0;pointer-events:none;line-height:1;user-select:none;-webkit-user-select:none;will-change:transform,opacity}
 .fxring{width:70px;height:70px;border-radius:50%;background:radial-gradient(circle,transparent 56%,#ffd26ab3 62%,transparent 70%)}
 .fxglow{width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,#ffbecdd9,#ffe2a066 45%,transparent 70%)}
-.fxtint{width:100vw;height:100vh}
+.fxtint{width:100vw;height:100vh;left:0;top:0;transform:none!important}
 .fxtint.warm{background:radial-gradient(ellipse at 50% 108%,#ff781e73,#ffa03c1f 50%,transparent 75%)}
 .fxtint.blue{background:linear-gradient(#4682c847,transparent 60%)}
 .fxtint.gold{background:radial-gradient(circle at 50% 45%,#ffd75a66,transparent 65%)}
@@ -883,6 +883,8 @@ div.g2tone.sel{border-color:var(--acc)}
 
 
 /* @css-qa */
+/* champs qui grandissent avec le texte : jamais de 2e barre de défilement dans la page */
+textarea{field-sizing:content;overflow:hidden;resize:none}
 .hostico{display:inline-flex;vertical-align:-2px}.hostico svg{display:block;width:18px;height:18px;filter:drop-shadow(0 1px 0 #0002)}
 .players .chip.pc{border-inline-start:5px solid var(--pc)}
 .lmkw{display:inline-block;margin-inline-start:4px;padding:1px 8px;border-radius:99px;background:#fff1db;font-size:12px;font-weight:700;color:var(--acc-d)}
@@ -1354,7 +1356,8 @@ const fxLv=n=>n>=40?4:n>=20?3:n>=10?2:n>=5?1:0;
 function fxLvOf(from,e){const c=FX.cmb[from+e];return c&&Date.now()-c.t<1400?fxLv(c.n):0}
 function fxLayer(){let l=$('#fx');if(!l){l=document.createElement('div');l.id='fx';l.setAttribute('aria-hidden','true');document.body.appendChild(l);FX.pool=[];FX.live=0}return l}
 function fxEl(cls){if(FX.live>=FXMAX)return null;const l=fxLayer();let el=FX.pool.pop();if(!el){el=document.createElement('span');l.appendChild(el)}
- el.className='fxp '+(cls||'');el.style.cssText='';el.textContent='';FX.live++;return el}
+ /* une animation finie (fill:both) garde sa position : sans ça, la teinte plein écran restait décalée en rectangle */
+ el.getAnimations().forEach(x=>{try{x.cancel()}catch(e){}});el.className='fxp '+(cls||'');el.style.cssText='';el.textContent='';FX.live++;return el}
 function fxRun(el,kf,dur,delay){const a=el.animate(kf,{duration:dur,delay:delay||0,easing:'linear',fill:'both'});let d=0;
  const done=()=>{if(d)return;d=1;FX.live--;el.style.display='none';FX.pool.push(el)};a.onfinish=done;a.oncancel=done}
 function fxP(ch,size,kf,dur,delay,cls){const el=fxEl(cls);if(!el)return null;el.textContent=ch;el.style.fontSize=size+'px';fxRun(el,kf,dur,delay);return el}
@@ -2083,7 +2086,10 @@ function g2BindTone(){$$('[data-tone]').forEach(b=>b.onclick=()=>{const v=+b.dat
 function captureFocus(){const a=document.activeElement;if(a&&a.dataset&&a.dataset.d)return{d:a.dataset.d,s:a.selectionStart,e:a.selectionEnd};return null}
 function restoreFocus(f){if(!f)return;const el=$(`[data-d="${CSS.escape(f.d)}"]`);if(el){qaRF=1;el.focus();qaRF=0;try{el.setSelectionRange(f.s,f.e)}catch(e){}}}
 /* jauge de caractères : on voit la place qui reste, la réponse sera affichée en entier */
-function gauges(){$$('textarea[maxlength],input[data-d][maxlength]').forEach(el=>{if(el._g&&el._g.isConnected)return;const max=+el.maxLength;if(!(max>=20))return;
+/* hauteur automatique des zones de texte (repli pour les navigateurs sans field-sizing) */
+function autoGrow(t){if(window.CSS&&CSS.supports&&CSS.supports('field-sizing','content'))return;t.style.height='auto';t.style.height=(t.scrollHeight+2)+'px'}
+document.addEventListener('input',e=>{if(e.target&&e.target.tagName=='TEXTAREA')autoGrow(e.target)});
+function gauges(){$$('textarea').forEach(autoGrow);$$('textarea[maxlength],input[data-d][maxlength]').forEach(el=>{if(el._g&&el._g.isConnected)return;const max=+el.maxLength;if(!(max>=20))return;
  const g=document.createElement('div');g.className='gauge';g.setAttribute('aria-hidden','true');g.innerHTML='<i><b></b></i><span></span>';el.after(g);el._g=g;
  const up=()=>{const n=el.value.length,p=Math.min(1,n/max);g.style.setProperty('--p',p.toFixed(3));g.classList.toggle('on',n>0);g.classList.toggle('mid',p>=.7);g.classList.toggle('full',p>=.97);g.querySelector('span').textContent=p>=.7?max-n:''};
  el.addEventListener('input',up);up()})}
