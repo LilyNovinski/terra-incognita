@@ -883,6 +883,7 @@ div.g2tone.sel{border-color:var(--acc)}
 
 
 /* @css-qa */
+.hostico{display:inline-flex;vertical-align:-2px}.hostico svg{display:block;filter:drop-shadow(0 1px 0 #0002)}
 .players .chip.pc{border-inline-start:5px solid var(--pc)}
 .lmkw{display:inline-block;margin-inline-start:4px;padding:1px 8px;border-radius:99px;background:#fff1db;font-size:12px;font-weight:700;color:var(--acc-d)}
 [data-theme=dark] .lmkw{background:#ffffff14}
@@ -1530,13 +1531,16 @@ function clientPeer(cb){
   else console.warn(e)});
  p.on('disconnected',()=>{try{if(!p.destroyed)p.reconnect()}catch(e){}})}
 /* se connecter à un hôte ; onFail si l'ID n'existe pas, ne répond pas ou ferme avant l'état */
+/* identifiant d'appareil (local) : reconnaître la même personne qui revient, sans la confondre avec un homonyme */
+const DEV={};/* hôte seulement, jamais dans st */
+function devId(){let v=LS.get('terra:dev',null);if(!v){v=rid()+rid();LS.set('terra:dev',v)}return v}
 function connectTo(id,onFail,ms=25000){
  let got=false,done=false;const fail=()=>{if(done||got)return;done=true;if(onUnavail===fail)onUnavail=null;try{c.close()}catch(e){}if(hostConn===c)hostConn=null;onFail&&onFail()};
  onUnavail=fail;
  const c=peer.connect(id,{reliable:true});hostConn=c;
  /* WebRTC entre deux réseaux (4G, box) peut mettre >10 s à s'établir : ne pas couper trop tôt ; un code inexistant échoue tout de suite via peer-unavailable */
  setTimeout(()=>{if(!c.open)fail()},ms);
- c.on('open',()=>{lastSeen=Date.now();c.send({t:'hello',name:me.name,color:me.color,saves:allSaves(),pend:window.gPend?gPend():null})});
+ c.on('open',()=>{lastSeen=Date.now();c.send({t:'hello',name:me.name,color:me.color,dev:devId(),saves:allSaves(),pend:window.gPend?gPend():null})});
  c.on('data',d=>{if(hostConn!==c)return;lastSeen=Date.now();
   if(d.t=='state'){got=true;migrating=false;onUnavail=null;const ph=st&&st.host;st=d.st;if(ph&&ph!=st.host)toast(T('newHost',{n:st.host}));persist();render();window.armTimer&&armTimer()}
   else if(d.t=='react')floatReact(d.from,d.e,d)
@@ -1570,8 +1574,11 @@ function migrate(to,eForce){
  if(to&&line.includes(to))line=[to,...line.filter(n=>n!=to)];
  let k=line.indexOf(me.name);if(k<0)k=line.length;
  let claimAt=t0+k*2500,claiming=false,busy=false;
- if(!to)toast(T('hostGone'));
+ let probed=!!to;
  const tick=()=>{
+  if(!probed){probed=true;busy=true;
+   /* l'hôte actuel répond-il encore ? (cas typique : téléphone revenu d'un autre onglet) */
+   clientPeer(()=>{if(my!==migSeq||!migrating||isHost)return;connectTo(hid(code,e-1),()=>{if(my!==migSeq||!migrating)return;busy=false;toast(T('hostGone'));claimAt=Date.now()+k*2500;setTimeout(tick,300)},7000)});return}
   if(my!==migSeq||!migrating||isHost)return;
   if(Date.now()-t0>45000){migrating=false;toast(T('lostHost'));lostScreen(code);return}
   if(!claiming&&Date.now()>=claimAt){claiming=true;
@@ -1618,7 +1625,7 @@ function handoff(){if(!isHost||!st)return false;
 /* battement de cœur : ping de l'hôte, détection côté client, hôte isolé qui se découvre remplacé */
 setInterval(()=>{
  if(!st)return;
- if(!isHost){if(!migrating&&hostConn&&hostConn.open&&Date.now()-lastSeen>9000)migrate();return}
+ if(!isHost){if(document.hidden){lastSeen=Date.now();return}if(!migrating&&hostConn&&hostConn.open&&Date.now()-lastSeen>9000)migrate();return}
  broadcast({t:'ping'});
  if(Object.keys(conns).length||st.players.length<2){aloneSince=0;return}
  aloneSince=aloneSince||Date.now();
@@ -1629,6 +1636,9 @@ setInterval(()=>{
    /* quelqu'un a pris la suite : on redevient client */
    isHost=false;conns={};dropBeacon();peer=null;try{hp.destroy()}catch(x){}st.epoch=e-1;migrate(null,e)})}},3000);
 window.addEventListener('pagehide',()=>{if(isHost&&st)handoff()});
+/* retour sur l'onglet (téléphone) : on ne se croit pas abandonné ; si le lien est tombé, on rejoint l'hôte actuel au lieu de prendre sa place */
+document.addEventListener('visibilitychange',()=>{if(document.hidden||!st||isHost)return;lastSeen=Date.now();
+ if(!migrating&&(!hostConn||!hostConn.open))migrate()});
 
 function leave(){const ho=isHost&&st&&handoff();migSeq++;migrating=false;onUnavail=null;dropBeacon();if(location.hash)history.replaceState(null,'',location.pathname+location.search);$('#modal').textContent='';lastPhaseKey='';app.classList.remove('still');const p=peer;st=null;peer=null;hostConn=null;conns={};isHost=false;chatLog=[];try{p&&(ho?setTimeout(()=>p.destroy(),400):p.destroy())}catch(e){}render()}
 function lostScreen(code){st=null;app.innerHTML=`<div class="banner"><p class="serif">${T('lostT')}</p><p class="mut" style="margin-top:8px">${T('lostD')}</p>
@@ -1733,13 +1743,16 @@ function hostRecv(c,d){
   let name=qaCut(chTidy(d.name),20);if(!name)return;
   if((st.banned||[]).includes(name)){c.send({t:'err',k:'kicked'});setTimeout(()=>c.close(),400);return}
   let p=P(name),renamed=false;
+  const dev=typeof d.dev=='string'?d.dev.slice(0,40):'';
+  /* même appareil qui revient (onglet changé, réseau coupé) : l'ancien lien est remplacé */
+  if(p&&dev&&DEV[name]===dev&&name!=me.name){for(const id in conns)if(conns[id]!==c&&conns[id].pname==name){const o=conns[id];delete conns[id];o.pname=null;try{o.close()}catch(e){}}}
   if(p&&p.online&&isLinked(name)){if(st.phase!='lobby'){c.send({t:'err',k:'errTaken',m:T('errTaken')});setTimeout(()=>c.close(),400);return}
    let k=2;while(P(qaCut(name,17)+' '+k))k++;name=qaCut(name,17)+' '+k;p=null;renamed=true}
   if(!p){if(st.phase!='lobby'){g2Ask(c,name,d);return}
    if(st.players.length>=8){c.send({t:'err',k:'errFull',m:T('errFull')});setTimeout(()=>c.close(),400);return}
    let color=PAL.includes(d.color)?d.color:PAL[0];if(st.players.some(x=>x.color==color))color=PAL.find(x=>!st.players.some(y=>y.color==x))||color;
-   p={name,color,online:true,peer:c.peer};st.players.push(p);toast(T('joined',{n:name}))}
-  else{p.online=true;p.peer=c.peer;if(Date.now()-hostSince>15000)toast(T('back',{n:name}))}
+   p={name,color,online:true,peer:c.peer};DEV[name]=dev;st.players.push(p);toast(T('joined',{n:name}))}
+  else{p.online=true;p.peer=c.peer;if(dev&&!DEV[name])DEV[name]=dev;if(Date.now()-hostSince>15000)toast(T('back',{n:name}))}
   if(renamed)c.send({t:'renamed',name});conns[c.peer]=c;c.pname=name;clientSaves[name]=d.saves||{};if(d.pend&&window.gRestore)gRestore(name,d.pend);bump();try{c.send({t:'chatlog',log:chatLog})}catch(e){}return}
  if(!c.pname)return;
  if(d.t=='act')act(c.pname,d.a);
@@ -2094,6 +2107,8 @@ const err=m=>{const e=$('.err');if(e)e.textContent=m};
 const B=n=>`<b style="color:${col(n)}">${esc(n)}</b>`;
 const BW=n=>`<b style="color:${col(n)};font-weight:500">${esc(n)}</b>`;
 const NS=n=>`<span style="color:${col(n)}">${esc(n)}</span>`;
+/* symbole de l'hôte : le phare (guide l'expédition dans la brume) */
+const LIGHT='<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M9.6 4.1 15.2 2.6v3z M6.4 4.1.8 2.6v3z" fill="#ffd56b" opacity=".6"/><path d="M6.1 14 7 5.2h2L9.9 14z" fill="#fff6e8" stroke="#b8502c" stroke-width=".9" stroke-linejoin="round"/><path d="M6.75 8.6h2.5M6.45 11.4h3.1" stroke="#e2603e" stroke-width="1.4"/><rect x="6.5" y="3" width="3" height="2.3" rx=".6" fill="#ffd56b" stroke="#b8502c" stroke-width=".8"/><path d="M6.2 3.1 8 1.3l1.8 1.8z" fill="#b8502c"/><path d="M4.4 14.6h7.2" stroke="#b8502c" stroke-width="1.4" stroke-linecap="round"/></svg>';
 const DOT=n=>`<span class="dot" style="background:${grad(col(n))}"></span>`;
 
 function render(){
@@ -2133,7 +2148,7 @@ function topbar(){
  const list=(st.order.length&&st.phase!='lobby'?st.order.map(P):st.players).filter(Boolean);
  return `<div class="top"><div class="brand" id="homebtn" role="button" tabindex="0" data-tip="${esc(T('home'))}" aria-label="${esc(T('home'))}">${LOGO(40,'t')}<span>Terra <i>Incognita</i></span>${SIG}</div><button class="code" id="codebtn" data-tip="${esc(T('copyInv'))}" aria-label="${esc(T('copyInv'))}">${st.code}</button>
  <button class="icon" id="mute" data-tip="${esc(T('sound'))}" aria-label="${esc(T('sound'))}">${muted?'🔇':'🔊'}</button>${thmBtn()}<button class="icon" id="help" data-tip="${esc(T('help'))}" aria-label="${esc(T('help'))}">?</button></div>
- <div class="players">${list.map(p=>`<span data-p="${esc(p.name)}" class="chip pc ${p.name==me.name?'me':''} ${p.online?'':'off'} ${p.name==ex?'turn':''}" style="--pc:${p.color}">${esc(p.name)}${p.name==ex?` <span class="role" data-tip="${esc(T('explores'))}" aria-label="${esc(T('explores'))}">⛵</span>`:''}${p.name==tr?` <span class="role" data-tip="${esc(T('explored'))}" aria-label="${esc(T('explored'))}">🏝️</span>`:''}${p.name==st.host&&st.phase=='lobby'?` <span class="mut">${T('host')}</span>`:''}${isHost&&p.name!=me.name?`<button class="kick" data-kick="${esc(p.name)}" aria-label="${esc(T('kick'))} ${esc(p.name)}"></button>`:''}</span>`).join('')}</div>`}
+ <div class="players">${list.map(p=>`<span data-p="${esc(p.name)}" class="chip pc ${p.name==me.name?'me':''} ${p.online?'':'off'} ${p.name==ex?'turn':''}" style="--pc:${p.color}">${esc(p.name)}${p.name==ex?` <span class="role" data-tip="${esc(T('explores'))}" aria-label="${esc(T('explores'))}">⛵</span>`:''}${p.name==tr?` <span class="role" data-tip="${esc(T('explored'))}" aria-label="${esc(T('explored'))}">🏝️</span>`:''}${p.name==st.host?` <span class="role hostico" data-tip="${esc(T('host'))}" aria-label="${esc(T('host'))}">${LIGHT}</span>`:''}${isHost&&p.name!=me.name?`<button class="kick" data-kick="${esc(p.name)}" aria-label="${esc(T('kick'))} ${esc(p.name)}"></button>`:''}</span>`).join('')}</div>`}
 
 function view(){
  switch(st.phase){
