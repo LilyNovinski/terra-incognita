@@ -587,7 +587,8 @@ div.gtile{grid-column:1/-1}
 .gmets{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
 .gmet[data-vote]{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:6px;text-align:start;padding:12px;font:600 14px Nunito,sans-serif}
 .gmh{display:flex;align-items:center;justify-content:space-between;gap:6px}.gmh b{font:600 17px Fredoka,Nunito,sans-serif}
-.gauge{display:inline-flex;gap:2px;align-items:flex-end}.gauge i{width:5px;border-radius:2px;background:var(--edge)}.gauge i:nth-child(1){height:7px}.gauge i:nth-child(2){height:11px}.gauge i:nth-child(3){height:15px}.gauge i.on{background:#3aa7b5}
+.wbars{display:inline-flex;gap:2px;align-items:flex-end}.wbars i{width:5px;border-radius:2px;background:var(--edge)}.wbars i:nth-child(1){height:7px}.wbars i:nth-child(2){height:11px}.wbars i:nth-child(3){height:15px}.wbars i.on{background:#3aa7b5}
+[data-theme=dark] .wbars i{background:#ffffff1f}[data-theme=dark] .wbars i.on{background:#5fd4e0;box-shadow:0 0 6px #5fd4e055}
 .gline{font-size:13px;line-height:1.3;color:var(--mut);font-weight:700;min-height:34px}
 .gbad{display:flex;flex-wrap:wrap;gap:2px}.gbad>span{display:inline-flex;transition:opacity .2s}.gbad>span.off{opacity:.22;filter:grayscale(1)}
 .gbad .badge,.gbad svg{width:22px;height:22px;box-shadow:none;animation:none}
@@ -872,6 +873,11 @@ div.g2tone{display:flex;flex-direction:column;gap:6px;padding:12px;border-radius
 div.g2tone.sel{border-color:var(--acc)}
 .g2warn{margin-top:10px;font:700 13px Nunito,sans-serif;color:#c94a2a}
 @media (max-width:480px){.g2rq{flex-wrap:wrap}.g2rq .g2rt{flex:1 1 calc(100% - 30px)}.g2rq button{flex:1}}
+
+
+
+
+/* @css-dark */
 
 
 
@@ -2168,7 +2174,7 @@ function gLobbyBody(host,my,on){
  const seg=(items,cur,attr)=>`<div class="gseg">${items.map(([v,l])=>`<button ${attr}="${v}" class="${cur==v?'sel':''}">${l}</button>`).join('')}</div>`;
  return `<div class="card"><h3>${T('modeT')}</h3><div class="gtiles">${host?['exp','esc','por','mir'].map(tile).join(''):tile(md)}</div>${by}</div>
  <div class="card"><h3>${T('meteoT')}</h3>
-  <div class="gmets">${[0,1,2].map(i=>`<button data-vote="${i}" class="gmet ${my==i?'sel':''}"><span class="gmh"><b>${MN(i)}</b><span class="gauge" aria-hidden="true">${[0,1,2].map(j=>`<i class="${j<=i?'on':''}"></i>`).join('')}</span></span><span class="gline">${T('mq'+i)}</span><span class="gbad">${ORDER.map(r=>`<span class="${(R[r].lvl||0)<=i?'':'off'}" data-tip="${esc(RN(r)+' · '+RT(r,1))}">${regionBadge(r,22)}</span>`).join('')}</span></button>`).join('')}</div>
+  <div class="gmets">${[0,1,2].map(i=>`<button data-vote="${i}" class="gmet ${my==i?'sel':''}"><span class="gmh"><b>${MN(i)}</b><span class="wbars" aria-hidden="true">${[0,1,2].map(j=>`<i class="${j<=i?'on':''}"></i>`).join('')}</span></span><span class="gline">${T('mq'+i)}</span><span class="gbad">${ORDER.map(r=>`<span class="${(R[r].lvl||0)<=i?'':'off'}" data-tip="${esc(RN(r)+' · '+RT(r,1))}">${regionBadge(r,22)}</span>`).join('')}</span></button>`).join('')}</div>
   <div class="status">${st.players.map(p=>`<span class="chip"><span class="dot" style="background:${grad(p.color)}"></span>${esc(p.name)} · ${MN(st.votes[p.name]??1)}</span>`).join('')}</div>
   <p class="gby">${T('tonight',{m:`<b>${MN(mt)}</b>`})}</p></div>
  <div class="card"><h3>${T('lenT')}</h3>
