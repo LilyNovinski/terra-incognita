@@ -57,6 +57,9 @@ W.GAct=function(s,from,a){const t=a&&a.t;
  if(t=='gsel'){if(from==s.host&&s.phase=='lobby'&&(!a.v||GAMES[a.v])){s.gsel=a.v||null;bump()}return true}
  if(t=='start'&&s.gsel&&s.phase=='lobby'){const G=GAMES[s.gsel],on=s.players.filter(p=>p.online);
   if(from==s.host&&G&&on.length>=G.min&&on.length<=G.max){s.order=on.map(p=>p.name);gStart(s);bump()}return true}
+ if(t=='gtie'){/* liens connus (couples…) : bascule une paire, hôte seulement, au salon */
+  if(from==s.host&&s.phase=='lobby'&&Array.isArray(a.v)&&a.v.length==2&&a.v[0]!==a.v[1]&&a.v.every(n=>typeof n=='string'&&s.players.some(p=>p.name==n))){
+   const k=a.v[0]<a.v[1]?a.v[0]+'|'+a.v[1]:a.v[1]+'|'+a.v[0],L=s.gtie||[];s.gtie=L.includes(k)?L.filter(x=>x!=k):[...L,k].slice(-8);bump()}return true}
  if(t=='gx'&&a.v=='stop'){if(from==s.host&&s.phase=='game'&&s.game){gFin(s);bump()}return true}
  if(t=='gx'){if(from!=s.host||s.phase!='gend')return true;s.players=s.players.filter(p=>p.online);
   const G=GAMES[s.game.id],on=s.players.map(p=>p.name);
@@ -122,9 +125,16 @@ W.GLobby=function(host,on,E){const sel=st.gsel&&GAMES[st.gsel]?st.gsel:'';
  let h=`<div class="card"><h3>🎲 ${GT('room')}</h3><div class="gtiles">${host?['',...Object.keys(GAMES)].map(tile).join(''):tile(sel)}</div>${host?'':`<p class="gby">${T('chosenBy',{n:B(st.host)})}</p>`}</div>`;
  if(sel){const G=GAMES[sel],ok=on>=G.min&&on<=G.max,rk='r_'+sel+(on==2&&GI18N.fr.ui['r_'+sel+'2']?'2':'');
   let tm='';try{if(!G.rt){const tf=st.timer??1;tm=`<h3 class="gh">${T('timerT')}</h3>${host?`<div class="gseg">${TIM.map((v,i)=>`<button data-tm="${i}" class="${v==tf?'sel':''}">${T('tm'+i)}</button>`).join('')}</div>`:`<p class="gval">${T('tm'+TIM.indexOf(tf))}</p>`}<p class="gsub">${T(tf?'timerD':'timer0D')}</p>`}}catch(e){}
-  h+=(G.tone?g2ToneCard(host):'')+`<div class="card"><p class="grule">${GT(rk)}</p>${ok?'':`<p class="err">${GT('needP',{a:G.min,b:G.max})}</p>`}${tm}
+  let ti='';if(G.ties){const L=(st.gtie||[]).filter(k=>k.split('|').every(p=>st.players.some(x=>x.name==p))),ps=st.players.filter(p=>p.online).map(p=>p.name);
+   ti=`<h3 class="gh">🔗 ${GT('mtieT')}</h3><p class="gsub">${GT('mtieD')}</p>${L.length?`<div class="gties">${L.map(k=>`<span class="gtie">${k.split('|').map(B).join(' 🔗 ')}${host?`<button class="gtx" data-gtie="${esc(k)}" aria-label="✕">✕</button>`:''}</span>`).join('')}</div>`:host?'':`<p class="gval">${GT('mtie0')}</p>`}
+   ${host&&ps.length>1?`<p class="gsub">${GT('mtieH')}</p><div class="gtiep">${ps.map(p=>`<button class="ghost ${GV.tie==p?'sel':''}" data-gtp="${esc(p)}">${esc(p)}</button>`).join('')}</div>`:''}`}
+  h+=(G.tone?g2ToneCard(host):'')+`<div class="card"><p class="grule">${GT(rk)}</p>${ok?'':`<p class="err">${GT('needP',{a:G.min,b:G.max})}</p>`}${tm}${ti}
   ${host?`<button class="pri wide" id="start" ${ok?'':'disabled'}>${GT('play',{g:GT('n_'+sel)})}</button>`:`<p class="gby">${GT('waitHost')}</p>`}</div>`}
  return h};
+/* liens connus : clics délégués (le salon est rendu par index.html) */
+if(typeof document!='undefined')document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('[data-gtp],[data-gtie]');if(!t)return;
+ if(t.dataset.gtie!=null){send({t:'gtie',v:t.dataset.gtie.split('|')});return}
+ const p=t.dataset.gtp;if(!GV.tie||GV.tie==p){GV.tie=GV.tie==p?null:p;render();return}const a=GV.tie;GV.tie=null;send({t:'gtie',v:[a,p]});render()});
 
 /* =====================================================================
    🍾 BOUTEILLES À LA MER — fiche
@@ -446,42 +456,46 @@ GAMES.arc={icon:'🏝️',min:2,max:8,dur:12,tags:['skill'],T:arcT,V:arcV,gd:arc
 
 /* =====================================================================
    🎭 LES MASQUES — fiche (confiance / trahison, 3-8 joueurs)
-   5 manches. Chaque manche : duos secrets tirés au sort (nombre impair : un trio), en limitant les rencontres répétées.
-     Chacun reçoit un masque marin au hasard (🐙🪼🐡…) et ne voit QUE le masque de son duo, jamais son nom.
-   Étapes : message anonyme au duo (75 s, modifiable jusqu'à la fin de l'étape ; invitation tirée sans remise dans une
-     réserve par ton : 26 tout public / 16 coquines / 16 trash) → choix secret Partager ou Garder (40 s, modifiable, sans
-     choix = Garder) → révélation (prêt/20 s) : ton résultat + « la mer des masques » (tous les duos, en masques seulement).
-   Gains : Partager/Partager = 4 chacun la 1re fois avec cette personne, 2 ensuite ; Garder face à Partager = 4 / 2 ;
-     Garder/Garder = 2/2. Réseau : chaque NOUVELLE personne avec qui tu partages à deux rapporte +2, +4, +6… à partir de la
-     2e (la 1re ne rapporte rien de plus) → faire confiance à des gens différents paie ; un couple qui se reconnaît (code,
-     même pièce) ne gagne qu'un lien, et ses rencontres répétées valent 2 comme un double Garder. Trio : moyenne des
-     face-à-face + liens. Pas de choix dominant : 1re rencontre, partager vaut 4+réseau contre 4 ; rencontre répétée,
-     garder vaut 4 contre 2 — et on ne sait pas qui est derrière le masque. Un « +2 » après un double partage trahit une
-     rencontre répétée : indice.
-   Scores secrets pendant la partie (sinon on déduirait son duo). Finale : les 2 premiers (ex æquo : tirage au sort)
-     jouent 16 points à visage découvert : tous deux Partager = 8 chacun ; un seul Voler = 16 pour lui ; tous deux Voler =
-     −8 chacun (jeu de la poule mouillée : voler n'est pas dominant). Les autres parient sur l'issue (+4 si juste).
-     Fin : constellation de qui a trahi qui (vert partage, rouge trahison fléchée, gris double Garder).
-   SIM (.sim/msk.js, hors site, 3000 parties/taille ; styles prudente = partage si la mer partage, agressive = garde et
-     vole toujours, imitatrice = rend ce qu'on lui a fait, hasard, naïve = partage toujours) :
-     sièges n=4 25.1/25.9/24.4/24.6 · n=8 11.7–13.3 (12.5 attendu). Victoire relative à 1/n : agressive 140–156 % à 3-6
-     joueurs mais 107 % à 7-8 ; naïve 57 % à 4 mais 113-115 % à 7-8 ; prudente 107–123 % ; imitatrice 72–86 % : aucun style
-     ne gagne partout. Couple qui se reconnaît et partage toujours entre eux : 55 % de victoires à 4 (50 % attendu),
-     56 % à 6 (33 %), 41 % à 8 (25 %) ; versions rejetées : 8/4/2 sans réseau (couple 77 % à 4), cagnotte « vol
-     dominant » (agressive 200 %).
+   4 à 6 manches (tirées au sort, nombre caché : pas de « dernière manche » sûre pour trahir). Duos secrets (impair : un
+     trio), rencontres répétées limitées ; masques marins au hasard, on ne voit QUE les masques de son duo/trio.
+   Étapes : message anonyme (75 s, modifiable ; invitations tirées sans remise par ton) → choix secret Partager/Garder
+     PAR PARTENAIRE (trio : un choix pour chacun ; 40 s, modifiable, sans choix = Garder) → révélation (prêt/20 s).
+   Gains par face-à-face : Partager/Partager = 4, puis 3, puis 2 avec la même personne (« habitude ») ; Garder face à
+     Partager = 4 / 1 ; Garder/Garder = 2. Trio : moyenne des deux face-à-face. Réseau : chaque NOUVELLE personne avec
+     qui tu partages à deux rapporte +2, +4, +6… dès la 2e.
+   🦈 Réputation publique : garder face à quelqu'un qui partageait (et qui n'avait pas de 🦈) te colle un 🦈 visible
+     sur ton masque par tous tes futurs partenaires ; chaque 🦈 coûte 1 point avant la finale et 4 sur un vol réussi en
+     finale. Garder face à un 🦈 ne marque pas (légitime défense) → pas de cascade de rancunes.
+   🔗 Liens connus (couples, colocs…) déclarés par l'hôte au salon : leur face-à-face vaut la moyenne des autres
+     face-à-face de la manche, leur lien ne compte que si la majorité des autres duos a partagé, et ils ne sont jamais
+     tous deux finalistes → se connaître IRL ne rapporte ni plus ni moins.
+   Scores secrets pendant la partie. Finale : le 1er contre le meilleur suivant qui n'est pas son lien connu (ex æquo :
+     tirage) : 16 points à visage découvert, tous deux Partager = 8 ; un seul Voler = 16 − 4×🦈 ; tous deux Voler = −8
+     chacun (poule mouillée). Les autres parient (+4 si juste). Fin : constellation de qui a trahi qui.
+   SIM (.sim/mskv.js, hors site, 2500 parties/taille ; styles : prudente = partage sauf face à un 🦈 ou si la mer partage
+     peu, agressive = garde et vole toujours, imitatrice, hasard, naïve = partage toujours, sournoise = partage puis garde
+     dès la 4e manche) : sièges ±1–13 % du 1/n (bruit). Victoire relative à 1/n, n=3→8 : agressive 124/86/65/64/38/41 ;
+     prudente 95–168 ; sournoise 123–153 ; imitatrice 68–99 ; hasard 43–85 ; naïve 81–136.
+     Couple déclaré (partage toujours entre eux) : 49/50 · 40/40 · 35/33 · 31/29 · 20/25 % (n=4…8, obtenu/attendu),
+     et parmi des joueurs prudents/imitateurs 41/50 · 42/40 · 30/33 · 28/29 · 24/25. Couple NON déclaré : juste parmi
+     des joueurs prudents (50/50 · 41/40 · 33/33 · 29/29 · 25/25) mais avantagé si d'autres jouent au hasard
+     (67/50 · 56/40 · 48/33 · 43/29 · 35/25) → d'où l'option « liens connus ».
+     Rejetés : sans réputation (agressive 140–156 %), « habitude » à 0 (le trio de 3 devient « tout garder »), évitement
+     total des liens (le couple perd des liens : 26 % au lieu de 40 à 5).
    ===================================================================== */
 const MKE=['🐙','🪼','🐡','🦀','🐢','🦑','🐠','🦞','🐬','🦭'];
 const mkPair=(a,b)=>a<b?a+'|'+b:b+'|'+a;
-const mkPay=(c1,c2,k)=>c1=='P'&&c2=='P'?(k?2:4):c1=='G'&&c2=='P'?4:2;
-GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,MKE,pay:mkPay,
- init(s){const g=s.game;g.n=5;g.r=0;g.pc={};g.mt={};g.net={};g.h=[];g.pub=[];g.q=gPool(s,'msk',g.n);this.round(s)},
+const mkPay=(c1,c2,k)=>c1=='P'&&c2=='P'?(k==0?4:k==1?3:2):c1=='G'&&c2=='P'?4:c1=='P'?1:2;/* 1re rencontre 4, puis 3, puis 2 (habitude) */
+GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,ties:true,MKE,pay:mkPay,nbf:k=>2*(k-1),POT:16,BET:4,TIEP:0,SHK:4,MKC:1,
+ init(s){const g=s.game;g.n=4+Math.floor(Math.random()*3);g.r=0;g.pc={};g.mt={};g.net={};g.h=[];g.pub=[];g.q=gPool(s,'msk',6);g.tie=(s.gtie||[]).filter(k=>k.split('|').every(p=>s.order.includes(p)));this.round(s)},
  round(s){const g=s.game,on=s.order;let best=null,bv=1e9;
   for(let t=0;t<40;t++){const o=shuf(on),gr=[];for(let i=0;i+1<o.length;i+=2)gr.push([o[i],o[i+1]]);if(o.length%2)gr[gr.length-1].push(o[o.length-1]);
-   let v=0;gr.forEach(x=>{for(let i=0;i<x.length;i++)for(let j=i+1;j<x.length;j++)v+=(g.mt[mkPair(x[i],x[j])]||0)**2});v+=Math.random()*.1;if(v<bv){bv=v;best=gr}}
-  g.grp=best;g.mk={};const ms=shuf(MKE.map((x,i)=>i));on.forEach((p,i)=>g.mk[p]=ms[i]);g.msg={};g.ch={};g.gain={};g.nb={};gWait(g,75,'m')},
+   let v=0;gr.forEach(x=>{for(let i=0;i<x.length;i++)for(let j=i+1;j<x.length;j++){const k=mkPair(x[i],x[j]);v+=(g.mt[k]||0)**2+(g.tie.includes(k)?this.TIEP:0)}});v+=Math.random()*.1;if(v<bv){bv=v;best=gr}}
+  g.grp=best;g.mk={};const ms=shuf(MKE.map((x,i)=>i));on.forEach((p,i)=>g.mk[p]=ms[i]);g.msg={};g.ch={};g.gain={};g.nb={};g.hab={};g.tm={};gWait(g,75,'m')},
  act(s,from,a){const g=s.game;
   if(g.st=='m'&&typeof a.w=='string'){g.msg[from]=tidy(a.w).slice(0,140);g.done[from]=1;return true}
-  if(g.st=='c'&&(a.v=='P'||a.v=='G')){g.ch[from]=a.v;g.done[from]=1;return true}
+  if(g.st=='c'&&(a.v=='P'||a.v=='G')){const pt=(g.grp.find(x=>x.includes(from))||[]).filter(q=>q!=from),c={...(g.ch[from]||{})};/* un choix par partenaire (trio) */
+   const to=a.to==null?pt:pt.filter(q=>g.mk[q]===a.to);if(!to.length)return;to.forEach(q=>c[q]=a.v);g.ch[from]=c;if(pt.every(q=>c[q]))g.done[from]=1;return true}
   if(g.st=='f'){if(g.fin.includes(from)){if(a.v=='P'||a.v=='V'){g.fc[from]=a.v;g.done[from]=1;return true}}
    else if([0,1,2].includes(a.b)){g.bet[from]=a.b;g.done[from]=1;return true}}},
  next(s){const g=s.game;
@@ -491,29 +505,37 @@ GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,MKE,pay:mkPa
   if(g.st=='f'){this.fres(s);gWait(g,25,'F',1);return}
   if(g.st=='F'){g.over=1}},
  resolve(s){const g=s.game,ch={},rec={grp:g.grp.map(x=>[...x]),mk:{...g.mk},ch:{},msg:{...g.msg},gain:{}},pub=[];
-  s.order.forEach(p=>ch[p]=g.ch[p]||'G');
+  const C=(a,b)=>(g.ch[a]||{})[b]||'G';const tr={},tie=g.tie||[];g.tr=g.tr||{};
+  /* lien connu (déclaré par l'hôte) : leur face-à-face vaut la moyenne des autres face-à-face de la manche, et leur lien
+     ne compte que si la majorité des autres duos a partagé → se connaître ne rapporte ni plus ni moins */
+  let fs=0,fn=0,pp=0,pn=0;g.grp.forEach(x=>{for(let i=0;i<x.length;i++)for(let j=i+1;j<x.length;j++){const a=x[i],b=x[j],k=mkPair(a,b);if(tie.includes(k))continue;
+   const pc=g.pc[k]||0,ca=C(a,b),cb=C(b,a);fs+=this.pay(ca,cb,pc)+this.pay(cb,ca,pc);fn+=2;pn++;if(ca=='P'&&cb=='P')pp++}});
+  const avg=fn?fs/fn:3,link=pn?pp*2>=pn:true;
   g.grp.forEach(x=>{const tot={},nb={};x.forEach(p=>{tot[p]=0;nb[p]=0});
    for(let i=0;i<x.length;i++)for(let j=i+1;j<x.length;j++){const a=x[i],b=x[j],k=mkPair(a,b),pc=g.pc[k]||0;
-    tot[a]+=mkPay(ch[a],ch[b],pc);tot[b]+=mkPay(ch[b],ch[a],pc);
-    if(ch[a]=='P'&&ch[b]=='P'){g.pc[k]=pc+1;if(!pc)[a,b].forEach(p=>{g.net[p]=(g.net[p]||0)+1;nb[p]+=2*(g.net[p]-1)})}g.mt[k]=(g.mt[k]||0)+1}
-   x.forEach(p=>{const v=tot[p]/(x.length-1)+nb[p];g.gain[p]=v;g.nb[p]=nb[p];g.sc[p]+=v;rec.gain[p]=v;rec.ch[p]=ch[p]});
+    if(tie.includes(k)){tot[a]+=avg;tot[b]+=avg;g.tm[a]=g.tm[b]=1;if(link&&!g.mt[k])[a,b].forEach(p=>{g.net[p]=(g.net[p]||0)+1;nb[p]+=this.nbf(g.net[p],s.order.length)});g.mt[k]=(g.mt[k]||0)+1;continue}
+    const ca=C(a,b),cb=C(b,a);tot[a]+=this.pay(ca,cb,pc);tot[b]+=this.pay(cb,ca,pc);
+    if(ca!=cb){const t=ca=='G'?a:b,u=t==a?b:a;if(!g.tr[u])tr[t]=1}/* garder face à un 🦈 ne marque pas */
+    if(ca=='P'&&cb=='P'){if(pc)g.hab[a]=g.hab[b]=1;g.pc[k]=pc+1;if(!pc)[a,b].forEach(p=>{g.net[p]=(g.net[p]||0)+1;nb[p]+=this.nbf(g.net[p],s.order.length)})}g.mt[k]=(g.mt[k]||0)+1}
+   x.forEach(p=>{const v=Math.round((tot[p]/(x.length-1)+nb[p])*2)/2;g.gain[p]=v;g.nb[p]=nb[p];g.sc[p]+=v;rec.gain[p]=v;const m={};x.forEach(q=>{if(q!=p)m[q]=C(p,q)});rec.ch[p]=m;const mv=Object.values(m);ch[p]=mv.every(c=>c=='P')?'P':mv.every(c=>c=='G')?'G':'M'});
    pub.push(shuf(x).map(p=>[g.mk[p],ch[p],g.gain[p]]))});
+  for(const p in tr)g.tr[p]=(g.tr[p]||0)+1;/* réputation : nb de manches où ce joueur a gardé face à quelqu'un qui partageait */
   g.h.push(rec);g.pub.push(shuf(pub))},
- final(s){const g=s.game,fin=shuf(s.order).sort((a,b)=>g.sc[b]-g.sc[a]).slice(0,2);/* ex æquo : tirage au sort (symétrique) */
-  g.fin=fin;g.pot=16;g.fc={};g.bet={};delete g.grp;g.mk={};gWait(g,90,'f')},
+ final(s){const g=s.game;if(this.MKC)for(const p in g.tr||{})g.sc[p]-=this.MKC*g.tr[p];/* chaque 🦈 coûte à la fin */const so=shuf(s.order).sort((a,b)=>g.sc[b]-g.sc[a]),fin=[so[0],so.slice(1).find(p=>!(g.tie||[]).includes(mkPair(so[0],p)))||so[1]];/* ex æquo : tirage au sort (symétrique) */
+  g.fin=fin;g.pot=this.POT;g.fc={};g.bet={};delete g.grp;g.mk={};gWait(g,90,'f')},
  fres(s){const g=s.game,c={};g.fin.forEach(p=>c[p]=g.fc[p]||'V');const st=g.fin.filter(p=>c[p]=='V'),out=st.length==0?0:st.length==1?1:2,add={};
-  g.fin.forEach(p=>add[p]=out==0?Math.floor(g.pot/g.fin.length):out==1?(c[p]=='V'?g.pot:0):(c[p]=='V'?-8:0));
-  s.order.forEach(p=>{if(!g.fin.includes(p))add[p]=g.bet[p]===out?4:0});for(const p in add)g.sc[p]+=add[p];g.fr={c,out,add}},
+  g.fin.forEach(p=>add[p]=out==0?Math.floor(g.pot/g.fin.length):out==1?(c[p]=='V'?Math.max(0,g.pot-this.SHK*((g.tr||{})[p]||0)):0):(c[p]=='V'?-g.pot/2:0));
+  s.order.forEach(p=>{if(!g.fin.includes(p))add[p]=g.bet[p]===out?this.BET:0});for(const p in add)g.sc[p]+=add[p];g.fr={c,out,add}},
  hide(g,n,s){const o={...g};delete o.grp;delete o.mk;delete o.h;delete o.pc;delete o.mt;delete o.msg;delete o.ch;delete o.gain;
-  o.sc={[n]:g.sc[n]};const gr=(g.grp||[]).find(x=>x.includes(n))||[],pt=gr.filter(p=>p!=n);
-  o.me={m:g.mk?g.mk[n]:null,pt:pt.map(p=>g.mk[p]),msg:g.msg?g.msg[n]:null,ch:g.ch?g.ch[n]:null};
+  o.sc={[n]:g.sc[n]};o.n=0;/* nombre de manches caché (4 à 6) */const gr=(g.grp||[]).find(x=>x.includes(n))||[],pt=gr.filter(p=>p!=n);
+  o.me={m:g.mk?g.mk[n]:null,pt:pt.map(p=>g.mk[p]),ptr:pt.map(p=>(g.tr||{})[p]||0),mtr:(g.tr||{})[n]||0,msg:g.msg?g.msg[n]:null,ch:pt.map(p=>((g.ch||{})[n]||{})[p]||null)};delete o.tr;
   if(g.st=='c'||g.st=='r')o.me.pm=pt.map(p=>g.msg[p]||'');
-  if(g.st=='r'){o.me.pc=pt.map(p=>g.ch[p]||'G');o.me.gain=g.gain[n];o.me.nb=(g.nb||{})[n]||0;o.me.ch=g.ch[n]||'G'}delete o.nb;delete o.net;
-  if(g.st=='f'){o.fc=hideOwn(g.fc,n);o.bet=hideOwn(g.bet,n)}return o},
+  if(g.st=='r'){o.me.pc=pt.map(p=>(g.ch[p]||{})[n]||'G');o.me.gain=g.gain[n];o.me.nb=(g.nb||{})[n]||0;o.me.ch=o.me.ch.map(c=>c||'G');o.me.hab=(g.hab||{})[n]||0;o.me.tm=(g.tm||{})[n]||0}delete o.nb;delete o.net;delete o.hab;delete o.tm;delete o.tie;o.tie=(g.tie||[]).filter(k=>k.split('|').includes(n)).length?1:0;
+  if(g.fin)o.ftr=g.fin.map(p=>(g.tr||{})[p]||0);if(g.st=='f'){o.fc=hideOwn(g.fc,n);o.bet=hideOwn(g.bet,n)}return o},
  mn(i){return `<span class="mkm"><span class="mke">${MKE[i]||'❔'}</span> ${esc(GL('mkn')[i]||'')}</span>`},
  view(s){const g=s.game,m=meN(),me=g.me||{},R=GAMES.msk;
-  const duo=me.pt&&me.pt.length?me.pt.map(i=>R.mn(i)).join(''):'';
-  const head=g.st=='m'||g.st=='c'||g.st=='r'?`<div class="mkhd"><span class="mkme ga">${GT('ymask')} ${R.mn(me.m)}</span><span class="mkvs ga" ${dl(1)}>${GT(me.pt.length>1?'ytrio':'yduo')} ${duo}</span></div>`:'';
+  const sh=v=>v?`<span class="mksh" title="${esc(GT('mshT'))}">🦈${v>1?'×'+v:''}</span>`:'',duo=me.pt&&me.pt.length?me.pt.map((i,j)=>R.mn(i)+sh((me.ptr||[])[j])).join(''):'';
+  const head=g.st=='m'||g.st=='c'||g.st=='r'?`<div class="mkhd"><span class="mkme ga">${GT('ymask')} ${R.mn(me.m)}${sh(me.mtr)}</span><span class="mkvs ga" ${dl(1)}>${GT(me.pt.length>1?'ytrio':'yduo')} ${duo}</span></div>`:'';
   if(g.st=='m'){const pq=g.q[g.r];
    if(g.done[m]&&R.ed!==g.k)return{html:`<div class="card c">${head}<div class="mkbub mine ga" ${dl(2)}>${me.msg?esc(me.msg):`<i class="mut">${GT('mnone')}</i>`}</div><p class="gnote ga" ${dl(3)}>${GT('msent')}</p><button class="ghost mked" id="gedit">✏️ ${GT('medit')}</button></div>`,
     bind(){$('#gedit').onclick=()=>{R.ed=g.k;drafts['gmw'+g.k]=me.msg||'';render()}}};
@@ -522,14 +544,15 @@ GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,MKE,pay:mkPa
     bind(){const t=$(`[data-d="gmw${g.k}"]`);$('#gsend').onclick=()=>{R.ed=null;gs({w:tidy(t.value)})};$('#gskip').onclick=()=>{R.ed=null;gs({w:''})}}}}
   const msgs=(me.pm||[]).map((x,i)=>`<div class="mkbub ga" ${dl(i+2)}><span class="mkfrom">${MKE[me.pt[i]]}</span>${x?esc(x):`<i class="mut">${GT('mnone')}</i>`}</div>`).join('');
   if(g.st=='c')return{html:`<div class="card c">${head}<p class="gq2">${GT('mread')}</p>${msgs}
-   <div class="gpk mkch">${['P','G'].map((v,i)=>`<button class="ga gdec ${me.ch==v?'sel':''}" ${dl(i,.3)} data-gm="${v}">${GT('k'+v)}</button>`).join('')}</div></div>`,
-   bind(){$$('[data-gm]').forEach(x=>x.onclick=()=>gs({v:x.dataset.gm}))}};
+   ${me.pt.length>1?me.pt.map((t,j)=>`<div class="mkrow ga" ${dl(j+3)}><span class="mkto">${R.mn(t)}${sh((me.ptr||[])[j])}</span><div class="gpk mkch sm">${['P','G'].map(v=>`<button class="gdec ${(me.ch||[])[j]==v?'sel':''}" data-gm="${v}" data-to="${t}">${GT('k'+v)}</button>`).join('')}</div></div>`).join(''):`<div class="gpk mkch">${['P','G'].map((v,i)=>`<button class="ga gdec ${(me.ch||[])[0]==v?'sel':''}" ${dl(i,.3)} data-gm="${v}">${GT('k'+v)}</button>`).join('')}</div>`}
+   ${(me.ptr||[]).some(Boolean)?`<p class="mut mkshd">🦈 ${GT('mshD')}</p>`:''}</div>`,
+   bind(){$$('[data-gm]').forEach(x=>x.onclick=()=>gs(x.dataset.to!=null?{v:x.dataset.gm,to:+x.dataset.to}:{v:x.dataset.gm}))}};
   if(g.st=='r'){const sea=(g.pub[g.r]||[]).map((gr,i)=>`<div class="mksea ga" ${dl(i,.4)}>${gr.map(([k,c,v])=>`<span class="mkc ${c=='P'?'p':'g'} ${k===me.m?'me':''}">${MKE[k]} ${c=='P'?'🤝':'🔒'} <b>+${v}</b></span>`).join('')}</div>`).join('');
-   const rep=me.ch=='P'&&(me.pc||[]).every(c=>c=='P')&&me.gain<4&&me.pt.length==1;
-   return{html:`<div class="card c">${head}<div class="mkres">${(me.pc||[]).map((c,i)=>`<p class="ga" ${dl(i+1)}>${MKE[me.pt[i]]} ${GT(c=='P'?'mshared':'mkept')}</p>`).join('')}
-    <p class="gbig2 ga ${me.gain>=4?'ok':''}" ${dl(3)}>+${me.gain}</p>${me.nb?`<p class="mknet ga" ${dl(4)}>🕸️ ${GT('mnet',{v:me.nb})}</p>`:''}${rep?`<p class="mut ga" ${dl(4)}>${GT('mrep')}</p>`:''}<p class="gcof">🔒 ${GT('mtot',{v:g.sc[m]??0})}</p></div>
+   const rep=me.hab;
+   return{html:`<div class="card c">${head}<div class="mkres">${(me.pc||[]).map((c,i)=>`<p class="ga" ${dl(i+1)}>${MKE[me.pt[i]]} ${GT(c=='P'?'mshared':'mkept')}${me.pt.length>1?` <span class="mut">· ${esc(GT('me'))} ${me.ch[i]=='P'?'🤝':'🔒'}</span>`:''}</p>`).join('')}
+    <p class="gbig2 ga ${me.gain>=4?'ok':''}" ${dl(3)}>+${me.gain}</p>${me.nb?`<p class="mknet ga" ${dl(4)}>🕸️ ${GT('mnet',{v:me.nb})}</p>`:''}${rep?`<p class="mut ga" ${dl(4)}>🔁 ${GT('mrep')}</p>`:''}${me.tm?`<p class="mut ga" ${dl(4)}>🔗 ${GT('mtieM')}</p>`:''}${me.mtr?`<p class="mut ga" ${dl(5)}>${sh(me.mtr)} ${GT('myshk',{v:me.mtr})}</p>`:''}<p class="gcof">🔒 ${GT('mtot',{v:g.sc[m]??0})}</p></div>
     <h3 class="gh3">🌊 ${GT('msea')}</h3>${sea}</div>`,bind(){if(me.gain>=4&&!RM())sparkles($('.mkres .gbig2'),me.nb?14:8)}}}
-  const fin=g.fin||[],isF=fin.includes(m),names=fin.map(NM).join(' & ');
+  const fin=g.fin||[],isF=fin.includes(m),names=fin.map((p,i)=>NM(p)+((g.ftr||[])[i]?' 🦈'+(g.ftr[i]>1?'×'+g.ftr[i]:''):'')).join(' & ');
   if(g.st=='f'){const top=`<div class="mkfin ga"><span class="gbig">🎭</span><b>${GT('mfinT')}</b><p>${GT('mfinD',{n:names,v:g.pot})}</p><p class="mut">${GT('mfinC')}</p></div>`;
    if(isF)return{html:`<div class="card c">${top}<div class="gpk mkch">${['P','V'].map((v,i)=>`<button class="ga gdec ${g.fc[m]==v?'sel':''}" ${dl(i,.3)} data-gf="${v}">${GT('k'+v)}</button>`).join('')}</div><p class="gcof">🔒 ${GT('mtot',{v:g.sc[m]??0})}</p></div>`,
     bind(){$$('[data-gf]').forEach(x=>x.onclick=()=>gs({v:x.dataset.gf}))}};
@@ -541,7 +564,7 @@ GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,MKE,pay:mkPa
    bind(){if(fr.out==0&&!RM())sparkles($('.mkduo'),16)}}},
  endView(s){const g=s.game,o=s.order,n=o.length,W=220,cx=110,cy=110,rr=82,pos={};o.forEach((p,i)=>{const a=2*Math.PI*i/n-Math.PI/2;pos[p]=[cx+rr*Math.cos(a),cy+rr*Math.sin(a)]});
   const E={};(g.h||[]).forEach(r=>r.grp.forEach(x=>{for(let i=0;i<x.length;i++)for(let j=i+1;j<x.length;j++){const a=x[i],b=x[j],k=mkPair(a,b),e=E[k]=E[k]||{a:a<b?a:b,b:a<b?b:a,pp:0,gg:0,t:{}};
-   const ca=r.ch[a],cb=r.ch[b];if(ca=='P'&&cb=='P')e.pp++;else if(ca=='G'&&cb=='G')e.gg++;else{const tr=ca=='G'?a:b;e.t[tr]=(e.t[tr]||0)+1}}}));
+   const ca=(r.ch[a]||{})[b]||'G',cb=(r.ch[b]||{})[a]||'G';if(ca=='P'&&cb=='P')e.pp++;else if(ca=='G'&&cb=='G')e.gg++;else{const tr=ca=='G'?a:b;e.t[tr]=(e.t[tr]||0)+1}}}));
   const f=v=>v.toFixed(1);let svg=`<svg class="mkcst" viewBox="0 0 ${W} ${W}" role="img" aria-label="${esc(GT('mconst'))}"><defs><marker id="mkar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--bad)"/></marker></defs>`;
   const ln=(a,b,cl,off,mk)=>{const [x1,y1]=pos[a],[x2,y2]=pos[b],dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy)||1,nx=-dy/L*off,ny=dx/L*off,sh=14/L;
    return `<line class="${cl}" x1="${f(x1+dx*sh+nx)}" y1="${f(y1+dy*sh+ny)}" x2="${f(x2-dx*sh+nx)}" y2="${f(y2-dy*sh+ny)}"${mk?' marker-end="url(#mkar)"':''}/>`};
@@ -692,6 +715,7 @@ section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) b
 [data-theme=dark] .arcb .v{fill:#bfe6ee;opacity:.7}[data-theme=dark] .arcb .isl{stroke:#e9f6f8}[data-theme=dark] .arcb .rk circle{fill:#8d9ea6;stroke:#53646b}
 [data-theme=dark] .arcb .tg.on{fill:#ff8a3d55}
 /* 🎭 Les Masques */
+.mksh{display:inline-block;margin-inline-start:4px;padding:0 5px;border-radius:9px;font-size:.82em;background:color-mix(in srgb,var(--bad) 16%,transparent);white-space:nowrap}.mkrow{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:8px 0}.mkto{font-weight:600}.mkch.sm{margin:0;gap:6px}.mkch.sm .gdec{padding:8px 12px;font-size:14px;min-width:0}.mkshd{font-size:13px;margin-top:8px}.gties{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.gtie{display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 10px;border-radius:14px;background:var(--paper2)}.gtx{min-width:0;padding:2px 8px;font-size:12px}.gtiep{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}.gtiep button{min-width:0;padding:6px 12px}.gtiep button.sel{box-shadow:inset 0 0 0 2px var(--acc)}
 .mkhd{display:flex;flex-wrap:wrap;gap:6px 10px;justify-content:center;margin:0 0 10px;font:700 14px Nunito;color:var(--mut)}
 .mkme,.mkvs{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:99px;background:var(--paper2);border:2px solid var(--edge)}
 .mkvs{border-color:var(--acc2);flex-wrap:wrap;justify-content:center;border-radius:18px}.mkhd .mke{font-size:20px;line-height:1}.mkm{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;color:var(--txt)}
@@ -1174,4 +1198,42 @@ GMX('he',`לערוך`,`השביעו במשהו יקר|ספרו זיכרון בל
 GMX('pt',`Editar`,`Jure por algo precioso|Conte uma lembrança sem citar nomes|Escreva rimando|Fale como um pirata|Cite uma música que resuma sua estratégia|Descreva sua máscara ideal|Dê uma dica de sobrevivência no mar|Confesse se já traiu nesta partida|Lance um desafio|Escreva só com emojis|Proponha uma aliança para depois|Finja ser outra pessoa|Conte o que vai fazer com seus pontos|Diga uma verdade em que ninguém vai acreditar`,
 `Confesse seu tipo em três palavras|Proponha uma dança debaixo d'água|Descreva o encontro perfeito num barco|Faça uma declaração ardente|Confesse sua fraqueza doce|Escreva como um poema de amor|Proponha um pacto selado com um beijo|Diga o que sussurraria no ouvido`,
 `Confesse sua pior experiência na cama|Descreva sua fantasia em três palavras|Proponha um acordo sem roupa|Confesse o lugar mais louco onde já transou|Faça uma promessa da qual vai se arrepender amanhã|Escreva o pior sexting possível|Descreva seu brinquedo favorito sem dizer o nome|Solte o que nunca teve coragem de pedir`);
+/* Les Masques v2 : choix par partenaire, 🦈 réputation, habitude, liens connus (couples) */
+const GMK2=(l,o)=>Object.assign(GI18N[l].ui,o);
+GMK2('fr',{r_msk:`Chaque manche (4 à 6, nul ne sait combien), tu es masqué face à 1 ou 2 joueurs : écris un message anonyme, puis choisis en secret Partager ou Garder avec chacun. Partager à deux rapporte 4 (puis 3, puis 2 par habitude) et agrandit ton réseau (+2, +4, +6… dès la 2e personne) ; Garder rapporte 4 face à un partage (1 pour l'autre) ou 2, mais te colle un 🦈 visible de tous (−1 à la fin, −4 sur un vol final), sauf si l'autre en portait déjà un. Les deux premiers jouent 16 points : tous Partager 8 chacun, un seul Voler tout pour lui, tous Voler −8 chacun.`,
+mrep:`Habitude : vous aviez déjà partagé ensemble, ça rapporte moins.`,mfinC:`Tous Partager : on divise. Un seul Voler : il prend tout, moins 4 par 🦈. Tous Voler : −8 chacun.`,
+mshT:`A déjà gardé face à quelqu'un qui partageait`,mshD:`a déjà trahi quelqu'un qui partageait. Garder face à un 🦈 ne te marque pas.`,myshk:`Tu portes {v} 🦈 : −{v} à la fin.`,
+mtieM:`Lien connu : votre face-à-face vaut la moyenne de la manche.`,mtieT:`Liens connus`,mtieD:`Couple, coloc… : leur face-à-face vaut la moyenne de la manche et ils ne s'affrontent jamais en finale. Se connaître ne donne aucun avantage.`,mtieH:`Touche deux prénoms pour les lier (ou les délier).`,mtie0:`Aucun lien déclaré.`});
+GMK2('en',{r_msk:`Each round (4 to 6, nobody knows how many), you're masked against 1 or 2 players: write an anonymous message, then secretly choose Share or Keep with each. Sharing both ways gives 4 (then 3, then 2 out of habit) and grows your network (+2, +4, +6… from the 2nd person); Keeping gives 4 against a sharer (1 for them) or 2, but sticks a 🦈 on you that everyone sees (−1 at the end, −4 on a final steal), unless the other already wore one. The top two play for 16 points: both Share 8 each, one Steals it all, both Steal −8 each.`,
+mrep:`Habit: you had already shared together, it pays less.`,mfinC:`Both Share: split it. One Steals: takes it all, minus 4 per 🦈. Both Steal: −8 each.`,
+mshT:`Has kept against someone who was sharing`,mshD:`has already betrayed someone who was sharing. Keeping against a 🦈 doesn't mark you.`,myshk:`You wear {v} 🦈: −{v} at the end.`,
+mtieM:`Known bond: your face-off is worth the round's average.`,mtieT:`Known bonds`,mtieD:`Couple, flatmates…: their face-off is worth the round's average and they never meet in the final. Knowing each other gives no edge.`,mtieH:`Tap two names to link them (or unlink).`,mtie0:`No bond declared.`});
+GMK2('es',{r_msk:`Cada ronda (de 4 a 6, nadie sabe cuántas) estás enmascarado frente a 1 o 2 jugadores: escribe un mensaje anónimo y elige en secreto Compartir o Guardar con cada uno. Compartir los dos da 4 (luego 3, luego 2 por costumbre) y amplía tu red (+2, +4, +6… desde la 2.ª persona); Guardar da 4 frente a quien comparte (1 para él) o 2, pero te pega un 🦈 que todos ven (−1 al final, −4 en un robo final), salvo si el otro ya llevaba uno. Los dos primeros se juegan 16 puntos: ambos Compartir 8 cada uno, uno solo Roba todo, ambos Roban −8 cada uno.`,
+mrep:`Costumbre: ya habíais compartido juntos, da menos.`,mfinC:`Ambos Compartir: se reparte. Uno solo Roba: se lo lleva todo, menos 4 por 🦈. Ambos Roban: −8 cada uno.`,
+mshT:`Ya guardó frente a alguien que compartía`,mshD:`ya traicionó a alguien que compartía. Guardar frente a un 🦈 no te marca.`,myshk:`Llevas {v} 🦈: −{v} al final.`,
+mtieM:`Vínculo conocido: vuestro cara a cara vale la media de la ronda.`,mtieT:`Vínculos conocidos`,mtieD:`Pareja, compis de piso…: su cara a cara vale la media de la ronda y nunca se enfrentan en la final. Conocerse no da ventaja.`,mtieH:`Toca dos nombres para vincularlos (o desvincularlos).`,mtie0:`Ningún vínculo declarado.`});
+GMK2('it',{r_msk:`Ogni round (da 4 a 6, nessuno sa quanti) sei mascherato davanti a 1 o 2 giocatori: scrivi un messaggio anonimo, poi scegli in segreto Condividi o Tieni con ciascuno. Condividere in due dà 4 (poi 3, poi 2 per abitudine) e allarga la tua rete (+2, +4, +6… dalla 2ª persona); Tenere dà 4 contro chi condivide (1 a lui) o 2, ma ti appiccica uno 🦈 visibile a tutti (−1 alla fine, −4 su un furto finale), a meno che l'altro ne avesse già uno. I primi due si giocano 16 punti: entrambi Condividi 8 a testa, uno solo Ruba tutto, entrambi Rubano −8 a testa.`,
+mrep:`Abitudine: avevate già condiviso insieme, rende meno.`,mfinC:`Entrambi Condividi: si divide. Uno solo Ruba: prende tutto, meno 4 per 🦈. Entrambi Rubano: −8 a testa.`,
+mshT:`Ha già tenuto contro qualcuno che condivideva`,mshD:`ha già tradito qualcuno che condivideva. Tenere contro uno 🦈 non ti marchia.`,myshk:`Porti {v} 🦈: −{v} alla fine.`,
+mtieM:`Legame noto: il vostro faccia a faccia vale la media del round.`,mtieT:`Legami noti`,mtieD:`Coppia, coinquilini…: il loro faccia a faccia vale la media del round e non si sfidano mai in finale. Conoscersi non dà vantaggi.`,mtieH:`Tocca due nomi per legarli (o slegarli).`,mtie0:`Nessun legame dichiarato.`});
+GMK2('de',{r_msk:`In jeder Runde (4 bis 6, niemand weiß wie viele) stehst du maskiert 1 oder 2 Leuten gegenüber: schreib eine anonyme Nachricht und wähle dann geheim Teilen oder Behalten, für jede Person. Beidseitiges Teilen bringt 4 (dann 3, dann 2 aus Gewohnheit) und vergrößert dein Netz (+2, +4, +6… ab der 2. Person); Behalten bringt 4 gegen jemanden, der teilt (1 für ihn), sonst 2, verpasst dir aber einen für alle sichtbaren 🦈 (−1 am Ende, −4 bei einem Diebstahl im Finale), außer der andere trug schon einen. Die zwei Besten spielen um 16 Punkte: beide Teilen je 8, einer Stiehlt alles, beide Stehlen je −8.`,
+mrep:`Gewohnheit: ihr hattet schon zusammen geteilt, das bringt weniger.`,mfinC:`Beide Teilen: wird geteilt. Einer Stiehlt: nimmt alles, minus 4 pro 🦈. Beide Stehlen: je −8.`,
+mshT:`Hat schon gegen jemanden behalten, der teilte`,mshD:`hat schon jemanden verraten, der teilte. Behalten gegen einen 🦈 markiert dich nicht.`,myshk:`Du trägst {v} 🦈: −{v} am Ende.`,
+mtieM:`Bekannte Verbindung: euer Duell zählt den Rundendurchschnitt.`,mtieT:`Bekannte Verbindungen`,mtieD:`Paar, WG…: ihr Duell zählt den Rundendurchschnitt und sie treffen sich nie im Finale. Sich zu kennen bringt keinen Vorteil.`,mtieH:`Tippe zwei Namen an, um sie zu verbinden (oder zu lösen).`,mtie0:`Keine Verbindung angegeben.`});
+GMK2('ru',{r_msk:`Каждый раунд (от 4 до 6, никто не знает сколько) ты в маске против 1 или 2 игроков: напиши анонимное сообщение, затем тайно выбери Делиться или Оставить — с каждым. Взаимный обмен даёт 4 (потом 3, потом 2 по привычке) и расширяет твою сеть (+2, +4, +6… со 2-го человека); Оставить даёт 4 против делящегося (ему 1) или 2, но вешает на тебя 🦈, видимую всем (−1 в конце, −4 при краже в финале), если только у другого её уже не было. Двое лучших играют на 16 очков: оба Делятся — по 8, один Крадёт — всё ему, оба Крадут — по −8.`,
+mrep:`Привычка: вы уже делились вместе, это приносит меньше.`,mfinC:`Оба Делятся: пополам. Один Крадёт: забирает всё, минус 4 за каждую 🦈. Оба Крадут: по −8.`,
+mshT:`Уже оставлял(а) себе против того, кто делился`,mshD:`уже предал(а) того, кто делился. Оставить против 🦈 — не помечает тебя.`,myshk:`На тебе {v} 🦈: −{v} в конце.`,
+mtieM:`Известная связь: ваша дуэль стоит среднего за раунд.`,mtieT:`Известные связи`,mtieD:`Пара, соседи…: их дуэль стоит среднего за раунд, и в финале они не встречаются. Знакомство не даёт преимущества.`,mtieH:`Нажми два имени, чтобы связать их (или развязать).`,mtie0:`Связей нет.`});
+GMK2('zh',{r_msk:`每轮（4到6轮，没人知道几轮）你戴着面具面对1或2名玩家：写一条匿名消息，然后对每个人秘密选择分享或独占。双方分享各得4分（之后3分、再之后2分，习惯了），并扩大你的人脉（从第2个人起+2、+4、+6…）；独占对分享者得4分（对方1分），否则2分，但会被贴上人人可见的🦈（结束时−1，决赛偷窃−4），除非对方已经有🦈。前两名争夺16分：都分享各8分，一人偷全归他，都偷各−8。`,
+mrep:`习惯了：你们已经一起分享过，得分变少。`,mfinC:`都分享：平分。一人偷：全拿，每个🦈减4。都偷：各−8。`,
+mshT:`曾对分享者选择独占`,mshD:`曾背叛过分享的人。对🦈独占不会给你打标记。`,myshk:`你带着{v}个🦈：结束时−{v}。`,
+mtieM:`已知关系：你们的对决按本轮平均分计算。`,mtieT:`已知关系`,mtieD:`情侣、室友……：他们的对决按本轮平均分计算，决赛中也不会相遇。彼此认识没有任何优势。`,mtieH:`点两个名字把他们连起来（或解开）。`,mtie0:`没有声明的关系。`});
+GMK2('he',{r_msk:`בכל סבב (4 עד 6, אף אחד לא יודע כמה) את/ה במסכה מול 1 או 2 שחקנים: כתבו הודעה אנונימית, ואז בחרו בסוד לחלוק או לשמור — מול כל אחד. חלוקה הדדית שווה 4 (אחר כך 3, ואז 2 מתוך הרגל) ומרחיבה את הרשת (+2, +4, +6… מהאדם השני); שמירה שווה 4 מול מי שחולק (לו 1) או 2, אבל מדביקה לך 🦈 שכולם רואים (−1 בסוף, −4 בגניבה בגמר), אלא אם לשני כבר היה אחד. שני הראשונים משחקים על 16 נקודות: שניהם חולקים — 8 לכל אחד, אחד גונב — הכול שלו, שניהם גונבים — ‎−8 לכל אחד.`,
+mrep:`הרגל: כבר חלקתם יחד, זה שווה פחות.`,mfinC:`שניהם חולקים: מתחלקים. אחד גונב: לוקח הכול, פחות 4 לכל 🦈. שניהם גונבים: ‎−8 לכל אחד.`,
+mshT:`כבר שמר/ה מול מישהו שחלק`,mshD:`כבר בגד/ה במישהו שחלק. שמירה מול 🦈 לא מסמנת אותך.`,myshk:`יש עליך {v} 🦈: ‎−{v} בסוף.`,
+mtieM:`קשר ידוע: הדו־קרב שלכם שווה את ממוצע הסבב.`,mtieT:`קשרים ידועים`,mtieD:`זוג, שותפים לדירה…: הדו־קרב שלהם שווה את ממוצע הסבב והם אף פעם לא נפגשים בגמר. היכרות לא נותנת יתרון.`,mtieH:`הקישו על שני שמות כדי לקשר (או לנתק).`,mtie0:`לא הוצהר קשר.`});
+GMK2('pt',{r_msk:`Em cada rodada (de 4 a 6, ninguém sabe quantas) você está mascarado diante de 1 ou 2 jogadores: escreva uma mensagem anônima e escolha em segredo Dividir ou Guardar com cada um. Dividir dos dois lados dá 4 (depois 3, depois 2 por costume) e aumenta sua rede (+2, +4, +6… a partir da 2ª pessoa); Guardar dá 4 contra quem divide (1 para ele) ou 2, mas cola em você um 🦈 que todos veem (−1 no fim, −4 num roubo final), a menos que o outro já tivesse um. Os dois primeiros disputam 16 pontos: ambos Dividir 8 cada, um só Rouba tudo, ambos Roubam −8 cada.`,
+mrep:`Costume: vocês já tinham dividido juntos, rende menos.`,mfinC:`Ambos Dividir: divide-se. Um só Rouba: leva tudo, menos 4 por 🦈. Ambos Roubam: −8 cada.`,
+mshT:`Já guardou contra alguém que dividia`,mshD:`já traiu alguém que dividia. Guardar contra um 🦈 não te marca.`,myshk:`Você carrega {v} 🦈: −{v} no fim.`,
+mtieM:`Laço conhecido: o seu frente a frente vale a média da rodada.`,mtieT:`Laços conhecidos`,mtieD:`Casal, colegas de casa…: o frente a frente deles vale a média da rodada e eles nunca se enfrentam na final. Se conhecer não dá vantagem.`,mtieH:`Toque em dois nomes para ligá-los (ou desligar).`,mtie0:`Nenhum laço declarado.`});
 })();
