@@ -50,7 +50,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Rubik:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sacramento&text=by&display=swap">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="i18n.js?v=20261115h"></script>
+<script src="i18n.js?v=20261115i"></script>
 <script src="decks.js?v=5"></script>
 <script src="games.js?v=2"></script><!-- @games -->
 <style>
@@ -1217,6 +1217,14 @@ html:not([data-theme=dark]) .banner .mut{display:inline-block;max-width:100%;pad
 .chip .kick{--kkb:#f3e5cc;width:40px;height:40px;margin:-9px -13px -9px -5px;background:radial-gradient(circle,var(--kkb) 10.5px,transparent 11.5px)!important}
 [data-theme=dark] .chip .kick{--kkb:#26475f}
 .chip .kick:hover,[data-theme=dark] .chip .kick:hover{--kkb:#e2603e}
+/* questions maison : choix de la région en pastilles (plus de menu natif) */
+.ownr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:10px}
+.ownr button span{display:flex;flex-direction:column;min-width:0;text-align:start;line-height:1.2}
+.ownr button small{font:600 11.5px Nunito,sans-serif;opacity:.72;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ownr button{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:14px;min-width:0;border:1.5px solid color-mix(in srgb,var(--rc) 45%,transparent);background:color-mix(in srgb,var(--rc) 10%,transparent);color:inherit;font:700 13px Nunito,sans-serif;cursor:pointer;transition:transform .15s,background .2s,border-color .2s,box-shadow .2s}
+.ownr button i{width:9px;height:9px;border-radius:50%;background:var(--rc);flex:none}
+.ownr button:hover{transform:translateY(-1px)}
+.ownr button.sel{background:color-mix(in srgb,var(--rc) 30%,transparent);border-color:var(--rc);box-shadow:0 0 0 3px color-mix(in srgb,var(--rc) 22%,transparent)}
 </style>
 </head>
 <body>
@@ -2199,10 +2207,11 @@ function ownPick(r,t){if(Math.random()>=.25)return null;const tn=st.tone||0,used
  if(!L.length)return null;const o=L[Math.floor(Math.random()*L.length)];return {id:o.id,q:unQ(o.q),custom:o.by||'?',own:1}}
 function ownDlg(){$('#modal').innerHTML=`<div class="modal"><div class="card"><h2>${T('ownT')}</h2><p class="mut" style="margin-top:6px;font-size:14px">${T('ownD')}</p>
  <textarea id="ownTx" maxlength="200" rows="3" style="width:100%;margin-top:10px" placeholder="${esc(T('ownPh'))}"></textarea>
- <select id="ownR" style="width:100%;margin-top:8px">${Object.keys(R).map(r=>`<option value="${r}">${esc(RN(r))}</option>`).join('')}</select>
+ <div class="ownr" role="radiogroup">${Object.keys(R).map((r,i)=>`<button type="button" role="radio" aria-checked="${!i}" class="${i?'':'sel'}" data-ownr="${r}" style="--rc:${R[r].c}"><i></i><span><b>${esc(RN(r))}</b><small>${esc(RT(r,1))}</small></span></button>`).join('')}</div>
  <div class="row" style="margin-top:12px"><button class="ghost" id="ownX">${T('ownClose')}</button><button class="pri" id="ownOk">${T('ownSend')}</button></div></div></div>`;
  $('#ownX').onclick=()=>{$('#modal').textContent=''};
- $('#ownOk').onclick=()=>{const q=tidy($('#ownTx').value);if(q.length<3)return;const o={id:'o'+Date.now()+Math.random().toString(36).slice(2,6),q,r:$('#ownR').value,d:OWN_D[(st&&st.tone)||0]};
+ $$('[data-ownr]').forEach(b=>b.onclick=()=>$$('[data-ownr]').forEach(x=>{const on=x==b;x.classList.toggle('sel',on);x.setAttribute('aria-checked',on)}));
+ $('#ownOk').onclick=()=>{const q=tidy($('#ownTx').value);if(q.length<3)return;const o={id:'o'+Date.now()+Math.random().toString(36).slice(2,6),q,r:($('[data-ownr].sel')||{dataset:{}}).dataset.ownr||'rivage',d:OWN_D[(st&&st.tone)||0]};
   ownAdd([{...o,by:me.name}]);send({t:'ownq',o});toast(T('ownOk'));$('#ownTx').value=''}}
 /* questions déjà posées sur cet appareil (hôte), d'une partie à l'autre */
 const SEENQ_K='terra:seenQ';function seenQ(){try{const a=JSON.parse(localStorage.getItem(SEENQ_K)||'[]');return Array.isArray(a)?a:[]}catch(e){return []}}
@@ -2620,8 +2629,8 @@ function vLobby(){
  hint:host?(on<2?T('hostShare'):st.gsel?GT('play',{g:GT('n_'+st.gsel)})+'.':T('hostReady')):st.gsel?GT('waitHost')+'.':T('waitHost',{n:`<b>${esc(st.host)}</b>`}),/* @games */
  html:`<div class="card c"><p class="mut">${T('islandCode')}</p><div class="bigcode">${[...st.code].map((ch,i)=>`<span style="animation-delay:${i*.08}s">${ch}</span>`).join('')}</div><p class="mut" style="margin-bottom:12px">${on>=3?T('archipel',{n:on}):on==2?T('duo'):T('waitOther')}</p><button id="copy">${T('copyInv')}</button></div>
  ${gLobbyBody(host,my,on)}
- <button class="ghost wide" id="ownq">✍️ ${T('ownBtn')}</button><button class="ghost wide" id="quit">${T('quit')}</button>`,
- bind(){$('#copy').onclick=copyInvite;$('#ownq').onclick=ownDlg;$$('[data-vote]').forEach(b=>b.onclick=()=>send({t:'vote',v:+b.dataset.vote}));
+ ${st.gsel?'':`<button class="ghost wide" id="ownq">✍🏻 ${T('ownBtn')}</button>`}<button class="ghost wide" id="quit">${T('quit')}</button>`,
+ bind(){$('#copy').onclick=copyInvite;$('#ownq')&&($('#ownq').onclick=ownDlg);$$('[data-vote]').forEach(b=>b.onclick=()=>send({t:'vote',v:+b.dataset.vote}));
   $$('[data-len]').forEach(b=>b.onclick=()=>send({t:'length',v:+b.dataset.len}));
   $$('[data-mode]').forEach(b=>b.onclick=()=>send({t:'mode',v:b.dataset.mode}));$$('[data-gsel]').forEach(b=>b.onclick=()=>send({t:'gsel',v:b.dataset.gsel}));/* @games */
   $$('[data-tm]').forEach(b=>b.onclick=()=>send({t:'timer',v:TIM[+b.dataset.tm]}));
@@ -2817,7 +2826,7 @@ function vCarnet(){const host=me.name==st.host;
   <div class="card"><p class="mut c">${T('thread')}</p>${constellation()}</div>
   ${st.log.slice().reverse().map((e,i)=>`<div class="card flat"><p class="mut">${T('expLine',{i:st.log.length-i,d:new Date(e.date).toLocaleDateString(D().loc,{day:'numeric',month:'long',year:'numeric'}),m:MN(e.meteo)})}</p>
    ${Object.entries(e.flags).flatMap(([from,to])=>Object.entries(to).filter(([n])=>n==me.name||from==me.name).map(([n,txt])=>`<p style="margin-top:10px;font-size:14px"><span class="mut">${e.anon?'✉️':`<span style="color:${col(from)}">${esc(from)}</span>`} →<span style="color:${col(n)}">${esc(n)}</span></span><br>${QQ(esc(txt))}</p>`)).join('')}${e.hist&&e.hist.length?`<button class="ghost" data-rev="${st.log.length-1-i}" style="margin-top:6px">${T('review')}</button>`:''}</div>`).join('')}
-  ${host?gRematchBtns():''}<button class="ghost wide" id="ownq">✍️ ${T('ownBtn')}</button><button class="ghost wide" id="quit">${T('quit')}</button>`,
+  ${host?gRematchBtns():''}<button class="ghost wide" id="ownq">✍🏻 ${T('ownBtn')}</button><button class="ghost wide" id="quit">${T('quit')}</button>`,
   bind(){bindRematch();$('#ownq').onclick=ownDlg;$$('[data-rev]').forEach(b=>b.onclick=()=>gReview(+b.dataset.rev));$('#quit').onclick=leave}}}
 
 /* === game : vues (timer, progression, anonymat, portrait, bilan, rejouer) === */
@@ -2987,9 +2996,9 @@ function g3Sugg(c){const q=c.q.custom?null:LQ(c.q,c.terr),out=[];
  if(c.type=='libre')for(const n in c.result||{})if(c.result[n]&&c.guesses[n]!=null)out.push(String(c.guesses[n]));
  return [...new Set(out.map(x=>qaCut(tidy(String(x).replaceAll('{Y}',c.terr)),80)).filter(Boolean))].slice(0,4)}
 function g3NoteCard(c,h){const ws=st.order.filter(n=>n!=c.terr),nt=h.nt||{},ns=h.ns||[],k='note:'+c.id;
- const chips=`<div class="g3wr">${ws.map(n=>`<span class="chip ${P(n)&&P(n).online?'':'off'}">${DOT(n)}${esc(n)} ${nt[n]?'<span class="g3ok">📌</span>':ns.includes(n)?'<span class="mut">–</span>':'<span class="g3pen">✍️</span>'}</span>`).join('')}</div>`;
+ const chips=`<div class="g3wr">${ws.map(n=>`<span class="chip ${P(n)&&P(n).online?'':'off'}">${DOT(n)}${esc(n)} ${nt[n]?'<span class="g3ok">📌</span>':ns.includes(n)?'<span class="mut">–</span>':'<span class="g3pen">✍🏻</span>'}</span>`).join('')}</div>`;
  const head=sub=>`<p class="g3nh"><span class="g3ni" aria-hidden="true">📝</span><span><b>${T('g3NoteT',{n:NS(c.terr)})}</b>${sub?`<br><span class="mut">${T('g3NoteD')}</span>`:''}</span></p>`;
- if(c.terr==me.name){const got=ws.filter(n=>nt[n]).length;return `<div class="card g3note g3sub"><p class="g3nh"><span class="g3ni" aria-hidden="true">✍️</span><span><b>${T('g3Subj')}</b><br><span class="mut">${T('g3SubjD')}</span></span>${got?`<b class="g3cnt">${got}</b>`:''}</p>${chips}</div>`}
+ if(c.terr==me.name){const got=ws.filter(n=>nt[n]).length;return `<div class="card g3note g3sub"><p class="g3nh"><span class="g3ni" aria-hidden="true">✍🏻</span><span><b>${T('g3Subj')}</b><br><span class="mut">${T('g3SubjD')}</span></span>${got?`<b class="g3cnt">${got}</b>`:''}</p>${chips}</div>`}
  if(!st.order.includes(me.name))return '';
  const mine=nt[me.name],edit=ui.g3ed==c.id;
  if(mine&&!edit)return `<div class="card g3note done">${head(0)}<div class="g3pinned" data-g3a="p${c.id}${esc(mine)}"><span class="g3tack" aria-hidden="true">📌</span><span>${esc(mine)}</span></div><div class="g3row"><button class="ghost" id="g3edit">${T('g3Edit')}</button></div>${ws.length>1?chips:''}</div>`;
