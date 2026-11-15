@@ -50,8 +50,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Rubik:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sacramento&text=by&display=swap">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="i18n.js?v=20261115f"></script>
-<script src="decks.js?v=3"></script>
+<script src="i18n.js?v=20261115g"></script>
+<script src="decks.js?v=4"></script>
 <style>
 :root{--sea1:#bdeef0;--sea2:#69c9d3;--deep:#0e5866;--deep2:#0a4652;--paper:#fffaf0;--paper2:#fbf0d9;--edge:#ead6ae;--edge2:#d8bd88;--txt:#3b2a1b;--mut:#8a7660;--acc:#ff8a3d;--acc-d:#d9661f;--acc2:#ffb15c;--ink:#1d8e6c;--sur:#d9661f;--ear:#5869b5;--bad:#d64b3c;--gold:#f2b84b}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -1372,7 +1372,7 @@ const unQ=s=>String(s).replace(/[\s?？؟¿.。…!！]+$/u,'');
 const QM=s=>{s=unQ(s);if(!s)return s;const l=LANG;return s+(/[　-鿿]/.test(s)?'？':l=='fr'?' ?':'?')};
 /* formulations multiples d'une question (« a || b ») : même choix pour tout le monde pendant un tour (graine = st.cur.id) */
 function qVar(s,id){if(typeof s!='string'||s.indexOf(' || ')<0)return s;const a=s.split(' || ');let z=String(id);try{if(st&&st.cur&&st.cur.q&&st.cur.q.id==id)z=st.cur.id}catch(e){}
- let x=5381;for(const c of z+'#'+id)x=(x*33+c.charCodeAt(0))>>>0;return a[x%a.length]}
+ let x=2166136261;for(const c of z+'#'+id)x=Math.imul(x^c.charCodeAt(0),16777619)>>>0;x^=x>>>15;return a[(x>>>0)%a.length]}
 function LQ(q,y){const L=LQ0(q);if(!L)return L;const f=s=>gz(s,k=>k=='Y'?gOf(y):GME());return {...L,q:f(q.custom?L.q:qVar(L.q,q.id)),...(L.o?{o:L.o.map(f)}:{}),...(L.a!=null?{a:f(L.a),b:f(L.b)}:{})}}
 function LQ0(q){if(!q)return q;if(q.custom)return {...q,q:QM(q.q)};const t=(D().q||{})[q.id];if(!t)return q;if(typeof t=='string')return {...q,q:t};
  if(q.o)return {...q,q:t[0],o:t.slice(1)};return {...q,q:t[0],a:t[1],b:t[2]}}
@@ -1934,7 +1934,7 @@ function connectTo(id,onFail,ms=25000){
  const c=peer.connect(id,{reliable:true});hostConn=c;
  /* WebRTC entre deux réseaux (4G, box) peut mettre >10 s à s'établir : ne pas couper trop tôt ; un code inexistant échoue tout de suite via peer-unavailable */
  setTimeout(()=>{if(!c.open)fail()},ms);
- c.on('open',()=>{lastSeen=Date.now();c.send({t:'hello',name:me.name,color:me.color,g:GN(me.g),dev:devId(),saves:allSaves(),pend:window.gPend?gPend():null})});
+ c.on('open',()=>{lastSeen=Date.now();c.send({t:'hello',name:me.name,color:me.color,g:GN(me.g),dev:devId(),own:ownAll().filter(o=>o.by==me.name).slice(-50),saves:allSaves(),pend:window.gPend?gPend():null})});
  c.on('data',d=>{if(hostConn!==c)return;lastSeen=Date.now();
   if(d.t=='state'){got=true;migrating=false;onUnavail=null;const ph=st&&st.host;st=d.st;if(ph&&ph!=st.host)toast(T('newHost',{n:st.host}));persist();render();window.armTimer&&armTimer()}
   else if(d.t=='react')floatReact(d.from,d.e,d)
@@ -2147,7 +2147,7 @@ function relayReact(from,e,o){o=o||{};if(!EMO.includes(e))return;
  broadcast(m);floatReact(from,e,m)}
 function hostRecv(c,d){
  if(d.t=='hello'){
-  let name=qaCut(chTidy(d.name),20);if(!name)return;
+  let name=qaCut(chTidy(d.name),20);if(!name)return;if(Array.isArray(d.own))ownAdd(d.own.slice(-50).map(o=>({...o,by:name})));
   if((st.banned||[]).includes(name)){c.send({t:'err',k:'kicked'});setTimeout(()=>c.close(),400);return}
   let p=P(name),renamed=false;
   const dev=typeof d.dev=='string'?d.dev.slice(0,40):'';
@@ -2185,10 +2185,27 @@ function send(a){if(a&&a.t=='flags'&&st)MYFL={gid:st.gid,v:a.v};if(isHost)act(me
 /* =========================================================
    RÈGLES (exécutées par l'hôte uniquement)
    ========================================================= */
+/* questions maison : écrites par les joueurs, gardées par l'hôte, ressortent ~1 fois sur 4 ; le ton d'écriture est respecté */
+const OWN_K='terra:own',OWN_D=['base','coquin','trash'];
+function ownAll(){try{const a=JSON.parse(localStorage.getItem(OWN_K)||'[]');return Array.isArray(a)?a.filter(o=>o&&typeof o.q=='string'&&R[o.r]):[]}catch(e){return []}}
+function ownAdd(list){try{const a=ownAll(),ids=new Set(a.map(o=>o.id));for(const o of list||[]){if(!o||typeof o.q!='string'||!R[o.r])continue;
+  const id=String(o.id||('o'+Date.now()+Math.random().toString(36).slice(2,6))).slice(0,40),q=tidy(o.q).slice(0,200);if(ids.has(id)||q.length<3)continue;
+  a.push({id,q,r:o.r,d:OWN_D.includes(o.d)?o.d:'base',by:qaCut(chTidy(String(o.by||'')),20)});ids.add(id)}
+ localStorage.setItem(OWN_K,JSON.stringify(a.slice(-200)))}catch(e){}}
+function ownPick(r,t){if(Math.random()>=.25)return null;const tn=st.tone||0,used=st.used[t]||[];
+ const L=ownAll().filter(o=>o.r==r&&o.by!=t&&(o.d=='base'||(o.d=='coquin'&&tn>=1)||(o.d=='trash'&&tn==2))&&!used.includes(o.id));
+ if(!L.length)return null;const o=L[Math.floor(Math.random()*L.length)];return {id:o.id,q:unQ(o.q),custom:o.by||'?',own:1}}
+function ownDlg(){$('#modal').innerHTML=`<div class="modal"><div class="card"><h2>${T('ownT')}</h2><p class="mut" style="margin-top:6px;font-size:14px">${T('ownD')}</p>
+ <textarea id="ownTx" maxlength="200" rows="3" style="width:100%;margin-top:10px" placeholder="${esc(T('ownPh'))}"></textarea>
+ <select id="ownR" style="width:100%;margin-top:8px">${Object.keys(R).map(r=>`<option value="${r}">${esc(RN(r))}</option>`).join('')}</select>
+ <div class="row" style="margin-top:12px"><button class="ghost" id="ownX">${T('ownClose')}</button><button class="pri" id="ownOk">${T('ownSend')}</button></div></div></div>`;
+ $('#ownX').onclick=()=>{$('#modal').textContent=''};
+ $('#ownOk').onclick=()=>{const q=tidy($('#ownTx').value);if(q.length<3)return;const o={id:'o'+Date.now()+Math.random().toString(36).slice(2,6),q,r:$('#ownR').value,d:OWN_D[(st&&st.tone)||0]};
+  ownAdd([{...o,by:me.name}]);send({t:'ownq',o});toast(T('ownOk'));$('#ownTx').value=''}}
 /* questions déjà posées sur cet appareil (hôte), d'une partie à l'autre */
 const SEENQ_K='terra:seenQ';function seenQ(){try{const a=JSON.parse(localStorage.getItem(SEENQ_K)||'[]');return Array.isArray(a)?a:[]}catch(e){return []}}
 function seenQAdd(id){if(id==null)return;try{const a=seenQ().filter(x=>x!==id);a.push(id);localStorage.setItem(SEENQ_K,JSON.stringify(a.slice(-400)))}catch(e){}}
-function pickQ(r,t){const q=pickQ0(r,t);if(q&&!q.custom)seenQAdd(q.id);return q}
+function pickQ(r,t){const o=ownPick(r,t);if(o)return o;const q=pickQ0(r,t);if(q&&!q.custom)seenQAdd(q.id);return q}
 function pickQ0(r,t){const SQ=seenQ(),SI=new Map(SQ.map((id,i)=>[id,i]));const used=st.used[t]||[],seen=(st.qseen||{})[t]||[],tn=st.tone||0;
  /* ton : tout public toujours ; coquin si tone>=1 ; trash si tone==2 ; environ 60 % de questions du ton choisi */
  const gt=gOf(t),gk=q=>!q.for||q.for==gt,ok=q=>gk(q)&&(!q.deck||q.deck=='base'||(q.deck=='coquin'&&tn>=1)||(q.deck=='trash'&&tn==2)),all=Q[r].filter(ok);
@@ -2222,6 +2239,7 @@ function loadBestSave(){const k=saveKey(st.order);const cands=[LS.get(k,null)];f
  st.qseen=qs;st.maps={};st.used={};const bl=best&&best.log||[];st.log=bl.length>(st.log||[]).length?bl:(st.log||[])}
 function act(from,a){const s=st;if(!P(from))return;g2Resp(from,a);
  switch(a.t){
+ case 'ownq':if(a.o&&typeof a.o.q=='string')ownAdd([{...a.o,by:from,d:['base','coquin','trash'][s.tone||0]}]);break;
  case 'vote':if(s.phase=='lobby'&&[0,1,2].includes(a.v))s.votes[from]=a.v;break;
  case 'length':if(from==s.host&&s.phase=='lobby'&&[3,5,7].includes(a.v))s.length=a.v;break;
  case 'start':{if(from!=s.host||s.phase!='lobby')return;const on=s.players.filter(p=>p.online);if(on.length<2)return;
@@ -2229,7 +2247,7 @@ function act(from,a){const s=st;if(!P(from))return;g2Resp(from,a);
   loadBestSave();s.bottles={};s.order.forEach(n=>s.bottles[n]=1);s.flags={};s.cur=null;s.phase='map';break}
  case 'pick':{if(s.phase!='map'||from!=explorer())return;const t=a.terr;if(!s.order.includes(t)||t==from||!R[a.r]||(s.mode=='por'&&t!=pSub()))return;
   if(!openSet(from,t)[a.r])return;let q,type=R[a.r].t;
-  if(a.bottle&&s.bottles[from]>0){q={id:'b'+Date.now(),q:unQ(tidy(a.bottle).slice(0,200)),custom:from,...(s.anon?{anon:1}:{})};type='libre';s.bottles[from]--}else q=pickQ(a.r,t);
+  if(a.bottle&&s.bottles[from]>0){q={id:'b'+Date.now(),q:unQ(tidy(a.bottle).slice(0,200)),custom:from,...(s.anon?{anon:1}:{})};type='libre';s.bottles[from]--}else{q=pickQ(a.r,t);if(q&&q.own)type=type=='ecoute'?'ecoute':'libre'}
   s.lp=from;s.cur={id:'c'+Date.now(),explorer:from,terr:t,r:a.r,q,type,answer:null,guesses:{},result:null,placeName:'',answered:false,sent:[],wind:WIND};g3Pick(s,from,t,!!q.custom);s.phase='question';break}
  case 'answer':if(s.phase!='question'||from!=s.cur.terr||!['choix','echelle'].includes(s.cur.type)||!gValid(s.cur,a.v))return;gSec(s.cur).ans=a.v;s.cur.answered=true;checkAll();break;
  case 'guess':if(s.phase!='question'||from==s.cur.terr||s.cur.type=='ecoute')return;gGuess(s.cur,from,a);break;
@@ -2599,8 +2617,8 @@ function vLobby(){
  hint:host?T(on<2?'hostShare':'hostReady'):T('waitHost',{n:`<b>${esc(st.host)}</b>`}),
  html:`<div class="card c"><p class="mut">${T('islandCode')}</p><div class="bigcode">${[...st.code].map((ch,i)=>`<span style="animation-delay:${i*.08}s">${ch}</span>`).join('')}</div><p class="mut" style="margin-bottom:12px">${on>=3?T('archipel',{n:on}):on==2?T('duo'):T('waitOther')}</p><button id="copy">${T('copyInv')}</button></div>
  ${gLobbyBody(host,my,on)}
- <button class="ghost wide" id="quit">${T('quit')}</button>`,
- bind(){$('#copy').onclick=copyInvite;$$('[data-vote]').forEach(b=>b.onclick=()=>send({t:'vote',v:+b.dataset.vote}));
+ <button class="ghost wide" id="ownq">✍️ ${T('ownBtn')}</button><button class="ghost wide" id="quit">${T('quit')}</button>`,
+ bind(){$('#copy').onclick=copyInvite;$('#ownq').onclick=ownDlg;$$('[data-vote]').forEach(b=>b.onclick=()=>send({t:'vote',v:+b.dataset.vote}));
   $$('[data-len]').forEach(b=>b.onclick=()=>send({t:'length',v:+b.dataset.len}));
   $$('[data-mode]').forEach(b=>b.onclick=()=>send({t:'mode',v:b.dataset.mode}));
   $$('[data-tm]').forEach(b=>b.onclick=()=>send({t:'timer',v:TIM[+b.dataset.tm]}));
@@ -2674,7 +2692,7 @@ function vMap(){
 
 /* ---------- Question ---------- */
 function qHead(c){const q=LQ(c.q,c.terr);return `<div class="card sheet"><div class="rhead">${regionBadge(c.r)}<div><p class="mut">${T('exploresIsland',{a:BW(c.explorer),b:BW(c.terr)})}</p><h3>${RN(c.r)} <span class="mut">· ${RT(c.r,1)}</span></h3></div></div>
- ${c.wind||c.mir?`<p class="gnote">${T(c.mir?'mirLine':'wind')}</p>`:''}${g3QNote(c)}${c.q.custom?`<p class="mut" style="margin-top:12px">${c.q.anon?T('bottleAnon'):T('bottleFrom',{n:esc(c.q.custom)})}</p>`:''}<p class="q" style="margin-top:12px">${fy(q.q,c.terr)}</p></div>`}
+ ${c.wind||c.mir?`<p class="gnote">${T(c.mir?'mirLine':'wind')}</p>`:''}${g3QNote(c)}${c.q.custom?`<p class="mut" style="margin-top:12px">${c.q.anon?T('bottleAnon'):T(c.q.own?'ownFrom':'bottleFrom',{n:esc(c.q.custom)})}</p>`:''}<p class="q" style="margin-top:12px">${fy(q.q,c.terr)}</p></div>`}
 function choiceInput(c,key){
  const sel=drafts[key],q=LQ(c.q,c.terr);
  if(c.type=='choix')return q.o.map((o,i)=>`<button class="opt ${sel==i?'sel':''}" data-opt="${i}">${esc(o)}</button>`).join('');
@@ -2795,8 +2813,8 @@ function vCarnet(){const host=me.name==st.host;
   <div class="card"><p class="mut c">${T('thread')}</p>${constellation()}</div>
   ${st.log.slice().reverse().map((e,i)=>`<div class="card flat"><p class="mut">${T('expLine',{i:st.log.length-i,d:new Date(e.date).toLocaleDateString(D().loc,{day:'numeric',month:'long',year:'numeric'}),m:MN(e.meteo)})}</p>
    ${Object.entries(e.flags).flatMap(([from,to])=>Object.entries(to).filter(([n])=>n==me.name||from==me.name).map(([n,txt])=>`<p style="margin-top:10px;font-size:14px"><span class="mut">${e.anon?'✉️':`<span style="color:${col(from)}">${esc(from)}</span>`} →<span style="color:${col(n)}">${esc(n)}</span></span><br>${QQ(esc(txt))}</p>`)).join('')}${e.hist&&e.hist.length?`<button class="ghost" data-rev="${st.log.length-1-i}" style="margin-top:6px">${T('review')}</button>`:''}</div>`).join('')}
-  ${host?gRematchBtns():''}<button class="ghost wide" id="quit">${T('quit')}</button>`,
-  bind(){bindRematch();$$('[data-rev]').forEach(b=>b.onclick=()=>gReview(+b.dataset.rev));$('#quit').onclick=leave}}}
+  ${host?gRematchBtns():''}<button class="ghost wide" id="ownq">✍️ ${T('ownBtn')}</button><button class="ghost wide" id="quit">${T('quit')}</button>`,
+  bind(){bindRematch();$('#ownq').onclick=ownDlg;$$('[data-rev]').forEach(b=>b.onclick=()=>gReview(+b.dataset.rev));$('#quit').onclick=leave}}}
 
 /* === game : vues (timer, progression, anonymat, portrait, bilan, rejouer) === */
 function gWho(c,k){const card=(c.cards||[]).find(x=>x.k==k),n=c.anonR?null:card?card.n:(c.cards?null:k),mine=myPend.cid==c.id&&myPend.k==k;
