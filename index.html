@@ -1548,12 +1548,13 @@ setTheme(document.documentElement.dataset.theme=='dark'?'dark':'light');
  const star=(x,y)=>`<path d="M${x} ${y-13}l4 8.5 9.4 1-7 6.4 2 9.3-8.4-4.8-8.4 4.8 2-9.3-7-6.4 9.4-1z" style="fill:var(--stf);stroke:var(--stf)" stroke-width="5" stroke-linejoin="round"/>`;
  const pebble=(x,y,rx,ry,c='--pb')=>`<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" ${F(c)}/><ellipse cx="${x-rx*.3}" cy="${y-ry*.35}" rx="${rx*.35}" ry="${ry*.22}" ${F('--dh')} opacity=".6"/>`;
  const shell=(x,y)=>`<path d="M${x-11} ${y}a11 11 0 0 1 22 0q-11 5-22 0z" ${F('--sh')}/><path d="M${x} ${y+1}l-5-9M${x} ${y+1}V${y-10}M${x} ${y+1}l5-9" fill="none" style="stroke:var(--sh2)" stroke-width="1.8" stroke-linecap="round"/>`;
- const mound=d=>`<path d="${d}" ${F('--d3')}/>`;
+ const mound=d=>`<path d="${d}" fill="url(#dgm)"/>`;
  const L=mound('M-10 270V206C60 176 170 182 236 210S340 246 410 270Z')+fan(150,206,62,'--c3','--c3b')+tubes(30,214,'--c4','--c4b')+branch(110,222,1,'--c1','--c1b')+ball(206,224,24,'--c2','--c2b')+branch(250,240,.62,'--c4','--c4b')+star(300,250)+pebble(345,256,14,8)+shell(176,246);
  const Rr=mound('M410 270V200C340 174 236 182 170 212S66 248 -10 270Z')+fan(262,202,70,'--c1','--c1b')+tubes(330,214,'--c3','--c3b')+branch(204,226,.9,'--c2','--c2b')+ball(130,236,20,'--c4','--c4b')+ball(366,212,14,'--c2','--c2b')+pebble(80,256,12,7)+shell(248,248)+star(100,252);
- const dunes=`<path d="M0 260V122C150 86 300 140 500 108S850 74 1000 112V260Z" ${F('--d1')}/>`+
-  `<path d="M0 260V172C200 134 380 192 560 160S870 136 1000 166V260Z" ${F('--d2')}/>`+
-  `<path d="M0 260V214C180 192 360 236 560 210S860 196 1000 220V260Z" ${F('--d3')}/>`+
+ const dg=(id,c,y0,y1)=>`<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="0" y1="${y0}" x2="0" y2="${y1}"><stop offset="0" style="stop-color:var(${c})" stop-opacity="0"/><stop offset=".45" style="stop-color:var(${c})" stop-opacity=".75"/><stop offset="1" style="stop-color:var(${c})"/></linearGradient>`;
+ const dunes=`<defs>${dg('dg1','--d1',80,200)}${dg('dg2','--d2',130,240)}${dg('dg3','--d3',190,260)}${dg('dgm','--d3',178,250)}</defs><path d="M0 260V122C150 86 300 140 500 108S850 74 1000 112V260Z" fill="url(#dg1)"/>`+
+  `<path d="M0 260V172C200 134 380 192 560 160S870 136 1000 166V260Z" fill="url(#dg2)"/>`+
+  `<path d="M0 260V214C180 192 360 236 560 210S860 196 1000 220V260Z" fill="url(#dg3)"/>`+
   `<path d="M120 186C230 166 330 182 420 176M600 178C700 160 800 152 900 158" fill="none" style="stroke:var(--dh)" stroke-width="5" stroke-linecap="round" opacity=".55"/>`+
   pebble(330,236,16,9)+pebble(356,242,9,6,'--pb2')+pebble(640,232,13,8)+pebble(470,248,10,6,'--pb2')+shell(560,240)+shell(420,250)+pebble(720,246,11,7);
  const alga=()=>sv('0 0 40 200','<path d="M20 200C6 164 34 134 20 100S8 42 20 10" fill="none" style="stroke:var(--g1)" stroke-width="13" stroke-linecap="round"/><path d="M20 190C10 160 30 134 20 104S12 50 20 20" fill="none" style="stroke:var(--g2)" stroke-width="3.5" stroke-linecap="round" opacity=".7"/>','none');
@@ -1650,7 +1651,7 @@ void main(){
  const size=()=>{const w=s.clientWidth||innerWidth,h=s.clientHeight||innerHeight;if(w==lw&&Math.abs(h-lh)<h*.25)return;lw=w;lh=h;
   const k=Math.min(sm?.5:.9,Math.sqrt(420000/(w*h)));cv.width=Math.max(1,Math.round(w*k));cv.height=Math.max(1,Math.round(h*k));gl.viewport(0,0,cv.width,cv.height)};
  const draw=(now,dt)=>{if(!gl)return;N+=(NT-N)*(RM?1:Math.min(1,dt*2.5));
-  gl.uniform2f(U.uR,cv.width,cv.height);gl.uniform1f(U.uT,((now-t0)/1000)%3600);gl.uniform1f(U.uN,N);gl.uniform2f(U.uP,0,0);gl.uniform1f(U.uS,.8);gl.drawArrays(gl.TRIANGLES,0,3)};
+  gl.uniform2f(U.uR,cv.width,cv.height);gl.uniform1f(U.uT,((now-t0)/1000*.5)%3600);gl.uniform1f(U.uN,N);gl.uniform2f(U.uP,0,0);gl.uniform1f(U.uS,.8);gl.drawArrays(gl.TRIANGLES,0,3)};
  const step=now=>{if(!run)return;requestAnimationFrame(step);if(now-last<40)return;const dt=last?Math.min(.1,(now-last)/1000):.04;last=now;draw(now,dt)};
  const start=()=>{if(RM){draw(performance.now(),.04);return}if(!run){run=true;last=0;requestAnimationFrame(step)}};
  size();start();
