@@ -736,6 +736,18 @@ he:{g3Subj:"פתק עליך נכתב עכשיו",g3SubjD:"הוא יתגלה בס
 pt:{g3Subj:"{o} está escrevendo uma nota sobre você",g3SubjD:"Você vai descobrir no final.",g3HintWait:"📝 Anote o que você guarda e continue.",woHead:"Entre nós, quem tem mais chance de…",g3WoWait:"Esperando o voto de {o}",g3WoSame:"Combinado: {n}!",g3EndD:"Releia suas notas sobre {o} e depois finque sua bandeira.",g3MyIsl:"🗺️ Sua ilha, vista por {o}",g3RNme:"O que {o} guardou de você"}};
 for(const l in EXT_GAME3)if(I18N[l]){Object.assign(I18N[l].ui,EXT_GAME3[l]);I18N[l].ui2=I18N[l].ui2||{};Object.assign(I18N[l].ui2,EXT_GAME3_2[l]||{})}
 
+/* @i18n-qa2 : genre Femme / Homme seulement */
+const EXT_QA2={fr:{gD0:"Un choix à faire pour que les phrases s'accordent.",gNeed:"Choisis Femme ou Homme pour continuer."},
+en:{gD0:"Pick one so sentences fit you.",gNeed:"Pick Woman or Man to continue."},
+es:{gD0:"Elige una opción para que las frases se adapten a ti.",gNeed:"Elige Mujer u Hombre para continuar."},
+it:{gD0:"Scegli un'opzione perché le frasi si accordino a te.",gNeed:"Scegli Donna o Uomo per continuare."},
+de:{gD0:"Wähle eine Option, damit die Sätze zu dir passen.",gNeed:"Wähle Frau oder Mann, um weiterzumachen."},
+ru:{gD0:"Выбери вариант, чтобы фразы согласовывались с тобой.",gNeed:"Выбери «Женщина» или «Мужчина», чтобы продолжить."},
+zh:{gD0:"选择一项，让句子与你相符。",gNeed:"请选择女或男以继续。"},
+he:{gD0:"צריך לבחור כדי שהמשפטים יותאמו אליך.",gNeed:"לבחור אישה או גבר כדי להמשיך."},
+pt:{gD0:"Escolha uma opção para as frases se ajustarem a você.",gNeed:"Escolha Mulher ou Homem para continuar."}};
+for(const l in EXT_QA2)if(I18N[l])Object.assign(I18N[l].ui,EXT_QA2[l]);
+
 /* @i18n-polish */
 const EXT_POL={fr:{timerD:"Le sablier laisse le temps de réfléchir et d'écrire, puis avance tout seul quand on regarde les réponses"},
 en:{timerD:"The hourglass leaves plenty of time to think and write, then moves on by itself while you look at the answers"},
