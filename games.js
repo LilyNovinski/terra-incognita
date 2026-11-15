@@ -589,25 +589,27 @@ GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,ties:true,MK
    🧭 LA CHAÎNE DES PHARES — fiche (rôles cachés, 4-8 joueurs, sans élimination ni nuit)
    Rôles secrets : 1 Naufrageur (4-5 joueurs) ou 2 (6-8, ils se connaissent) ; les autres sont gardiens de phare.
    Vague : un capitaine (tour à tour, départ tiré au sort) reçoit le bon chenal parmi 4 (🐚⭐🌙🐋). Il le transmet EN
-     PRIVÉ à qui il veut, qui le relaie à son tour (2 relais à 4-7 joueurs, 3 à 8) ; le dernier guide le navire.
+     PRIVÉ à qui il veut, qui le relaie à son tour (2 relais à 4, 6 et 7 joueurs, 3 à 5 et 8) ; le dernier guide le navire.
      Chaque relais choisit le chenal qu'il transmet : un Naufrageur peut le changer… ou pas, pour rester crédible.
      35 s par relais (sans choix : il transmet ce qu'il a reçu, à quelqu'un au hasard).
    Public : la route (qui a relayé, dans quel ordre), le bon chenal et celui pris par le navire (arrivé ou coulé).
      Privé : ce que chacun a reçu/transmis. On débat dans le chat (affirmations invérifiables).
    ⛓️ Entre deux vagues, vote (45 s) : la majorité absolue des joueurs en ligne met un suspect aux fers (ou l'en libère
      en votant « personne ») ; il joue toujours, mais ce qu'il reçoit et transmet devient public.
-   Fin : 6 vagues (4-5 joueurs) ou 7 (6-8), ou dès que l'issue est jouée. Les Naufrageurs gagnent à 2 navires coulés (4-5 joueurs) ou 3 (6-8).
+   Fin : 6 vagues (4-5 joueurs), 8 (6), 7 (7-8), ou dès que l'issue est jouée. Les Naufrageurs gagnent à 2 navires coulés
+     (4-5 joueurs), 4 (6), 3 (7-8) — le compteur 💥 l'affiche.
      Puis accusation secrète (60 s, autant de noms que de Naufrageurs). Points : équipage gagnant +4 chacun,
      Naufrageurs gagnants +6 chacun, et chaque gardien +2 par Naufrageur bien accusé.
    SIM (.sim/chn.js, hors site, 1500 parties/cas ; gardiens « prudents » = inférence bayésienne sur leurs propres relais et
      ceux du joueur aux fers, évitent les suspects, votent et accusent les plus probables ; « hasard » ; Naufrageurs agressif /
      malin (ne brouille pas après un complice, se calme s'il est trop suspect) / timide (1 fois sur 2)) : sièges ±6 % (bruit).
-     Victoire des Naufrageurs n=4→8, contre gardiens prudents : malin 37/30/56/38/47 %, agressif 39/35/74/43/39 %,
-     timide 32/23/34/23/30 % ; moitié prudents moitié hasard : 75/52/77/61/80 % ; tout hasard : 83–94 %.
-     Gardiens prudents : 63–92 % d'accusations justes. Rejetés : 3 coulés à 4-5 joueurs (0–10 %), 3 relais à 6-7 (82 % / 66 %).
+     Victoire des Naufrageurs n=4→8, contre gardiens prudents : malin 37/46/36/40/48 %, agressif 37/48/40/41/36 %,
+     timide 29/38/15/23/31 % ; moitié prudents moitié hasard : 74/68/60/61/79 % ; tout hasard : 83–94 %.
+     Gardiens prudents : 63–94 % d'accusations justes. Rejetés : 3 coulés à 4-5 joueurs (0–10 %), à 6 joueurs 3 coulés
+     (malin 56 %, agressif 74 %) ou 4 coulés en 7 vagues (agressif 21 %), 3 relais à 6-7 (82 % / 66 %).
    ===================================================================== */
 const CHI=['🐚','⭐','🌙','🐋'];
-GAMES.chn={icon:'🧭',min:4,max:8,dur:20,tags:['social'],CHI,NF:n=>n<=5?1:2,RL:n=>n<=7?2:3,WV:n=>n<=5?6:7,TH:n=>n<=5?2:3,CW:4,NW:6,AC:2,
+GAMES.chn={icon:'🧭',min:4,max:8,dur:20,tags:['social'],CHI,NF:n=>n<=5?1:2,RL:n=>n==5||n==8?3:2,WV:n=>n<=5?6:n==6?8:7,TH:n=>n<=5?2:n==6?4:3,CW:4,NW:6,AC:2,
  init(s){const g=s.game,o=s.order;g.nf=shuf(o).slice(0,this.NF(o.length));g.K=g.nf.length;g.n=this.WV(o.length);g.th=this.TH(o.length);
   g.r=0;g.sk=0;g.ok=0;g.irn=null;g.h=[];g.pv={};o.forEach(p=>g.pv[p]=[]);g.c0=Math.floor(Math.random()*o.length);g.lv=null;this.wave(s)},
  wave(s){const g=s.game,o=s.order,on=gOn(s);let cap=o[(g.c0+g.r)%o.length];
@@ -2002,7 +2004,7 @@ bot2:`Um lugar maluco onde você transou|Uma primeira vez memorável|Uma fantasi
 /* 🧭 La Chaîne des Phares : textes */
 const GCH=(l,o)=>Object.assign(GI18N[l].ui,o);
 GCH('fr',{n_chn:`La Chaîne des Phares`,d_chn:`Passez le bon chenal… sans savoir qui le brouille`,
-r_chn:`Chaque vague, un capitaine reçoit en secret le bon chenal (🐚 ⭐ 🌙 🐋) et le transmet en privé au gardien de son choix, qui le relaie à son tour : le dernier guide le navire. Parmi vous se cache 1 Naufrageur (2 dès 6 joueurs) qui peut changer le chenal : à 2 navires coulés (3 dès 6 joueurs), les Naufrageurs gagnent. Entre les vagues, débattez dans le chat et votez pour mettre un suspect aux fers (ce qu'il reçoit et transmet devient public) ; à la fin, chacun accuse en secret : +2 par Naufrageur démasqué.`,
+r_chn:`Chaque vague, un capitaine reçoit en secret le bon chenal (🐚 ⭐ 🌙 🐋) et le transmet en privé au gardien de son choix, qui le relaie à son tour : le dernier guide le navire. Parmi vous se cache 1 Naufrageur (2 dès 6 joueurs) qui peut changer le chenal : s'ils coulent assez de navires (compteur 💥), les Naufrageurs gagnent. Entre les vagues, débattez dans le chat et votez pour mettre un suspect aux fers (ce qu'il reçoit et transmet devient public) ; à la fin, chacun accuse en secret : +2 par Naufrageur démasqué.`,
 chN:`Naufrageur`,chC:`Gardien de phare`,chSkT:`Les Naufrageurs gagnent à {v} navires coulés`,chWaitC:`{n} est capitaine : la passe part…`,chWait:`{n} relaie la passe…`,
 chCap:`Le bon chenal :`,chGot:`On t'a transmis :`,chNtip:`Tu peux changer le chenal… ou le garder pour rester crédible.`,chPass:`Quel chenal transmets-tu ?`,chPilot:`Tu guides le navire : quel chenal ?`,chTo:`À qui ?`,chSail:`Lever l'ancre`,
 chOk:`Le navire est arrivé !`,chKo:`Le navire a coulé !`,chTr:`bon chenal`,chF:`chenal pris`,chVote:`Mettre quelqu'un aux fers ?`,chVoteD:`Il faut la majorité. Ses relais deviendront publics.`,chFree:`Personne (libérer)`,chNone:`Personne`,chNoneS:`personne`,
@@ -2012,7 +2014,7 @@ tu_chn1:`{a} est capitaine : il reçoit le bon chenal ⭐ et le passe en secret 
 tu_chn3:`Le dernier relais guide le navire : mauvais chenal, il coule. Tous voient la route, personne ne voit ce que les autres ont passé.`,tu_chn4:`Débattez, puis votez : le suspect est mis aux fers ⛓️ et ce qu'il passe devient public.`,
 tu_chn5:`À la fin, accusez en secret : +2 par Naufrageur démasqué. Mais assez de navires coulés, et ce sont eux qui gagnent.`});
 GCH('en',{n_chn:`The Lighthouse Chain`,d_chn:`Pass on the right channel… without knowing who scrambles it`,
-r_chn:`Each wave, a captain secretly gets the right channel (🐚 ⭐ 🌙 🐋) and privately passes it to a keeper of their choice, who relays it in turn: the last one steers the ship. Hidden among you is 1 Wrecker (2 from 6 players) who can change the channel: at 2 sunk ships (3 from 6 players), the Wreckers win. Between waves, debate in the chat and vote to put a suspect in irons (what they receive and pass becomes public); at the end, everyone accuses in secret: +2 per Wrecker unmasked.`,
+r_chn:`Each wave, a captain secretly gets the right channel (🐚 ⭐ 🌙 🐋) and privately passes it to a keeper of their choice, who relays it in turn: the last one steers the ship. Hidden among you is 1 Wrecker (2 from 6 players) who can change the channel: if enough ships sink (💥 counter), the Wreckers win. Between waves, debate in the chat and vote to put a suspect in irons (what they receive and pass becomes public); at the end, everyone accuses in secret: +2 per Wrecker unmasked.`,
 chN:`Wrecker`,chC:`Lighthouse keeper`,chSkT:`The Wreckers win at {v} sunk ships`,chWaitC:`{n} is captain: the channel sets off…`,chWait:`{n} is relaying the channel…`,
 chCap:`The right channel:`,chGot:`You were passed:`,chNtip:`You can change the channel… or keep it to stay believable.`,chPass:`Which channel do you pass on?`,chPilot:`You steer the ship: which channel?`,chTo:`To whom?`,chSail:`Weigh anchor`,
 chOk:`The ship made it!`,chKo:`The ship sank!`,chTr:`right channel`,chF:`channel taken`,chVote:`Put someone in irons?`,chVoteD:`It takes a majority. Their relays will become public.`,chFree:`Nobody (release)`,chNone:`Nobody`,chNoneS:`nobody`,
@@ -2022,7 +2024,7 @@ tu_chn1:`{a} is captain: they get the right channel ⭐ and secretly pass it to 
 tu_chn3:`The last relay steers the ship: wrong channel, it sinks. Everyone sees the route, nobody sees what the others passed.`,tu_chn4:`Debate, then vote: the suspect is put in irons ⛓️ and what they pass becomes public.`,
 tu_chn5:`At the end, accuse in secret: +2 per Wrecker unmasked. But enough sunk ships, and they win.`});
 GCH('es',{n_chn:`La Cadena de Faros`,d_chn:`Pasad el canal correcto… sin saber quién lo enreda`,
-r_chn:`Cada ola, un capitán recibe en secreto el canal correcto (🐚 ⭐ 🌙 🐋) y lo pasa en privado al farero que elija, que lo releva a su vez: el último guía el barco. Entre vosotros se esconde 1 Naufragador (2 desde 6 jugadores) que puede cambiar el canal: con 2 barcos hundidos (3 desde 6 jugadores), ganan los Naufragadores. Entre olas, debatid en el chat y votad para encadenar a un sospechoso (lo que recibe y pasa se vuelve público); al final, cada uno acusa en secreto: +2 por Naufragador desenmascarado.`,
+r_chn:`Cada ola, un capitán recibe en secreto el canal correcto (🐚 ⭐ 🌙 🐋) y lo pasa en privado al farero que elija, que lo releva a su vez: el último guía el barco. Entre vosotros se esconde 1 Naufragador (2 desde 6 jugadores) que puede cambiar el canal: si se hunden bastantes barcos (contador 💥), ganan los Naufragadores. Entre olas, debatid en el chat y votad para encadenar a un sospechoso (lo que recibe y pasa se vuelve público); al final, cada uno acusa en secreto: +2 por Naufragador desenmascarado.`,
 chN:`Naufragador`,chC:`Farero`,chSkT:`Los Naufragadores ganan con {v} barcos hundidos`,chWaitC:`{n} es capitán: el canal sale…`,chWait:`{n} releva el canal…`,
 chCap:`El canal correcto:`,chGot:`Te han pasado:`,chNtip:`Puedes cambiar el canal… o mantenerlo para seguir siendo creíble.`,chPass:`¿Qué canal pasas?`,chPilot:`Guías el barco: ¿qué canal?`,chTo:`¿A quién?`,chSail:`Levar anclas`,
 chOk:`¡El barco ha llegado!`,chKo:`¡El barco se ha hundido!`,chTr:`canal correcto`,chF:`canal tomado`,chVote:`¿Encadenar a alguien?`,chVoteD:`Hace falta mayoría. Sus relevos serán públicos.`,chFree:`Nadie (liberar)`,chNone:`Nadie`,chNoneS:`nadie`,
@@ -2032,7 +2034,7 @@ tu_chn1:`{a} es capitán: recibe el canal correcto ⭐ y se lo pasa en secreto a
 tu_chn3:`El último relevo guía el barco: canal equivocado, se hunde. Todos ven la ruta, nadie ve lo que pasaron los demás.`,tu_chn4:`Debatid y votad: el sospechoso queda encadenado ⛓️ y lo que pasa se vuelve público.`,
 tu_chn5:`Al final, acusad en secreto: +2 por Naufragador desenmascarado. Pero con bastantes barcos hundidos, ganan ellos.`});
 GCH('it',{n_chn:`La Catena dei Fari`,d_chn:`Passate il canale giusto… senza sapere chi lo confonde`,
-r_chn:`A ogni ondata, un capitano riceve in segreto il canale giusto (🐚 ⭐ 🌙 🐋) e lo passa in privato al guardiano che vuole, che lo inoltra a sua volta: l'ultimo guida la nave. Tra voi si nasconde 1 Naufragatore (2 da 6 giocatori) che può cambiare il canale: con 2 navi affondate (3 da 6 giocatori), vincono i Naufragatori. Tra un'ondata e l'altra, discutete in chat e votate per mettere ai ferri un sospettato (ciò che riceve e passa diventa pubblico); alla fine ognuno accusa in segreto: +2 per Naufragatore smascherato.`,
+r_chn:`A ogni ondata, un capitano riceve in segreto il canale giusto (🐚 ⭐ 🌙 🐋) e lo passa in privato al guardiano che vuole, che lo inoltra a sua volta: l'ultimo guida la nave. Tra voi si nasconde 1 Naufragatore (2 da 6 giocatori) che può cambiare il canale: se affondano abbastanza navi (contatore 💥), vincono i Naufragatori. Tra un'ondata e l'altra, discutete in chat e votate per mettere ai ferri un sospettato (ciò che riceve e passa diventa pubblico); alla fine ognuno accusa in segreto: +2 per Naufragatore smascherato.`,
 chN:`Naufragatore`,chC:`Guardiano del faro`,chSkT:`I Naufragatori vincono con {v} navi affondate`,chWaitC:`{n} è capitano: il canale parte…`,chWait:`{n} inoltra il canale…`,
 chCap:`Il canale giusto:`,chGot:`Ti hanno passato:`,chNtip:`Puoi cambiare il canale… o tenerlo per restare credibile.`,chPass:`Che canale passi?`,chPilot:`Guidi la nave: quale canale?`,chTo:`A chi?`,chSail:`Salpare`,
 chOk:`La nave è arrivata!`,chKo:`La nave è affondata!`,chTr:`canale giusto`,chF:`canale preso`,chVote:`Mettere qualcuno ai ferri?`,chVoteD:`Serve la maggioranza. I suoi passaggi diventeranno pubblici.`,chFree:`Nessuno (liberare)`,chNone:`Nessuno`,chNoneS:`nessuno`,
@@ -2042,7 +2044,7 @@ tu_chn1:`{a} è capitano: riceve il canale giusto ⭐ e lo passa in segreto a {b
 tu_chn3:`L'ultimo passaggio guida la nave: canale sbagliato, affonda. Tutti vedono la rotta, nessuno vede cosa hanno passato gli altri.`,tu_chn4:`Discutete, poi votate: il sospettato finisce ai ferri ⛓️ e ciò che passa diventa pubblico.`,
 tu_chn5:`Alla fine accusate in segreto: +2 per Naufragatore smascherato. Ma con abbastanza navi affondate, vincono loro.`});
 GCH('de',{n_chn:`Die Leuchtturmkette`,d_chn:`Gebt die richtige Fahrrinne weiter… ohne zu wissen, wer sie verfälscht`,
-r_chn:`In jeder Welle erhält ein Kapitän geheim die richtige Fahrrinne (🐚 ⭐ 🌙 🐋) und gibt sie privat an einen Wärter seiner Wahl weiter, der sie wiederum weiterreicht: der Letzte steuert das Schiff. Unter euch versteckt sich 1 Strandräuber (2 ab 6 Leuten), der die Rinne ändern kann: bei 2 gesunkenen Schiffen (3 ab 6 Leuten) gewinnen die Strandräuber. Zwischen den Wellen diskutiert im Chat und stimmt ab, wen ihr in Ketten legt (was er erhält und weitergibt, wird öffentlich); am Ende klagt jeder geheim an: +2 pro entlarvtem Strandräuber.`,
+r_chn:`In jeder Welle erhält ein Kapitän geheim die richtige Fahrrinne (🐚 ⭐ 🌙 🐋) und gibt sie privat an einen Wärter seiner Wahl weiter, der sie wiederum weiterreicht: der Letzte steuert das Schiff. Unter euch versteckt sich 1 Strandräuber (2 ab 6 Leuten), der die Rinne ändern kann: sinken genug Schiffe (Zähler 💥), gewinnen die Strandräuber. Zwischen den Wellen diskutiert im Chat und stimmt ab, wen ihr in Ketten legt (was er erhält und weitergibt, wird öffentlich); am Ende klagt jeder geheim an: +2 pro entlarvtem Strandräuber.`,
 chN:`Strandräuber`,chC:`Leuchtturmwärter`,chSkT:`Die Strandräuber gewinnen bei {v} gesunkenen Schiffen`,chWaitC:`{n} ist Kapitän: die Rinne geht los…`,chWait:`{n} gibt die Rinne weiter…`,
 chCap:`Die richtige Rinne:`,chGot:`Du hast erhalten:`,chNtip:`Du kannst die Rinne ändern… oder sie behalten, um glaubwürdig zu bleiben.`,chPass:`Welche Rinne gibst du weiter?`,chPilot:`Du steuerst das Schiff: welche Rinne?`,chTo:`An wen?`,chSail:`Anker lichten`,
 chOk:`Das Schiff ist angekommen!`,chKo:`Das Schiff ist gesunken!`,chTr:`richtige Rinne`,chF:`genommene Rinne`,chVote:`Jemanden in Ketten legen?`,chVoteD:`Es braucht eine Mehrheit. Seine Weitergaben werden öffentlich.`,chFree:`Niemand (freilassen)`,chNone:`Niemand`,chNoneS:`niemand`,
@@ -2052,7 +2054,7 @@ tu_chn1:`{a} ist Kapitän: er erhält die richtige Rinne ⭐ und gibt sie geheim
 tu_chn3:`Der Letzte steuert das Schiff: falsche Rinne, es sinkt. Alle sehen die Route, niemand sieht, was die anderen weitergegeben haben.`,tu_chn4:`Diskutiert, dann stimmt ab: der Verdächtige kommt in Ketten ⛓️ und was er weitergibt, wird öffentlich.`,
 tu_chn5:`Am Ende klagt ihr geheim an: +2 pro entlarvtem Strandräuber. Aber sinken genug Schiffe, gewinnen sie.`});
 GCH('ru',{n_chn:`Цепь маяков`,d_chn:`Передайте верный фарватер… не зная, кто его путает`,
-r_chn:`Каждую волну капитан тайно получает верный фарватер (🐚 ⭐ 🌙 🐋) и лично передаёт его выбранному смотрителю, а тот — дальше: последний ведёт корабль. Среди вас прячется 1 Мародёр (2 — от 6 игроков), который может подменить фарватер: при 2 затонувших кораблях (3 — от 6 игроков) Мародёры побеждают. Между волнами спорьте в чате и голосуйте, кого заковать в кандалы (всё, что он получает и передаёт, становится публичным); в конце каждый тайно обвиняет: +2 за каждого разоблачённого Мародёра.`,
+r_chn:`Каждую волну капитан тайно получает верный фарватер (🐚 ⭐ 🌙 🐋) и лично передаёт его выбранному смотрителю, а тот — дальше: последний ведёт корабль. Среди вас прячется 1 Мародёр (2 — от 6 игроков), который может подменить фарватер: если затонет достаточно кораблей (счётчик 💥), Мародёры побеждают. Между волнами спорьте в чате и голосуйте, кого заковать в кандалы (всё, что он получает и передаёт, становится публичным); в конце каждый тайно обвиняет: +2 за каждого разоблачённого Мародёра.`,
 chN:`Мародёр`,chC:`Смотритель маяка`,chSkT:`Мародёры побеждают при {v} затонувших кораблях`,chWaitC:`{n} — капитан: фарватер отправляется…`,chWait:`{n} передаёт фарватер…`,
 chCap:`Верный фарватер:`,chGot:`Тебе передали:`,chNtip:`Можно подменить фарватер… или оставить, чтобы не вызвать подозрений.`,chPass:`Какой фарватер передаёшь?`,chPilot:`Ты ведёшь корабль: какой фарватер?`,chTo:`Кому?`,chSail:`Поднять якорь`,
 chOk:`Корабль дошёл!`,chKo:`Корабль затонул!`,chTr:`верный фарватер`,chF:`выбранный фарватер`,chVote:`Заковать кого-нибудь?`,chVoteD:`Нужно большинство. Его передачи станут публичными.`,chFree:`Никого (освободить)`,chNone:`Никого`,chNoneS:`никого`,
@@ -2062,7 +2064,7 @@ tu_chn1:`{a} — капитан: получает верный фарватер 
 tu_chn3:`Последний ведёт корабль: неверный фарватер — и он тонет. Маршрут видят все, а что передали другие — никто.`,tu_chn4:`Спорьте и голосуйте: подозреваемого заковывают ⛓️, и всё, что он передаёт, становится публичным.`,
 tu_chn5:`В конце обвиняйте тайно: +2 за каждого разоблачённого Мародёра. Но если кораблей затонет достаточно, побеждают они.`});
 GCH('zh',{n_chn:`灯塔之链`,d_chn:`传出正确的航道……却不知道是谁在捣乱`,
-r_chn:`每一波，船长秘密得知正确航道（🐚 ⭐ 🌙 🐋），私下传给自己选的守塔人，再由他继续传下去：最后一人为船掌舵。你们之中藏着1名破船者（6人起为2名），他可以改动航道：沉船达到2艘（6人起为3艘），破船者获胜。每波之间在聊天里讨论，并投票给嫌疑人戴上镣铐（他收到和传出的内容都会公开）；最后每人秘密指认：每揪出一名破船者+2。`,
+r_chn:`每一波，船长秘密得知正确航道（🐚 ⭐ 🌙 🐋），私下传给自己选的守塔人，再由他继续传下去：最后一人为船掌舵。你们之中藏着1名破船者（6人起为2名），他可以改动航道：沉船达到一定数量（见💥计数），破船者获胜。每波之间在聊天里讨论，并投票给嫌疑人戴上镣铐（他收到和传出的内容都会公开）；最后每人秘密指认：每揪出一名破船者+2。`,
 chN:`破船者`,chC:`守塔人`,chSkT:`沉船达到{v}艘时破船者获胜`,chWaitC:`{n}是船长：航道出发了……`,chWait:`{n}正在传递航道……`,
 chCap:`正确航道：`,chGot:`你收到的是：`,chNtip:`你可以改动航道……也可以照传以保持可信。`,chPass:`你要传出哪条航道？`,chPilot:`你来掌舵：走哪条航道？`,chTo:`传给谁？`,chSail:`起锚`,
 chOk:`船到港了！`,chKo:`船沉了！`,chTr:`正确航道`,chF:`实际航道`,chVote:`要给谁戴上镣铐吗？`,chVoteD:`需要过半数。他的传递将会公开。`,chFree:`不选（释放）`,chNone:`不选`,chNoneS:`不选`,
@@ -2072,7 +2074,7 @@ tu_chn1:`{a}是船长：他得知正确航道⭐，并秘密传给{b}。`,tu_chn
 tu_chn3:`最后一人掌舵：航道错了，船就沉。大家都看得到路线，却看不到别人传了什么。`,tu_chn4:`讨论后投票：嫌疑人被戴上镣铐⛓️，他传出的内容会公开。`,
 tu_chn5:`最后秘密指认：每揪出一名破船者+2。但沉船够多的话，就是他们赢。`});
 GCH('he',{n_chn:`שרשרת המגדלורים`,d_chn:`העבירו את הנתיב הנכון… בלי לדעת מי משבש אותו`,
-r_chn:`בכל גל, רב החובל מקבל בסוד את הנתיב הנכון (🐚 ⭐ 🌙 🐋) ומעביר אותו בפרטי לשומר שהוא בוחר, וזה מעביר הלאה: האחרון מנווט את הספינה. ביניכם מסתתר מטביע 1 (2 החל מ־6 שחקנים) שיכול לשנות את הנתיב: ב־2 ספינות טבועות (3 החל מ־6 שחקנים) המטביעים מנצחים. בין הגלים התווכחו בצ׳אט והצביעו מי נכבל באזיקים (מה שהוא מקבל ומעביר נהיה גלוי); בסוף כל אחד מאשים בסוד: ‎+2 על כל מטביע שנחשף.`,
+r_chn:`בכל גל, רב החובל מקבל בסוד את הנתיב הנכון (🐚 ⭐ 🌙 🐋) ומעביר אותו בפרטי לשומר שהוא בוחר, וזה מעביר הלאה: האחרון מנווט את הספינה. ביניכם מסתתר מטביע 1 (2 החל מ־6 שחקנים) שיכול לשנות את הנתיב: אם טובעות מספיק ספינות (מונה 💥), המטביעים מנצחים. בין הגלים התווכחו בצ׳אט והצביעו מי נכבל באזיקים (מה שהוא מקבל ומעביר נהיה גלוי); בסוף כל אחד מאשים בסוד: ‎+2 על כל מטביע שנחשף.`,
 chN:`מטביע`,chC:`שומר מגדלור`,chSkT:`המטביעים מנצחים ב־{v} ספינות טבועות`,chWaitC:`{n} רב החובל: הנתיב יוצא לדרך…`,chWait:`{n} מעביר את הנתיב…`,
 chCap:`הנתיב הנכון:`,chGot:`העבירו לך:`,chNtip:`אפשר לשנות את הנתיב… או להשאיר אותו כדי להישאר אמין.`,chPass:`איזה נתיב להעביר?`,chPilot:`אתה מנווט את הספינה: איזה נתיב?`,chTo:`למי?`,chSail:`להרים עוגן`,
 chOk:`הספינה הגיעה!`,chKo:`הספינה טבעה!`,chTr:`נתיב נכון`,chF:`נתיב שנבחר`,chVote:`לכבול מישהו?`,chVoteD:`צריך רוב. ההעברות שלו ייחשפו.`,chFree:`אף אחד (לשחרר)`,chNone:`אף אחד`,chNoneS:`אף אחד`,
@@ -2082,7 +2084,7 @@ tu_chn1:`{a} רב החובל: הוא מקבל את הנתיב הנכון ⭐ ו�
 tu_chn3:`האחרון מנווט את הספינה: נתיב שגוי, והיא טובעת. כולם רואים את המסלול, אף אחד לא רואה מה האחרים העבירו.`,tu_chn4:`התווכחו ואז הצביעו: החשוד נכבל ⛓️ ומה שהוא מעביר נהיה גלוי.`,
 tu_chn5:`בסוף האשימו בסוד: ‎+2 על כל מטביע שנחשף. אבל אם טבעו מספיק ספינות, הם מנצחים.`});
 GCH('pt',{n_chn:`A Corrente de Faróis`,d_chn:`Passem o canal certo… sem saber quem o embaralha`,
-r_chn:`A cada onda, um capitão recebe em segredo o canal certo (🐚 ⭐ 🌙 🐋) e o passa no privado para o faroleiro que quiser, que o repassa por sua vez: o último guia o navio. Entre vocês se esconde 1 Naufragador (2 a partir de 6 jogadores) que pode mudar o canal: com 2 navios afundados (3 a partir de 6 jogadores), os Naufragadores vencem. Entre as ondas, debatam no chat e votem para acorrentar um suspeito (o que ele recebe e passa fica público); no fim, cada um acusa em segredo: +2 por Naufragador desmascarado.`,
+r_chn:`A cada onda, um capitão recebe em segredo o canal certo (🐚 ⭐ 🌙 🐋) e o passa no privado para o faroleiro que quiser, que o repassa por sua vez: o último guia o navio. Entre vocês se esconde 1 Naufragador (2 a partir de 6 jogadores) que pode mudar o canal: se afundarem navios suficientes (contador 💥), os Naufragadores vencem. Entre as ondas, debatam no chat e votem para acorrentar um suspeito (o que ele recebe e passa fica público); no fim, cada um acusa em segredo: +2 por Naufragador desmascarado.`,
 chN:`Naufragador`,chC:`Faroleiro`,chSkT:`Os Naufragadores vencem com {v} navios afundados`,chWaitC:`{n} é capitão: o canal está saindo…`,chWait:`{n} está repassando o canal…`,
 chCap:`O canal certo:`,chGot:`Passaram para você:`,chNtip:`Você pode mudar o canal… ou mantê-lo para continuar confiável.`,chPass:`Que canal você passa?`,chPilot:`Você guia o navio: qual canal?`,chTo:`Para quem?`,chSail:`Levantar âncora`,
 chOk:`O navio chegou!`,chKo:`O navio afundou!`,chTr:`canal certo`,chF:`canal tomado`,chVote:`Acorrentar alguém?`,chVoteD:`É preciso maioria. Os repasses dele ficarão públicos.`,chFree:`Ninguém (soltar)`,chNone:`Ninguém`,chNoneS:`ninguém`,
