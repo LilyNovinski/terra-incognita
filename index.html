@@ -50,9 +50,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Rubik:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sacramento&text=by&display=swap">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="i18n.js?v=20261115i"></script>
+<script src="i18n.js?v=20261115j"></script>
 <script src="decks.js?v=5"></script>
-<script src="games.js?v=4"></script><!-- @games -->
+<script src="games.js?v=5"></script><!-- @games -->
 <style>
 :root{--sea1:#bdeef0;--sea2:#69c9d3;--deep:#0e5866;--deep2:#0a4652;--paper:#fffaf0;--paper2:#fbf0d9;--edge:#ead6ae;--edge2:#d8bd88;--txt:#3b2a1b;--mut:#8a7660;--acc:#ff8a3d;--acc-d:#d9661f;--acc2:#ffb15c;--ink:#1d8e6c;--sur:#d9661f;--ear:#5869b5;--bad:#d64b3c;--gold:#f2b84b}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -1068,7 +1068,7 @@ html[data-theme=dark]{color-scheme:dark}
 .g3dbar i{flex:1;height:8px;border-radius:99px;background:#f6dbe4}
 .g3dbar i.on{background:linear-gradient(90deg,#ff9ab8,#ec4f93)}
 .g3rit{margin-top:12px;padding:10px 12px;border-radius:14px;background:#fff;border:1.5px dashed #f3b6c9;font:700 14px Nunito,sans-serif}
-#g3cx{position:relative;display:flex;align-items:center;gap:8px;margin:-4px 4px 10px;padding:4px 12px;border-radius:99px;background:#fff5f8cc;font:700 12px Nunito,sans-serif;color:#a7284f}
+#g3cx{position:relative;display:flex;align-items:center;gap:8px;margin:6px 4px 12px;padding:4px 12px;border-radius:99px;background:#fff5f8cc;font:700 12px Nunito,sans-serif;color:#a7284f}
 #g3cx .g3ci{font-size:15px}
 #g3cx .g3cn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #g3cx .g3cb{flex:1;min-width:40px;height:6px;border-radius:99px;background:#f6dbe4;overflow:hidden}
@@ -1225,6 +1225,17 @@ html:not([data-theme=dark]) .banner .mut{display:inline-block;max-width:100%;pad
 .ownr button i{width:9px;height:9px;border-radius:50%;background:var(--rc);flex:none}
 .ownr button:hover{transform:translateY(-1px)}
 .ownr button.sel{background:color-mix(in srgb,var(--rc) 30%,transparent);border-color:var(--rc);box-shadow:0 0 0 3px color-mix(in srgb,var(--rc) 22%,transparent)}
+/* bulles « en train d'écrire » */
+.ch-typ{display:flex;align-items:center;gap:8px;height:0;overflow:hidden;padding:0 14px;font:600 12.5px Nunito,sans-serif;color:var(--mut);opacity:0;transition:height .25s ease,opacity .25s ease}
+.ch-typ.on{height:26px;opacity:1}
+.ch-typ .bb{position:relative;width:20px;height:20px;flex:none}
+.ch-typ .bb i{position:absolute;left:calc(50% - 3px);bottom:0;width:6px;height:6px;border-radius:50%;border:1.5px solid var(--c);background:color-mix(in srgb,var(--c) 18%,transparent);opacity:0;animation:chbub 1.8s ease-out infinite}
+.ch-typ .bb i:nth-child(even){left:calc(50% + 1px);width:4px;height:4px}
+@keyframes chbub{0%{transform:translate(0,4px) scale(.4);opacity:0}25%{opacity:1}70%{transform:translate(-3px,-9px) scale(1);opacity:.9}100%{transform:translate(2px,-14px) scale(1.15);opacity:0}}
+.ch-tab.typ::before,.ch-tab.typ::after{content:"";position:absolute;left:50%;top:2px;width:7px;height:7px;border-radius:50%;border:1.5px solid var(--tc);background:color-mix(in srgb,var(--tc) 20%,transparent);pointer-events:none;opacity:0;animation:chbt 2s ease-out infinite}
+.ch-tab.typ::after{width:5px;height:5px;animation-delay:1s;left:58%}
+@keyframes chbt{0%{transform:translate(-50%,4px) scale(.5);opacity:0}25%{opacity:1}100%{transform:translate(-80%,-22px) scale(1.1);opacity:0}}
+@media (prefers-reduced-motion:reduce){.ch-typ .bb i,.ch-tab.typ::before,.ch-tab.typ::after{animation-duration:4s}}
 </style>
 </head>
 <body>
@@ -1945,9 +1956,10 @@ function connectTo(id,onFail,ms=25000){
  setTimeout(()=>{if(!c.open)fail()},ms);
  c.on('open',()=>{lastSeen=Date.now();c.send({t:'hello',name:me.name,color:me.color,g:GN(me.g),dev:devId(),own:ownAll().filter(o=>o.by==me.name).slice(-50),saves:allSaves(),pend:window.gPend?gPend():null})});
  c.on('data',d=>{if(hostConn!==c)return;lastSeen=Date.now();
-  if(d.t=='state'){got=true;migrating=false;onUnavail=null;const ph=st&&st.host;st=d.st;if(ph&&ph!=st.host)toast(T('newHost',{n:st.host}));persist();render();window.armTimer&&armTimer()}
+  if(d.t=='state'){got=true;migrating=false;onUnavail=null;const ph=st&&st.host;st=d.st;RCV=Date.now();RCVV=st.v;if(ph&&ph!=st.host)toast(T('newHost',{n:st.host}));persist();render();window.armTimer&&armTimer()}
   else if(d.t=='react')floatReact(d.from,d.e,d)
   else if(d.t=='renamed'){me.name=d.name;setTimeout(()=>toast(T('renamed',{n:d.name})),300)}
+  else if(d.t=='typ')typShow(d.n)
   else if(d.t=='chat')chatAdd(d.m)
   else if(d.t=='chatlog')chatMerge(d.log)
   else if(d.t=='chatslow')toast(T('chSlow'))
@@ -1998,7 +2010,8 @@ function becomeHost(p,e){
  peer=p;isHost=true;migrating=false;hostConn=null;conns={};hostSince=Date.now();aloneSince=0;
  if(cp&&cp!==p)try{cp.destroy()}catch(x){}
  st.epoch=e;st.host=me.name;
- const op=P(old);if(op&&old!=me.name){if(st.phase=='lobby'){st.players=st.players.filter(x=>x!=op);delete st.votes[old]}else op.online=false}
+ const gave=st.gave==old;delete st.gave;
+ const op=P(old);if(op&&old!=me.name&&!gave){if(st.phase=='lobby'){st.players=st.players.filter(x=>x!=op);delete st.votes[old]}else op.online=false}
  const mp=P(me.name);if(mp){mp.online=true;mp.peer='host'}
  wireHost(p);
  if(st.phase=='question'&&st.cur)checkAll();
@@ -2043,9 +2056,9 @@ setInterval(()=>{
 window.addEventListener('pagehide',()=>{if(isHost&&st)handoff()});
 /* donner l'hôte : on passe l'état complet à la personne choisie, puis on redevient joueur·se comme les autres */
 function giveHost(n){if(!isHost||!st||n==me.name)return;const p=P(n);if(!p||!p.online||!isLinked(n)){toast(T('giveHostNo'));return}
- const s=JSON.parse(JSON.stringify(st));
+ const s=JSON.parse(JSON.stringify(st));s.gave=me.name;
  for(const id in conns){const c=conns[id];if(c.open)try{c.send({t:'handoff',to:n,st:c.pname==n?s:viewFor(c.pname,s)})}catch(e){}}
- st=viewFor(me.name,s);const old=peer;setTimeout(()=>{isHost=false;conns={};peer=null;try{old&&old.destroy()}catch(e){}migrate(n)},600)}
+ st=viewFor(me.name,s);delete st.gave;const old=peer;setTimeout(()=>{isHost=false;conns={};peer=null;try{old&&old.destroy()}catch(e){}migrate(n)},600)}
 /* retour sur l'onglet (téléphone) : on ne se croit pas abandonné ; si le lien est tombé, on rejoint l'hôte actuel au lieu de prendre sa place */
 document.addEventListener('visibilitychange',()=>{if(document.hidden||!st||isHost)return;lastSeen=Date.now();
  if(!migrating&&(!hostConn||!hostConn.open))migrate()});
@@ -2072,10 +2085,21 @@ function normGif(u){const m=String(u||'').trim().match(/^https?:\/\/(?:www\.)?gi
 function chatIn(from,m){if(!m||typeof m!='object'||!st)return;const now=Date.now(),r=chatRate[from]=(chatRate[from]||[]).filter(t=>now-t<10000);
  const txt=chTidy(m.txt).slice(0,300),gif=cleanGif(m.gif);if(!txt&&!gif)return;if(r.length>=5)return false;r.push(now);
  const msg={id:String(m.id||'').replace(/\W/g,'').slice(0,24)||rid(),from,txt,gif,ts:now};chatAdd(msg);broadcast({t:'chat',m:msg})}
+/* « en train d'écrire » : des bulles d'air montent, à la couleur de la personne (dans le chat, et depuis le bouton 💬 fermé) */
+const CHT={};let chtS=0;
+function typSend(){const now=Date.now();if(now-chtS<2500||!st)return;chtS=now;if(isHost)typRelay(me.name);else if(hostConn&&hostConn.open)try{hostConn.send({t:'typ'})}catch(e){}}
+function typRelay(n){if(!isHost||!n||!P(n))return;for(const id in conns){const c=conns[id];if(c.open&&c.pname!=n)try{c.send({t:'typ',n})}catch(e){}}typShow(n)}
+function typShow(n){if(!n||!st||n==me.name||!P(n))return;CHT[n]=Date.now();typDraw();clearTimeout(typShow.t);typShow.t=setTimeout(typDraw,4100)}
+function typDraw(){const w=$('#chat');if(!w)return;const now=Date.now(),L=Object.keys(CHT).filter(n=>now-CHT[n]<4000&&P(n));Object.keys(CHT).forEach(n=>{if(!L.includes(n))delete CHT[n]});
+ const b=w.querySelector('.ch-typ'),tab=w.querySelector('.ch-tab');if(!b)return;
+ if(!L.length){b.classList.remove('on');tab.classList.remove('typ');return}
+ const c=col(L[0]),k=JSON.stringify(L);w.style.setProperty('--tc',c);tab.classList.add('typ');
+ if(b._k!==k){b._k=k;b.innerHTML=`<span class="bb">${L.slice(0,3).map((n,i)=>`<i style="--c:${col(n)};animation-delay:${i*.45}s"></i><i style="--c:${col(n)};animation-delay:${i*.45+.9}s"></i>`).join('')}</span><span>${T(L.length>1?'chTypN':'chTyp1',{n:L.map(n=>`<b style="color:${col(n)}">${esc(n)}</b>`).join(', ')})}</span>`}
+ b.classList.add('on')}
 function chatSend(txt,gif){const m={id:rid(),txt:chTidy(txt).slice(0,300),gif:cleanGif(gif)};if(!m.txt&&!m.gif)return false;
  if(isHost){if(chatIn(me.name,m)===false){toast(T('chSlow'));return false}}else if(hostConn&&hostConn.open)hostConn.send({t:'chat',m});else return false;return true}
 function chatOk(m){return m&&typeof m=='object'&&typeof m.id=='string'&&typeof m.from=='string'&&(m.txt||m.gif)}
-function chatAdd(m){if(!chatOk(m)||chatLog.some(x=>x.id==m.id))return;const prev=chatLog[chatLog.length-1];chatLog.push(m);if(chatLog.length>60)chatLog.shift();
+function chatAdd(m){if(!chatOk(m)||chatLog.some(x=>x.id==m.id))return;if(CHT[m.from]){delete CHT[m.from];typDraw()}const prev=chatLog[chatLog.length-1];chatLog.push(m);if(chatLog.length>60)chatLog.shift();
  const l=$('#chat .ch-list');if(l){const near=l.scrollHeight-l.scrollTop-l.clientHeight<80;const e=l.querySelector('.ch-empty');e&&e.remove();l.appendChild(chatEl(m,prev));if(near||m.from==me.name)l.scrollTop=l.scrollHeight;while(l.children.length>60)l.firstChild.remove()}
  if(m.from!=me.name&&!chatOpen){chatUnread++;chatBadge();chatPeek(m)}}
 function chatMerge(log){if(!Array.isArray(log))return;const ids=new Set(chatLog.map(x=>x.id));log.forEach(m=>{if(chatOk(m)&&!ids.has(m.id)){chatLog.push(m);ids.add(m.id)}});
@@ -2125,12 +2149,14 @@ function chatSync(){let w=$('#chat');
  <div class="ch-list" aria-live="polite"></div>
  <div class="ch-pop ch-emo" hidden>${CH_EMO.map(e=>`<button type="button" data-ce="${e}">${e}</button>`).join('')}</div>
  <div class="ch-pop ch-gif" hidden><input class="ch-gq" maxlength="500" autocomplete="off" spellcheck="false" placeholder="${esc(T(GIF_KEY?'chGifQ':'chGifP'))}"><div class="ch-gres"></div></div>
+ <div class="ch-typ" aria-hidden="true"></div>
  <div class="ch-bar"><button type="button" class="ch-b ch-be" aria-label="${esc(T('chEmo'))}">😊</button><button type="button" class="ch-b ch-bg" aria-label="GIF">GIF</button><input class="ch-in" maxlength="300" autocomplete="off" enterkeyhint="send" placeholder="${esc(T('chPh'))}"><button type="button" class="ch-send" aria-label="${esc(T('chSend'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l15-7-5 15-2.5-6.2z" fill="currentColor"/></svg></button></div></div>`;
  document.body.appendChild(w);
  const inp=w.querySelector('.ch-in'),go=()=>{if(chatSend(inp.value)){inp.value='';chatPop('')}};
  w.querySelector('.ch-tab').onclick=()=>chatToggle();w.querySelector('.ch-x').onclick=()=>chatToggle(false);w.querySelector('.ch-veil').onclick=()=>chatToggle(false);
  w.querySelector('.ch-peek').onclick=()=>chatToggle(true);
  w.querySelector('.ch-send').onclick=()=>{go();inp.focus()};
+ inp.addEventListener('input',()=>{if(inp.value.trim())typSend()});
  inp.onkeydown=e=>{if(e.key=='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();go()}else if(e.key=='Escape')chatToggle(false)};
  w.querySelector('.ch-be').onclick=()=>chatPop('emo');w.querySelector('.ch-bg').onclick=()=>chatPop('gif');
  w.querySelectorAll('[data-ce]').forEach(b=>b.onclick=()=>{const s=inp.selectionStart??inp.value.length,e=inp.selectionEnd??s;if(inp.value.length-(e-s)+b.dataset.ce.length>300)return;inp.setRangeText(b.dataset.ce,s,e,'end');inp.focus()});
@@ -2140,7 +2166,7 @@ function chatSync(){let w=$('#chat');
 function chatHint(h){const d=h&&h.firstElementChild;if(!d||!st)return;const b=document.createElement('button');b.type='button';b.className='ch-hb';b.setAttribute('aria-label',T('chT'));b.innerHTML='<span aria-hidden="true">💬</span><i class="ch-badge"></i>';b.onclick=()=>chatToggle();d.appendChild(b);chatBadge()}
 
 function broadcast(msg){for(const id in conns){const c=conns[id];if(c.open)try{c.send(msg)}catch(e){}}}
-function bump(){st.v++;st.updatedAt=Date.now();for(const id in conns){const c=conns[id];if(c.open)try{c.send({t:'state',st:viewFor(c.pname,st)})}catch(e){}}persist();render()}
+function bump(){st.v++;st.updatedAt=Date.now();RCV=st.updatedAt;RCVV=st.v;for(const id in conns){const c=conns[id];if(c.open)try{c.send({t:'state',st:viewFor(c.pname,st)})}catch(e){}}persist();render()}
 /* @qa2 : vue par destinataire : notes sur `name` scellées jusqu'à la fin, votes « Qui de nous » masqués tant que tout le monde n'a pas voté */
 function viewFor(name,s){if(!s||!name)return s;if(s.phase=='game'||s.phase=='gend')return GHide(name,s);/* @games */const c=s.cur,seal=!['lobby','end','recap','carnet'].includes(s.phase),wh=c&&c.wo&&!g3WoDone(c);if(!seal&&!wh)return s;const v={...s};
  if(seal){if((s.hist||[]).some(h=>h.terr==name&&h.nt))v.hist=s.hist.map(h=>h.terr==name&&h.nt?{...h,nt:Object.fromEntries(Object.keys(h.nt).map(k=>[k,1]))}:h);
@@ -2173,6 +2199,7 @@ function hostRecv(c,d){
  if(!c.pname)return;
  if(d.t=='act')act(c.pname,d.a);
  else if(d.t=='react')relayReact(c.pname,d.e,d)
+ else if(d.t=='typ')typRelay(c.pname);
  else if(d.t=='chat'){if(chatIn(c.pname,d.m)===false)try{c.send({t:'chatslow'})}catch(e){}}}
 function kick(name,ban){const p=P(name);if(!isHost||!p||name==st.host)return;
  if(ban){st.banned=st.banned||[];if(!st.banned.includes(name))st.banned.push(name)}
@@ -3055,7 +3082,7 @@ function g3Fresh(){const on=st.players.filter(p=>p.online).map(p=>p.name);if(on.
 const g3FreshLine=()=>st.g3f==null?'':`<p class="g3fresh">${st.g3f>0?T('g3Fresh',{n:st.g3f}):T('g3Fresh0')}</p>`;
 /* barre de complicité (duo) + petites récompenses */
 let G3AN=new Set(),G3P=null,G3WR={},G3E=null,G3CX={gid:null,v:0,l:0};
-function g3CxBar(){let el=$('#g3cx');const tb=$('#tb'),show=tb&&st.order&&st.order.length==2&&st.order.includes(me.name)&&!['lobby','end','recap','carnet'].includes(st.phase);
+function g3CxBar(){let el=$('#g3cx');const tb=$('#tb'),show=tb&&st.order&&st.order.length==2&&st.order.includes(me.name)&&!['lobby','end','recap','carnet','game','gend'/* @games : la complicité ne compte que l'Expédition */].includes(st.phase);
  if(!show){el&&el.remove();return}
  const p=g3Cx(st.hist),L=g3Lv(p);if(!el||el.parentNode!==tb){el=document.createElement('div');el.id='g3cx';tb.appendChild(el)}const pb=$('#gprog');if(pb&&pb.parentNode==tb&&pb.nextElementSibling!==el)pb.after(el);
  const h=`<span class="g3ci" aria-hidden="true">🔗</span><span class="g3cn">${T('cxT')} · <b>${esc(L.name)}</b></span><span class="g3cb" aria-hidden="true"><i style="width:${Math.round(L.f*100)}%"></i></span><b class="g3cp">${p}</b>`;
