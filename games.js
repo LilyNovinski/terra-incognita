@@ -688,6 +688,268 @@ GAMES.chn={icon:'🧭',min:4,max:8,dur:20,tags:['social'],CHI,NF:n=>n<=5?1:2,RL:
  fin(s){return{pts:s.game.sc}}};
 
 /* =====================================================================
+   🐙 LE MIMÉTIQUE — fiche (rôles cachés EN TEMPS RÉEL, 4-8 joueurs, sans élimination)
+   Grotte sous-marine 1000×640 dans le noir. On nage en touchant / cliquant un point (glisser pour diriger) : même geste
+     au doigt et à la souris. Lampe : on ne voit les autres et les perles que dans son halo (rayon 115) ; l'hôte n'envoie
+     à chacun QUE ce qui est dans son halo (positions, perles, nuages d'encre), jamais les rôles.
+   Rôles secrets : 1 Mimétique (2 dès 7 joueurs, ils se connaissent), les autres = équipage.
+   Perles : P0=2 par couleur au départ, puis 1 par couleur toutes les SI=20 s de plongée ; chaque couleur parcourt les 6 zones
+     (épave, arche, coraux, kelp, cheminée, méduses) dans un ordre tiré au sort → même nombre, mêmes zones pour tous.
+     On ramasse en passant dessus, seulement les siennes. Le rythme vient des apparitions, pas de la vitesse de nage.
+   🎭 Le Mimétique prend l'apparence d'un·e autre MD=12 s (recharge CD=18 s, fin anticipée possible ; un nuage d'encre
+     trahit chaque transformation pour qui la voit). Déguisé en Léa, il ramasse les perles de Léa = VOL (retirée, compte 0,
+     compteur public 🐙 vols x/S). Ses propres perles, il peut faire semblant de les ramasser : annoncées, comptées 0.
+   Fil public : « Léa · près de l'épave · 3:12 » (marqué « volée » si c'était un vol) : on sait QU'il y a eu vol, pas QUI.
+   📯 Débat : 1 par joueur, 2 au total à 4-5 joueurs, 3 dès 6, jamais dans les 20 premières secondes d'une plongée.
+     Chrono figé, le filet est compté (vraies perles / annoncées), chat + vote secret modifiable (90 s) ; la personne qui a
+     plus de voix que toute autre option (« personne » compris) et au moins 2 révèle son rôle : Mimétique → ses pouvoirs
+     s'éteignent ; équipage → −30 s de plongée. Puis tout le monde repart de la cloche (cercle, places tirées au hasard).
+   Fin : objectif Q = QF × perles de l'équipage, ou tous les Mimétiques démasqués → équipage +4 ;
+     S vols (3, 4 dès 7 joueurs) ou chrono à 0 → Mimétiques +6 ; +1 à chaque équipier qui a voté pour un Mimétique démasqué.
+   Réseau : intentions {t:'grt',x,y | m} → hôte (simulation à pas ≤ 67 ms sur l'horloge murale : un onglet en veille rattrape
+     au retour ; minuteur dans un Worker pour ne pas ralentir les autres) → instantanés filtrés par joueur ~10 Hz {t:'grt'}.
+     L'état complet (bump) seulement aux changements d'étape. Clients : tampon d'interpolation 140 ms, prédiction de son
+     propre plongeur, canvas + requestAnimationFrame (arrêté si l'onglet est caché).
+   SIM (.sim/mim.js, hors site, 500 parties/taille, vraie logique tick/snap/act/next ; IA équipage « compétente » : partage
+     les perles vues, alibis par observations, témoins d'encre, vote si preuve nette ; Mimétique : vole les perles connues
+     d'un·e équipier·e vu·e loin, se transforme hors de vue, accuse le plus suspect) :
+     victoire Mimétiques n=4→8 : 41 / 51 / 40 / 46 / 49 % ; victoires par siège n=8 : 48–53 % (n=4 : 51–59, bruit ±4).
+     Témoins : équipage qui ne débat jamais → Mimétiques 82 / 75 / 84 % (n=4/6/8) ; Mimétique qui ne vole jamais → 17 / 2 / 0 %.
+     Rejetés : 6 perles fixes (l'équipage finit en 18 s), sans compteur de vols (voler ne servait à rien : l'équipage sans
+     débat gagnait 99 % à 6), QF unique (8 joueurs : .72 → 19 %, .78 → 67 %).
+   ===================================================================== */
+const MIW=1000,MIH=640,MIL=115,MISP=120,MIPK=17,MIDR=13,MIC=[500,320];
+const MIZ=[[185,160],[500,110],[815,160],[185,480],[500,530],[815,480]],MIZE=['⚓','🪨','🪸','🌿','🫧','🪼','🔔'];
+const MIRK=[[330,235,40],[670,235,40],[330,405,40],[670,405,40],[88,320,34],[912,320,34],[500,212,24],[500,428,24],[300,66,26],[700,66,26],[300,574,26],[700,574,26]];
+const miZone=(x,y)=>{if(Math.hypot(x-MIC[0],y-MIC[1])<100)return 6;let b=0,bd=1e9;MIZ.forEach(([a,c],i)=>{const d=(x-a)**2+(y-c)**2;if(d<bd){bd=d;b=i}});return b};
+const miFree=(x,y,pad)=>x>40&&x<MIW-40&&y>40&&y<MIH-40&&MIRK.every(([a,b,r])=>Math.hypot(x-a,y-b)>=r+pad);
+const miCl=(v,a,b)=>Math.max(a,Math.min(b,v));
+/* un pas de nage : droit vers la cible ; contre un rocher on glisse le long, du côté de la cible */
+function miMove(d,h){const dx=d.tx-d.x,dy=d.ty-d.y,L=Math.hypot(dx,dy);if(L<.5)return;const sp=Math.min(L,MISP*h);let vx=dx/L*sp,vy=dy/L*sp;
+ for(const [a,b,r] of MIRK){const ex=d.x+vx-a,ey=d.y+vy-b,e=Math.hypot(ex,ey);if(e>=r+MIDR||e<.01)continue;
+  const nx=ex/e,ny=ey/e,dot=vx*nx+vy*ny;if(dot<0){vx-=nx*dot;vy-=ny*dot;if(Math.hypot(vx,vy)<sp*.35){const s=nx*dy-ny*dx<0?-1:1;vx=-ny*s*sp*.8;vy=nx*s*sp*.8}}}
+ d.x+=vx;d.y+=vy;
+ for(const [a,b,r] of MIRK){const ex=d.x-a,ey=d.y-b,e=Math.hypot(ex,ey),m=r+MIDR;if(e<m&&e>.01){d.x=a+ex/e*m;d.y=b+ey/e*m}}
+ d.x=miCl(d.x,26,MIW-26);d.y=miCl(d.y,26,MIH-26)}
+const miClock=s=>{s=Math.max(0,Math.ceil(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+GAMES.mim={icon:'🐙',min:4,max:8,dur:10,tags:['social','skill'],
+ NM:n=>n>=7?2:1,ND:n=>n<=5?2:3,T:n=>200+10*n,P0:2,SI:20,S:n=>n<7?3:4,QF:n=>n==4?.91:n==5?.96:n<7?.9:n<8?.74:.72,MD:12,CD:18,CD0:12,DA:20,PEN:30,DT:90,RV:14,CW:4,MW:6,
+ init(s){const g=s.game,o=s.order,n=o.length;g.N=[...o];g.M=shuf(o).slice(0,this.NM(n));g.out=[];g.C=n-g.M.length;
+  g.D=this.ND(n);g.S=this.S(n);g.th=0;g.cl={};g.got=0;g.net=0;g.ann={};g.feed=[];g.fi=0;g.f0=0;g.fx=[];g.xi=0;g.hist=[];g.ss={};
+  o.forEach(p=>g.ss[p]={c:0,v:0,f:0});g.left0=this.T(n)*1000;g.pl=[];g.pi=0;g.el=0;g.nsp=this.SI*1000;
+  g.Q=Math.round(this.QF(n)*g.C*(this.P0+Math.floor(this.T(n)/this.SI)));
+  /* perles : P0 au départ puis une par couleur toutes les SI s de plongée ; chaque couleur parcourt les 6 zones
+     dans un ordre tiré au sort — même nombre, mêmes zones pour tout le monde */
+  g.zp=g.N.map(()=>shuf([0,1,2,3,4,5]));g.zc=g.N.map(()=>0);for(let j=0;j<this.P0;j++)g.N.forEach((p,oi)=>this.spawn(g,oi));
+  g.k=1;/* la 1re plongée ouvre à k=2 : les règles sont au salon, la grotte garde toute la place */
+  this.resume(s,Date.now());if(typeof window!='undefined')miTicker()},
+ /* départ de la cloche : cercle régulier, rotation et places tirées au hasard (aucun siège avantagé) */
+ resume(s,now){const g=s.game,o=shuf(s.order),a0=Math.random()*Math.PI*2;g.dv=g.dv||{};
+  o.forEach((p,i)=>{const a=a0+2*Math.PI*i/o.length,x=Math.round(MIC[0]+62*Math.cos(a)),y=Math.round(MIC[1]+62*Math.sin(a));g.dv[p]={x,y,tx:x,ty:y,mk:null,me:0,cd:now+this.CD0*1000}});
+  g.st='p';g.k++;g.done={};g.need=null;g.dl=0;g.rv=0;g.sec=0;g.pt0=now;g.lt=now;g.da=now+this.DA*1000;g.f0=g.fi;g.caller=null},
+ left(g,now){return g.st=='p'?g.left0-(now-g.pt0):g.left0},
+ active(s){const g=s.game;return g.M.filter(p=>s.order.includes(p)&&!g.out.includes(p))},
+ /* hôte : avance la plongée jusqu'à now (sous-pas ≤ 67 ms, masques expirés au bon moment) ; true si la partie est finie */
+ tick(s,now){const g=s.game;if(g.st!='p'||g.over)return false;if(!g.dv||!g.pl){g.win=null;g.over=1;return true}
+  let dt=Math.min(120,Math.max(0,(now-(g.lt||now))/1000)),t=now-dt*1000;g.lt=now;const on=new Set(gOn(s));
+  while(dt>1e-4){const h=Math.min(.067,dt);dt-=h;t+=h*1000;g.el+=h*1000;while(g.el>=g.nsp){g.nsp+=this.SI*1000;g.N.forEach((p,oi)=>s.order.includes(p)&&this.spawn(g,oi,g.dv))}
+   for(const n of s.order){const d=g.dv[n];if(!d)continue;if(d.mk&&t>=d.me)this.unmask(g,d,t);if(!on.has(n)){d.tx=d.x;d.ty=d.y;continue}miMove(d,h);this.pick(s,n,d,now)}}
+  if(g.fx.length)g.fx=g.fx.filter(f=>now-f.t<1600);
+  if(g.got>=g.Q||!this.active(s).length){g.win='c';this.score(s);g.over=1;return true}
+  if(g.th>=g.S||this.left(g,now)<=0){if(this.left(g,now)<=0){g.left0=0;g.pt0=now}g.win='m';this.score(s);g.over=1;return true}
+  return false},
+ pick(s,n,d,now){const g=s.game,ap=d.mk||n,oi=g.N.indexOf(ap),im=g.M.includes(n);
+  for(let i=g.pl.length-1;i>=0;i--){const p=g.pl[i];if(p.o!==oi||(p.x-d.x)**2+(p.y-d.y)**2>MIPK*MIPK)continue;
+   g.pl.splice(i,1);const k=d.mk?'v':im?'f':'c';g.ann[ap]=(g.ann[ap]||0)+1;g.ss[n][k]++;if(k=='c')g.got++;else if(k=='v')g.th++;
+   g.feed.push({i:++g.fi,o:oi,z:miZone(p.x,p.y),l:Math.ceil(this.left(g,now)/1000),...(k=='v'?{s:1}:{})});if(g.feed.length>80)g.feed.shift()}},
+ spawn(g,oi,dv){const z=g.zp[oi][g.zc[oi]++%6],[cx,cy]=MIZ[z];let x=cx,y=cy;
+  for(let t=0;t<300;t++){x=cx+(Math.random()*2-1)*150;y=cy+(Math.random()*2-1)*115;
+   if(miFree(x,y,14)&&miZone(x,y)==z&&g.pl.every(q=>(q.x-x)**2+(q.y-y)**2>=34*34)&&(!dv||t>200||Object.values(dv).every(d=>(d.x-x)**2+(d.y-y)**2>70*70)))break}
+  g.pl.push({i:g.pi++,o:oi,x:Math.round(x),y:Math.round(y)})},
+ unmask(g,d,t){d.mk=null;d.cd=t+this.CD*1000;g.fx.push({i:++g.xi,x:d.x,y:d.y,t})},
+ /* hôte : intention reçue hors état (cible de nage, masque) — pas de bump */
+ input(s,from,d,now){const g=s.game,v=g.dv&&g.dv[from];if(!v||g.st!='p')return;
+  if(typeof d.x=='number'&&typeof d.y=='number'&&isFinite(d.x)&&isFinite(d.y)){v.tx=miCl(d.x,26,MIW-26);v.ty=miCl(d.y,26,MIH-26);return}
+  if(typeof d.m!='number'||!g.M.includes(from)||g.out.includes(from))return;
+  if(d.m<0){if(v.mk)this.unmask(g,v,now);return}
+  const t=g.N[d.m];if(v.mk||now<(v.cd||0)||!t||t==from||!s.order.includes(t)||g.out.includes(t))return;
+  v.mk=t;v.me=now+this.MD*1000;g.fx.push({i:++g.xi,x:v.x,y:v.y,t:now})},
+ /* instantané pour UN joueur : seulement ce qui est dans son halo ; apparence (jamais l'identité réelle) */
+ snap(s,n,now){const g=s.game,me=g.dv&&g.dv[n];if(!me||g.st!='p')return null;const R2=(MIL+14)**2,N=g.N,im=g.M.includes(n),r=Math.round,ix=x=>N.indexOf(x),near=(x,y)=>(x-me.x)**2+(y-me.y)**2<=R2;
+  const ds=[];for(const p of s.order){const d=g.dv[p];if(p==n||!d||!near(d.x,d.y))continue;const ap=d.mk||p;ds.push([ix(ap),r(d.x),r(d.y),(g.out.includes(ap)?1:0)|(im&&g.M.includes(p)?2:0)])}
+  ds.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);ds.forEach((e,i)=>e.push(i&&ds[i-1][0]==e[0]?ds[i-1][4]+1:0));
+  let a=0;for(const k in g.ann)a+=g.ann[k];
+  return{t:'grt',k:g.k,h:now,me:[r(me.x),r(me.y),r(me.tx),r(me.ty),me.mk?ix(me.mk):-1,me.mk?Math.max(0,Math.ceil((me.me-now)/100)):0,Math.max(0,Math.ceil(((me.cd||0)-now)/100)),im?g.ss[n].v:g.ss[n].c],
+   d:ds,p:g.pl.filter(p=>near(p.x,p.y)).map(p=>[p.i,p.x,p.y,p.o]),x:g.fx.filter(f=>near(f.x,f.y)).map(f=>[f.i,r(f.x),r(f.y)]),
+   l:Math.max(0,Math.ceil(this.left(g,now)/100)),a,v:g.th,dc:Math.max(0,Math.ceil((g.da-now)/1000)),f:g.feed.slice(-4)}},
+ act(s,from,a){const g=s.game,now=Date.now();
+  if(a.a=='call'){if(g.st!='p'||g.cl[from]||g.D<=0||now<g.da)return;if(this.tick(s,now)){gFin(s);return true}
+   g.cl[from]=1;g.D--;g.caller=from;g.left0=Math.max(0,this.left(g,now));g.net=g.got;
+   for(const p in g.dv){const d=g.dv[p];if(d.mk){d.mk=null;d.cd=now}}g.vt={};gWait(g,this.DT,'d');return true}
+  if(g.st=='d'&&(a.v===''||(typeof a.v=='string'&&s.order.includes(a.v)&&a.v!=from&&!g.out.includes(a.v)))){g.vt[from]=a.v;g.done[from]=1;return true}},
+ next(s){const g=s.game;
+  if(g.st=='d'){const c={};for(const p in g.vt)if(s.order.includes(p))c[g.vt[p]]=(c[g.vt[p]]||0)+1;
+   const e=Object.entries(c).sort((a,b)=>b[1]-a[1]);let who=null;if(e.length&&e[0][0]!==''&&e[0][1]>=2&&(!e[1]||e[1][1]<e[0][1]))who=e[0][0];
+   const mim=!!who&&g.M.includes(who);if(mim&&!g.out.includes(who))g.out.push(who);else if(who)g.left0=Math.max(0,g.left0-this.PEN*1000);
+   g.res={who,mim,c};g.hist.push({by:g.caller,who,mim,vt:{...g.vt}});
+   if(!this.active(s).length)g.win='c';else if(g.left0<=0)g.win='m';gWait(g,this.RV,'r',1);return}
+  if(g.st=='r'){if(g.win){this.score(s);g.over=1;return}this.resume(s,Date.now())}},
+ score(s){const g=s.game,cw=g.win=='c';if(g.scored)return;g.scored=1;
+  s.order.forEach(p=>{const im=g.M.includes(p);let v=im?(cw?0:this.MW):(cw?this.CW:0);if(!im)g.hist.forEach(h=>{if(h.mim&&h.vt[p]===h.who)v++});g.sc[p]+=v})},
+ hide(g,n){const o={...g},im=g.M.includes(n);o.M=im?g.M:null;delete o.dv;delete o.pl;delete o.got;delete o.fx;delete o.win;o.fin=g.win?1:0;
+  o.ss={[n]:g.ss[n]};o.hist=g.hist.map(h=>({...h,vt:null}));if(g.vt)o.vt=hideOwn(g.vt,n);return o},
+ view(s){const g=s.game,m=meN(),R=this,N=g.N,im=!!(g.M&&g.M.includes(m)),out=g.out.includes(m),play=s.order.includes(m);
+  const L=MI.gid==s.gid&&MI.last&&MI.last.k==g.k?MI.last:null,an=L?L.a:Object.values(g.ann).reduce((a,b)=>a+b,0);
+  const role=`<span class="chrole ga ${im?'n':''}">${im?'🐙 '+GT(out?'miOut':'miMim')+(g.M.length>1?' · '+g.M.filter(p=>p!=m).map(B).join(', '):''):'🤿 '+GT('miCrew')}</span>`;
+  const hd=`<div class="mihd">${role}<span class="michip ga" ${dl(1)} id="mitl">⏱ ${miClock(L?L.l/10:g.left0/1000)}</span><span class="michip ga" ${dl(2)} id="mian" data-tip="${esc(GT('miGoalT'))}">🦪 <b>${an}</b>/${g.Q}${g.k>2?` · ✓${g.net}`:''}</span><span class="michip ga mith" ${dl(3)} id="mith">🐙 <b>${L?L.v:g.th}</b>/${g.S} ${GT('miThefts')}</span>${g.out.length?`<span class="michip ga" ${dl(3)}>🐙 ${g.out.map(B).join(', ')}</span>`:''}</div>`;
+  const fl=(e,i)=>`<li class="ga${e.s?' st':''}" ${dl(i||0)}>${miFeedLi(N,e)}</li>`;
+  if(g.st=='p'){const tg=s.order.filter(p=>p!=m&&!g.out.includes(p)),canCall=play&&!g.cl[m]&&g.D>0;
+   const fd=(MI.gid==s.gid?MI.feed:g.feed).filter(e=>e.i>g.f0).slice(-3).reverse();
+   return{hint:GT(im&&!out?'miHintM':'miHint'),mine:false,html:`<div class="card c mim">${hd}<div class="micv" id="micv"></div>
+    <div class="mibar">${im&&!out?`<button class="ghost mimk" id="mimk">🎭 ${GT('miMask')}</button>`:''}<span class="michip" id="mimine">${im?'🎭':'🦪'} <b>${L?L.me[7]:(g.ss[m]||{})[im?'v':'c']||0}</b> ${GT(im?'miStolen':'miMine')}</span>
+     ${play?`<button class="ghost micall" id="micall" ${canCall&&!(L&&L.dc>0)?'':'disabled'}>📯 ${GT('miCall')} · ${g.D}</button>`:''}</div>
+    ${im&&!out?`<div class="mipk" id="mipk" ${MI.pick?'':'hidden'}><p class="gsub">${GT('miMaskQ')}</p><div class="gpk">${tg.map(p=>`<button data-mim="${N.indexOf(p)}">${DT(p)}<span>${esc(p)}</span></button>`).join('')}</div></div>`:''}
+    <ul class="mifd" id="mifd" aria-live="polite">${fd.map(e=>fl(e)).join('')}</ul></div>`,
+    bind(){miMount();const k=$('#mimk');k&&(k.onclick=()=>{const l=MI.last;if(l&&l.me[4]>=0){miSend({m:-1});return}MI.pick=!MI.pick;const pk=$('#mipk');pk&&(pk.hidden=!MI.pick)});
+     $$('[data-mim]').forEach(b=>b.onclick=()=>{miSend({m:+b.dataset.mim});MI.pick=false;const pk=$('#mipk');pk&&(pk.hidden=true)});
+     const c=$('#micall');c&&(c.onclick=()=>ask(GT('miCallAsk',{v:g.D}),GT('miCall')).then(v=>v&&gs({a:'call'})));if(L)miHud(L)}}}
+  const since=g.feed.filter(e=>e.i>g.f0).reverse();
+  const log=since.length?`<details class="chlog mild" ${g.st=='d'?'open':''}><summary>📜 ${GT('miLog')} (${since.length})</summary><ul class="mifd">${since.map((e,i)=>fl(e,Math.min(i,6))).join('')}</ul></details>`:'';
+  if(g.st=='d'){const v=g.vt[m],cand=s.order.filter(p=>p!=m&&!g.out.includes(p)),nv=gNeed(s).filter(p=>g.done[p]).length;
+   return{html:`<div class="card c mim">${hd}<p class="gbig2 ga ok">📯 ${GT('miDeb',{n:B(g.caller)})}</p>
+    <p class="minet ga" ${dl(1)}>${GT('miNet',{a:`<b>${g.net}</b>`,b:`<b>${an}</b>`})}</p><p class="gsub ga" ${dl(2)}>${GT('miNetD')}</p>${log}
+    <p class="gq2">${GT('miVote')}</p><p class="gsub">${GT('miVoteD',{v:R.PEN})}</p>${play?pick(cand,v,'data-miv',m)+`<button class="ghost wide chno ${v===''?'sel':''}" data-miv="">${GT('miNone')}</button>`:''}
+    <p class="mut mivn">🗳️ ${nv}/${gNeed(s).length}</p></div>`,bind(){$$('[data-miv]').forEach(b=>b.onclick=()=>gs({v:b.dataset.miv}))}}}
+  const r=g.res||{},tl=Object.entries(r.c||{}).sort((a,b)=>b[1]-a[1]).map(([p,v],i)=>`<span class="gchip ga" ${dl(i,.9)}>${p?DT(p)+esc(p):esc(GT('miNone'))} <b>×${v}</b></span>`).join('');
+  return{html:`<div class="card c mim">${hd}${r.who?`<div class="mirev ${r.mim?'m':'c'}" aria-hidden="true"><span class="mirav" style="--c:${col(r.who)}">${esc(([...r.who][0]||'').toUpperCase())}</span><span class="miric">${r.mim?'🐙':'🤿'}</span></div>
+   <p class="gbig2 ga ok" ${dl(2,.6)}>${GT(r.mim?'miRevM':'miRevC',{n:B(r.who),v:R.PEN})}</p>`:`<p class="gbig2 ga">${GT('miRev0')}</p>`}<div class="arcsc mitly">${tl}</div>
+   ${g.fin||g.win?'':`<p class="gnote ga" ${dl(3,.8)}>🔔 ${GT('miBack')}</p>`}</div>`,
+   bind(){if(r.mim&&!RM())setTimeout(()=>{try{sparkles($('.mirev'),16)}catch(e){}},700);if(r.who&&!r.mim&&!RM())try{$('.mirev').classList.add('shk')}catch(e){}}}},
+ endView(s){const g=s.game,cw=g.win=='c',M=g.M||[];
+  return `<div class="chend"><p class="gbig2 ga ok">${GT(cw?(g.got>=g.Q?'miWinC':'miWinC2'):g.th>=g.S?'miWinS':'miWinM',{v:g.th})}</p><p class="ga" ${dl(1)}>🐙 ${GT('miWere')} ${M.map(B).join(', ')}</p>
+   ${s.order.map((p,i)=>{const x=g.ss[p]||{};return `<p class="mut ga" ${dl(i+2)}>${B(p)} · ${M.includes(p)?GT('miStM',{a:x.v||0,b:x.f||0}):GT('miStC',{a:x.c||0})}</p>`}).join('')}
+   <p class="mut ga" ${dl(2)}>🦪 ${g.got}/${g.Q}</p>${g.hist.length?`<h3 class="gh3">📯 ${GT('miCall')}</h3>${g.hist.map((h,i)=>`<div class="chlr ga" ${dl(i,.4)}><b>${i+1}</b> ${B(h.by)} → ${h.who?B(h.who)+(h.mim?' 🐙 ✅':' 🤿 ❌'):esc(GT('miNone'))}</div>`).join('')}`:''}</div>`},
+ fin(s){return{pts:s.game.sc}}};
+
+/* ---------- 🐙 temps réel : côté hôte ---------- */
+W.GRtIn=function(from,d){try{const s=st,g=s&&s.game;if(!isHost||!g||s.phase!='game'||g.id!='mim'||!s.order.includes(from)||(d.k!=null&&d.k!==g.k))return;GAMES.mim.input(s,from,d,Date.now())}catch(e){}};
+W.GRtTick=function(){try{if(!isHost||!st||st.phase!='game'||!st.game||st.game.id!='mim'||st.game.st!='p')return;const G=GAMES.mim,now=Date.now();
+ if(G.tick(st,now)){gFin(st);bump();return}
+ if(now-(MI.ls||0)<95)return;MI.ls=now;
+ for(const id in conns){const c=conns[id];if(c.open&&c.pname&&st.order.includes(c.pname))try{const v=G.snap(st,c.pname,now);v&&c.send(v)}catch(e){}}
+ const v=G.snap(st,me.name,now);v&&W.GRtRx(v)}catch(e){console.warn(e)}};
+/* minuteur dans un Worker : un onglet hôte en arrière-plan continue d'envoyer ~10 instantanés/s (setInterval y serait bridé) */
+let MIT=null;function miTicker(){if(MIT)return;try{const u=URL.createObjectURL(new Blob(['setInterval(()=>postMessage(0),66)'],{type:'text/javascript'}));MIT=new Worker(u);MIT.onmessage=()=>W.GRtTick()}catch(e){MIT=1}}
+if(typeof setInterval!='undefined'&&typeof document!='undefined')setInterval(()=>{if(MIT&&MIT!==1)return;W.GRtTick()},66);
+
+/* ---------- 🐙 temps réel : côté joueur (réception, interpolation, rendu canvas) ---------- */
+const MI={gid:null,k:null,buf:[],off:null,last:null,feed:[],fmax:0,fx:{},cv:null,ctx:null,raf:0,ro:null,sp:null,tap:null,ts:0,tt:0,pick:false,cam:null,bg:null,bgL:null,w:0,h:0,dpr:1,ft:0};
+function miSend(o){try{o.t='grt';o.k=st.game.k;if(isHost)W.GRtIn(me.name,o);else if(hostConn&&hostConn.open)hostConn.send(o)}catch(e){}}
+W.GRtRx=function(d){try{if(!st||st.phase!='game'||!st.game||st.game.id!='mim'||!d||!d.me)return;const now=Date.now();
+ if(MI.gid!==st.gid){MI.gid=st.gid;MI.feed=[];MI.fmax=0;MI.fx={};MI.pick=false;MI.off=null}
+ if(d.k!==MI.k){MI.k=d.k;MI.buf=[];MI.sp=null;MI.tap=null}
+ const o=now-d.h;MI.off=MI.off==null||o<MI.off?o:MI.off+(o-MI.off)*.02;
+ MI.buf.push(d);if(MI.buf.length>12)MI.buf.shift();MI.last=d;
+ const nf=[];(d.f||[]).forEach(e=>{if(e.i>MI.fmax){MI.fmax=e.i;MI.feed.push(e);nf.push(e)}});if(MI.feed.length>80)MI.feed.splice(0,MI.feed.length-80);
+ (d.x||[]).forEach(([i,x,y])=>{if(!MI.fx[i])MI.fx[i]={x,y,t:now}});
+ miHud(d,nf);if(MI.cv&&MI.cv.isConnected&&!MI.raf&&!document.hidden)MI.raf=requestAnimationFrame(miDraw)}catch(e){}};
+function miHud(d,nf){const g=st.game,m=meN(),q=s=>document.getElementById(s);if(!q('micv'))return;
+ const t=q('mitl');t&&(t.textContent='⏱ '+miClock(d.l/10),t.classList.toggle('low',d.l<300));
+ const a=q('mian');if(a){const b=a.querySelector('b');b&&(b.textContent=d.a)}
+ const h=q('mith');if(h){const b=h.querySelector('b');if(b&&b.textContent!=String(d.v)){b.textContent=d.v;h.classList.add('hot');RM()||h.animate&&h.animate([{transform:'scale(1.2)'},{transform:'none'}],{duration:400})}}
+ const n=q('mimine');if(n){const b=n.querySelector('b');b&&b.textContent!=String(d.me[7])&&(b.textContent=d.me[7],RM()||n.animate&&n.animate([{transform:'scale(1.15)'},{transform:'none'}],{duration:300}))}
+ const k=q('mimk');if(k){const on=d.me[4]>=0,cd=d.me[6];k.disabled=!on&&cd>0;k.classList.toggle('on',on);
+  k.style.setProperty('--cd',on?d.me[5]/(GAMES.mim.MD*10):cd>0?cd/(GAMES.mim.CD*10):0);
+  const lb=on?'🎭 '+GT('miAs',{n:esc(g.N[d.me[4]]||'')})+' · '+Math.ceil(d.me[5]/10)+' s':cd>0?'🎭 '+Math.ceil(cd/10)+' s':'🎭 '+GT('miMask');if(k._l!==lb){k._l=lb;k.innerHTML=lb}
+  if(on&&MI.pick){MI.pick=false;const pk=q('mipk');pk&&(pk.hidden=true)}}
+ const c=q('micall');if(c){const ok=!g.cl[m]&&g.D>0&&d.dc<=0&&g.st=='p';c.disabled=!ok}
+ const f=q('mifd');if(f&&nf&&nf.length){nf.forEach(e=>{const li=document.createElement('li');li.className='ga'+(e.s?' st':'');li.innerHTML=miFeedLi(g.N,e);f.prepend(li)});while(f.children.length>3)f.lastChild.remove()}}
+/* une ligne du fil : « 🦪 Léa · près de l'épave · 3:12 » (volée : 🐙, en rouge) */
+function miFeedLi(N,e){const nm=N[e.o]||'?',zn=GT('miZ').split('|');return `<i aria-hidden="true">${e.s?'🐙':'🦪'}</i>${DT(nm)}${B(nm)}<span>${e.s?`<b class="mist">${esc(GT('miStole'))}</b> `:''}${esc(zn[e.z]||'')} · ⏱ ${miClock(e.l)}</span>`}
+function miMount(){const box=document.getElementById('micv');if(!box)return;
+ if(!MI.cv){const cv=MI.cv=document.createElement('canvas');cv.className='micanvas';cv.setAttribute('role','img');MI.ctx=cv.getContext('2d');
+  const tap=(e,force)=>{const r=cv.getBoundingClientRect(),c=MI.cam;if(!c||!st||!st.game||st.game.st!='p')return;const px=e.clientX-r.left,py=e.clientY-r.top;let x,y;
+   const mm=c.mm;if(mm&&px>=mm.x&&px<=mm.x+mm.w&&py>=mm.y&&py<=mm.y+mm.h){x=(px-mm.x)/mm.w*MIW;y=(py-mm.y)/mm.h*MIH}else{x=c.x+(px-r.width/2)/c.z;y=c.y+(py-r.height/2)/c.z}
+   MI.tap={x:Math.round(miCl(x,26,MIW-26)),y:Math.round(miCl(y,26,MIH-26)),t:Date.now()};const now=Date.now();clearTimeout(MI.tt);
+   if(force||now-MI.ts>=90){MI.ts=now;miSend({x:MI.tap.x,y:MI.tap.y})}else MI.tt=setTimeout(()=>{MI.ts=Date.now();MI.tap&&miSend({x:MI.tap.x,y:MI.tap.y})},90-(now-MI.ts))};
+  cv.addEventListener('pointerdown',e=>{e.preventDefault();try{cv.setPointerCapture(e.pointerId)}catch(x){}MI.drag=true;tap(e,true)});
+  cv.addEventListener('pointermove',e=>{if(MI.drag)tap(e)});
+  const up=()=>{MI.drag=false};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);cv.addEventListener('contextmenu',e=>e.preventDefault())}
+ MI.cv.setAttribute('aria-label',GT('n_mim'));box.appendChild(MI.cv);
+ const fit=()=>{const w=box.clientWidth;if(!w)return;const vh=innerHeight||700,h=Math.round(miCl(Math.min(w*(w<500?.95:.72),vh-320),200,w));MI.dpr=Math.min(2,devicePixelRatio||1);
+  if(MI.w!==w||MI.h!==h||MI.cv.width!==Math.round(w*MI.dpr)){MI.w=w;MI.h=h;MI.cv.style.height=h+'px';MI.cv.width=Math.round(w*MI.dpr);MI.cv.height=Math.round(h*MI.dpr)}};
+ fit();try{MI.ro&&MI.ro.disconnect();MI.ro=new ResizeObserver(fit);MI.ro.observe(box)}catch(e){}
+ if(!MI.raf&&!document.hidden)MI.raf=requestAnimationFrame(miDraw)}
+if(typeof document!='undefined')document.addEventListener('visibilitychange',()=>{if(document.hidden)return;MI.buf=MI.buf.slice(-1);MI.sp=null;MI.ft=0;if(MI.cv&&MI.cv.isConnected&&!MI.raf)MI.raf=requestAnimationFrame(miDraw)});
+const miRnd=a=>()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+/* décor fixe de la grotte, dessiné une fois (par langue : noms des zones) */
+function miBg(){const lang=typeof LANG!='undefined'?LANG:'fr';if(MI.bg&&MI.bgL==lang)return MI.bg;const S=1.25,c=document.createElement('canvas');c.width=MIW*S;c.height=MIH*S;
+ const x=c.getContext('2d'),r=miRnd(11);x.scale(S,S);
+ let gr=x.createRadialGradient(500,320,30,500,320,640);gr.addColorStop(0,'#1f6580');gr.addColorStop(1,'#0b3045');x.fillStyle=gr;x.fillRect(0,0,MIW,MIH);
+ for(let i=0;i<110;i++){x.fillStyle=`rgba(170,220,230,${(.025+r()*.05).toFixed(3)})`;x.beginPath();x.ellipse(r()*MIW,r()*MIH,8+r()*40,3+r()*12,r()*3,0,7);x.fill()}
+ const wall=[],per=2*(MIW+MIH);for(let i=0;i<96;i++){let t=i/96*per,px,py;const j=10+r()*22;
+  if(t<MIW){px=t;py=j}else if((t-=MIW)<MIH){px=MIW-j;py=t}else if((t-=MIH)<MIW){px=MIW-t;py=MIH-j}else{t-=MIW;px=j;py=MIH-t}wall.push([px,py])}
+ const path=()=>{x.beginPath();wall.forEach(([a,b],i)=>i?x.lineTo(a,b):x.moveTo(a,b));x.closePath()};
+ x.save();x.beginPath();x.rect(-9,-9,MIW+18,MIH+18);wall.slice().reverse().forEach(([a,b],i)=>i?x.lineTo(a,b):x.moveTo(a,b));x.closePath();x.fillStyle='#04141e';x.fill();x.restore();
+ path();x.strokeStyle='rgba(140,210,225,.22)';x.lineWidth=3;x.stroke();
+ MIRK.forEach(([a,b,rr])=>{x.beginPath();for(let i=0;i<14;i++){const an=i/14*Math.PI*2,q=rr*(.9+r()*.22);i?x.lineTo(a+q*Math.cos(an),b+q*Math.sin(an)):x.moveTo(a+q,b)}x.closePath();
+  const g2=x.createRadialGradient(a-rr*.35,b-rr*.4,rr*.1,a,b,rr*1.1);g2.addColorStop(0,'#3d6474');g2.addColorStop(1,'#10293a');x.fillStyle=g2;x.fill();x.strokeStyle='rgba(150,210,225,.28)';x.lineWidth=2;x.stroke()});
+ const zn=GT('miZn').split('|');x.textAlign='center';x.textBaseline='middle';
+ [...MIZ,MIC].forEach(([a,b],i)=>{x.globalAlpha=.6;x.font='32px serif';x.fillText(MIZE[i],a,b);x.globalAlpha=.5;x.font='700 15px Nunito,sans-serif';x.fillStyle='#d6f3f8';x.fillText(zn[i]||'',a,b+30);x.globalAlpha=1});
+ MI.bg={c,S};MI.bgL=lang;return MI.bg}
+/* positions à l'instant « maintenant − 140 ms » (heure de l'hôte), entre les deux instantanés qui l'encadrent */
+function miSample(now){const B=MI.buf;if(!B.length)return null;const rt=now-MI.off-140;let a=B[0],b=B[0];
+ for(let i=B.length-1;i>=0;i--)if(B[i].h<=rt){a=B[i];b=B[i+1]||B[i];break}
+ const al=b===a?1:miCl((rt-a.h)/(b.h-a.h),0,1),key=e=>e[0]+'.'+e[4],A=new Map(a.d.map(e=>[key(e),e])),out=[];
+ for(const e of b.d){const k=key(e),p=A.get(k);if(p){const far=Math.abs(p[1]-e[1])+Math.abs(p[2]-e[2])>90;out.push({n:e[0],x:far?e[1]:p[1]+(e[1]-p[1])*al,y:far?e[2]:p[2]+(e[2]-p[2])*al,f:e[3],o:1});A.delete(k)}
+  else out.push({n:e[0],x:e[1],y:e[2],f:e[3],o:al})}
+ for(const p of A.values())out.push({n:p[0],x:p[1],y:p[2],f:p[3],o:1-al});return{ds:out,pl:b.p}}
+function miDraw(){MI.raf=0;const cv=MI.cv,s=st,g=s&&s.game;if(!cv||!cv.isConnected||!g||g.id!='mim'||g.st!='p'||document.hidden)return;MI.raf=requestAnimationFrame(miDraw);
+ const x=MI.ctx,cw=MI.w,ch=MI.h,L=MI.last,now=Date.now(),rm=RM(),T=now/1000;if(!cw)return;const dt=MI.ft?Math.min(.1,(now-MI.ft)/1000):0;MI.ft=now;
+ x.setTransform(MI.dpr,0,0,MI.dpr,0,0);x.globalAlpha=1;x.fillStyle='#03101a';x.fillRect(0,0,cw,ch);
+ if(!L||L.k!==g.k){x.fillStyle='#bfe3ea';x.font='600 14px Nunito,sans-serif';x.textAlign='center';x.fillText('…',cw/2,ch/2);return}
+ /* moi : prédiction depuis le dernier instantané (vers ma cible la plus récente), lissée */
+ const M=L.me,age=miCl((now-MI.off-L.h)/1000,0,.35),tp=MI.tap&&now-MI.tap.t<450?MI.tap:null,pr={x:M[0],y:M[1],tx:tp?tp.x:M[2],ty:tp?tp.y:M[3]};miMove(pr,age);
+ if(!MI.sp||Math.hypot(MI.sp.x-pr.x,MI.sp.y-pr.y)>90)MI.sp={x:pr.x,y:pr.y};else{const k=1-Math.exp(-dt*14);MI.sp.x+=(pr.x-MI.sp.x)*k;MI.sp.y+=(pr.y-MI.sp.y)*k}
+ const sx=MI.sp.x,sy=MI.sp.y,z=Math.min(cw,ch)*.37/MIL,vw=cw/z,vh=ch/z,cx=vw>=MIW?MIW/2:miCl(sx,vw/2,MIW-vw/2),cy=vh>=MIH?MIH/2:miCl(sy,vh/2,MIH-vh/2);
+ const X=v=>(v-cx)*z+cw/2,Y=v=>(v-cy)*z+ch/2,RR=MIL+14,fade=(px,py)=>miCl((RR-Math.hypot(px-sx,py-sy))/26,0,1);
+ const bg=miBg();x.drawImage(bg.c,(cx-vw/2)*bg.S,(cy-vh/2)*bg.S,vw*bg.S,vh*bg.S,0,0,cw,ch);
+ const N=g.N,smp=miSample(now)||{ds:[],pl:[]},myI=N.indexOf(meN()),ap=M[4]>=0?M[4]:myI;
+ /* neige marine */
+ x.fillStyle='#d8f4fa';const rs=miRnd(5);for(let i=0;i<46;i++){const px=((rs()*MIW+(rm?0:T*(3+rs()*4)))%MIW),py=((rs()*MIH+(rm?0:T*(5+rs()*5)))%MIH),q=fade(px,py);if(q<=0){rs();continue}x.globalAlpha=q*(.25+rs()*.35);x.fillRect(X(px),Y(py),1.6,1.6)}
+ /* perles */
+ for(const [i,px,py,o] of smp.pl){const a=fade(px,py);if(a<=0)continue;const c=col(N[o]),X0=X(px),Y0=Y(py),pr2=Math.max(3.5,6*z);x.globalAlpha=a;
+  if(o===ap){x.globalAlpha=a*(rm?.35:.22+.14*Math.sin(T*3+i));x.fillStyle=c;x.beginPath();x.arc(X0,Y0,pr2*2.3,0,7);x.fill();x.globalAlpha=a}
+  const gg=x.createRadialGradient(X0-pr2*.35,Y0-pr2*.4,pr2*.1,X0,Y0,pr2);gg.addColorStop(0,'#fff');gg.addColorStop(.5,c);gg.addColorStop(1,'rgba(0,0,0,.35)');x.fillStyle=gg;x.beginPath();x.arc(X0,Y0,pr2,0,7);x.fill()}
+ /* nuages d'encre (transformations vues) */
+ for(const i in MI.fx){const f=MI.fx[i],p=(now-f.t)/1200;if(p>=1){if(p>3)delete MI.fx[i];continue}x.globalAlpha=(1-p)*.75*fade(f.x,f.y);x.fillStyle='#2a1238';
+  for(let j=0;j<5;j++){const an=j*1.26+(+i),rr=(8+30*(rm?.6:p))*z;x.beginPath();x.arc(X(f.x)+Math.cos(an)*rr*.5,Y(f.y)+Math.sin(an)*rr*.5,rr*.62,0,7);x.fill()}}
+ /* plongeurs */
+ const dv=(px,py,n,a,me,fl,dis)=>{const nm=N[n]||'?',c=col(nm),X0=X(px),Y0=Y(py),r=Math.max(8,MIDR*z);x.globalAlpha=a;
+  if(!rm){x.fillStyle='rgba(220,245,255,.5)';for(let j=0;j<2;j++){const p=(T*.9+j*.5+n*.13)%1;x.beginPath();x.arc(X0+Math.sin(p*9+n)*3,Y0-r-p*r*2.2,1.2+p*1.6,0,7);x.fill()}}
+  x.fillStyle=c;x.beginPath();x.arc(X0,Y0,r,0,7);x.fill();x.lineWidth=me?2.5:1.5;x.strokeStyle=me?'#fff':'rgba(255,255,255,.7)';if(dis||fl&2)x.setLineDash([3,3]);x.stroke();x.setLineDash([]);
+  x.fillStyle='#fff';x.font=`800 ${Math.round(r*1.05)}px Nunito,sans-serif`;x.textAlign='center';x.textBaseline='middle';x.fillText(([...nm][0]||'').toUpperCase(),X0,Y0+1);
+  if(!me){x.font='700 11px Nunito,sans-serif';x.fillStyle='rgba(235,250,255,.92)';x.fillText(nm.length>12?nm.slice(0,11)+'…':nm,X0,Y0+r+10)}
+  if(fl&1||dis||fl&2){x.font=`${Math.round(r*.95)}px serif`;x.fillText(fl&1?'🐙':dis?'🎭':'🐙',X0+r*.95,Y0-r*.9)}};
+ for(const e of smp.ds){const a=e.o*fade(e.x,e.y);if(a>0.02)dv(e.x,e.y,e.n,a,false,e.f,false)}
+ dv(sx,sy,ap,1,true,g.out.includes(meN())?1:0,M[4]>=0);
+ /* obscurité : seul le halo de ma lampe éclaire */
+ const hx=X(sx),hy=Y(sy),hr=MIL*z*(rm?1:1+.015*Math.sin(T*2.1)),gd=x.createRadialGradient(hx,hy,hr*.42,hx,hy,hr*1.02);
+ gd.addColorStop(0,'rgba(2,9,16,0)');gd.addColorStop(.65,'rgba(2,9,16,.28)');gd.addColorStop(1,'rgba(2,9,16,.88)');x.globalAlpha=1;x.fillStyle=gd;x.fillRect(0,0,cw,ch);
+ /* ma cible */
+ const tg=tp||{x:M[2],y:M[3]};if(Math.hypot(tg.x-sx,tg.y-sy)>8){x.globalAlpha=.7;x.strokeStyle='#ffd27a';x.lineWidth=1.5;x.beginPath();x.arc(X(tg.x),Y(tg.y),5+(rm?0:2*Math.sin(T*5)),0,7);x.stroke()}
+ if(MI.tap&&now-MI.tap.t<700&&!rm){const p=(now-MI.tap.t)/700;x.globalAlpha=1-p;x.strokeStyle='#ffe2a0';x.lineWidth=2;x.beginPath();x.arc(X(MI.tap.x),Y(MI.tap.y),6+18*p,0,7);x.stroke()}
+ /* zone actuelle + mini-carte (toucher la mini-carte = nager vers ce point) */
+ const zi=miZone(sx,sy),zl=MIZE[zi]+' '+(GT('miZn').split('|')[zi]||'');x.globalAlpha=1;x.font='700 12px Nunito,sans-serif';x.textAlign='left';x.textBaseline='middle';
+ const tw=x.measureText(zl).width;x.fillStyle='rgba(2,12,20,.6)';x.beginPath();x.roundRect?x.roundRect(8,8,tw+16,22,11):x.rect(8,8,tw+16,22);x.fill();x.fillStyle='#e3f6fa';x.fillText(zl,16,19.5);
+ const mw=Math.round(Math.min(110,cw*.28)),mh=Math.round(mw*MIH/MIW),mx=cw-mw-8,my=8;MI.cam={x:cx,y:cy,z,mm:{x:mx,y:my,w:mw,h:mh}};
+ x.globalAlpha=.85;x.fillStyle='rgba(2,12,20,.62)';x.fillRect(mx,my,mw,mh);x.strokeStyle='rgba(160,215,230,.35)';x.lineWidth=1;x.strokeRect(mx+.5,my+.5,mw-1,mh-1);
+ x.fillStyle='rgba(160,215,230,.35)';MIRK.forEach(([a,b,r])=>{x.beginPath();x.arc(mx+a/MIW*mw,my+b/MIH*mh,Math.max(1.5,r/MIW*mw),0,7);x.fill()});
+ x.globalAlpha=.8;x.font='9px serif';x.textAlign='center';[...MIZ,MIC].forEach(([a,b],i)=>x.fillText(MIZE[i],mx+a/MIW*mw,my+b/MIH*mh));
+ x.globalAlpha=1;x.strokeStyle='#ffd27a';x.strokeRect(mx+(cx-vw/2)/MIW*mw,my+(cy-vh/2)/MIH*mh,vw/MIW*mw,vh/MIH*mh);
+ x.fillStyle=col(N[ap]);x.beginPath();x.arc(mx+sx/MIW*mw,my+sy/MIH*mh,3.2,0,7);x.fill();x.strokeStyle='#fff';x.lineWidth=1.2;x.stroke()}
+
+/* =====================================================================
    📖 TUTORIELS ANIMÉS — une mini-démo scriptée par jeu (pièces factices qui bougent, étape par étape).
    Ouvert par le « ? » du haut (contexte : jeu en cours, ou jeu choisi au salon) et par « Les règles en images » au salon.
    Scène = 300×180 (coordonnées px), éléments .te animés en transform/opacity seulement ; mouvement réduit : état final fixe.
@@ -763,6 +1025,15 @@ TUS.chn=[
  {k:'tu_chn3',d:6,s:()=>`<i class="tsea"></i>`+TU.e(150,46,'⛵',.2,'p big o','--o:1.8s')+TU.e(150,46,'💥',1.8,'p big')+TU.e(150,96,TU.cd('⭐ ≠ 🌙','no'),1,'p')+TU.e(150,150,TU.cd(TU.n().slice(0,3).map(esc).join(' <i class="charr">➜</i> ')),2.4,'p')},
  {k:'tu_chn4',d:6,s:()=>[0,1,2,3].map(i=>TU.e(45+70*i,150,TU.av(i))).join('')+[0,1,3].map((i,j)=>TU.e(45+70*i,108,'✋',.3+.25*j,'p')).join('')+TU.e(185,104,'⛓️',1.6,'p big')+TU.e(185,56,TU.cd('🌙 › 🌙'),2.4,'p')},
  {k:'tu_chn5',d:6,s:()=>[0,1,2,3].map(i=>TU.e(45+70*i,150,TU.av(i))).join('')+TU.e(45,108,'🕵️',.3,'p')+TU.e(115,108,'🕵️',.5,'p')+TU.e(255,108,'🏴‍☠️',1.5,'p big')+TU.e(45,66,TU.pt('+2'),2.1,'p')+TU.e(115,66,TU.pt('+2'),2.2,'p')+TU.e(185,66,TU.pt('+2'),2.3,'p')}];
+/* 🐙 tutoriel du Mimétique : grotte sombre, halo de lampe autour de chaque plongeur */
+const tuDv=(i,dis)=>'<i class="tlamp"></i>'+TU.av(i,false)+(dis?'<small>🎭</small>':'');
+TUS.mim=[
+ {k:'tu_mim1',s:()=>'<i class="tcave"></i>'+TU.e(225,55,'👆',.2,'p o','--o:1.2s')+TU.e(225,55,'<i class="tring"></i>',.3,'p o','--o:1.4s')+TU.mv(70,130,225,62,tuDv(0),.9)+TU.e(150,160,TU.cd('⚓ 🪸 🌿'),2.2,'p')},
+ {k:'tu_mim2',d:6,s:()=>'<i class="tcave"></i>'+TU.e(150,90,TU.dot(0),0,'a o','--o:1.5s')+TU.e(240,60,TU.dot(0),0,'a o','--o:2.6s')+TU.e(110,130,TU.dot(1))+TU.mv(50,110,150,90,tuDv(0),.2,'o','--o:1.5s')+TU.mv(150,90,240,60,tuDv(0),1.5,'','--op0:0')+TU.e(150,62,TU.pt('+1'),1.5,'p')+TU.e(240,30,TU.pt('+1'),2.6,'p')+TU.e(150,160,TU.cd('🦪 21 / 30'),2.9,'p')},
+ {k:'tu_mim3',d:7,s:()=>'<i class="tcave"></i>'+TU.e(110,95,'<i class="tlamp"></i>🐙',0,'a big o','--o:1.3s')+TU.e(110,95,'<i class="tink"></i>',1.1,'p o','--o:2.2s')+TU.e(110,95,tuDv(1,1),1.4,'p o','--o:2.4s')+TU.mv(110,95,230,70,tuDv(1,1),2.4,'','--op0:0')+TU.e(230,70,TU.dot(1),0,'a o','--o:3.3s')+TU.e(150,158,TU.cd('🐙 '+esc(TU.n()[1])+' · ⚓','no'),3.5,'p')},
+ {k:'tu_mim4',d:6,s:()=>'<i class="tcave"></i>'+TU.e(70,80,tuDv(0))+TU.e(110,80,tuDv(1))+TU.e(90,130,TU.cd('🙋 '+esc(TU.n()[1])),.3,'p')+TU.e(235,80,'⚓',0,'a big')+TU.e(235,125,TU.cd('🐙 '+esc(TU.n()[1]),'no'),.6,'p')+TU.e(235,40,'❓🎭',1.6,'p')+TU.e(160,80,'↔️',2.2,'p')},
+ {k:'tu_mim5',d:7,s:()=>TU.e(150,24,'📯',0,'p big')+[0,1,2,3].map(i=>TU.e(45+70*i,150,TU.av(i))).join('')+[0,1,2].map((i,j)=>TU.e(45+70*i,108,'✋',.6+.25*j,'p')).join('')+TU.e(255,104,'🐙',2,'p big')+TU.e(150,66,TU.cd('🎭 ✕','ok'),2.7,'p')},
+ {k:'tu_mim6',d:6,s:()=>TU.e(80,50,TU.cd('🦪 30 / 30','ok'),.2,'p')+TU.e(80,95,'🤿',.6,'p big')+TU.e(80,140,TU.cd('🐙 ✕ ✕','ok'),1,'p')+TU.e(150,95,TU.cd('/'),0,'a')+TU.e(220,50,TU.cd('🐙 3 / 3','no'),1.6,'p')+TU.e(220,95,'🐙',2,'p big')+TU.e(220,140,TU.cd('⏱ 0:00','no'),2.4,'p')}];
 
 for(const id in TUS)if(GAMES[id])GAMES[id].tut=TUS[id];
 const GTU={id:null,i:0,t:null};
@@ -1013,6 +1284,36 @@ section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) b
 .chend{text-align:start}.chend .gbig2{text-align:center}
 @media (prefers-reduced-motion:reduce){.chn.on::after,.chship,.chres.shk .chsea,.chboom{animation:none!important}.chship.ko{transform:translateY(30px) rotate(28deg);opacity:.35}}
 
+/* 🐙 Le Mimétique */
+.mim .chrole.n{border-color:#8c5cf2}
+.mihd{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:0 0 10px;font:700 14px Nunito}
+.michip{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:99px;background:var(--paper2);border:2px solid var(--edge);white-space:nowrap;font:700 14px Nunito;font-variant-numeric:tabular-nums}
+.michip.low{border-color:var(--bad);color:var(--bad)}.mith.hot{border-color:#8c5cf2}
+.micv{position:relative;margin:0 -4px;border-radius:18px;overflow:hidden;background:#03101a;box-shadow:inset 0 0 0 2px var(--edge)}
+.micanvas{display:block;width:100%;touch-action:none;user-select:none;-webkit-user-select:none;cursor:crosshair}
+.mibar{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;margin:10px 0 0}
+.mibar button{min-width:0;padding:8px 14px;font-size:15px;border-radius:99px}
+.mimk{position:relative;overflow:hidden;isolation:isolate}
+.mimk::before{content:'';position:absolute;inset:0;z-index:-1;background:color-mix(in srgb,#8c5cf2 26%,transparent);transform-origin:left;transform:scaleX(var(--cd,0));transition:transform .12s linear}
+[dir=rtl] .mimk::before{transform-origin:right}.mimk.on{border-color:#8c5cf2;color:#6a3fd0}
+.mipk{margin-top:8px}.mipk .gpk>button{flex:1 1 30%;padding:8px;font-size:14px}
+.mifd{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:4px;text-align:start}
+.mifd li{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:12px;background:var(--paper2);font:600 13px Nunito;min-width:0}
+.mifd li>i{font-style:normal}.mifd li span{color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.mifd li.st{background:color-mix(in srgb,#8c5cf2 14%,var(--paper2))}.mist{color:#8c5cf2}
+.chlog.mild .mifd{margin-top:6px}
+.minet{font:700 16px Nunito;margin:10px 0 2px}.mivn{text-align:center;font-size:13px;margin:8px 0 0}
+.mirev{position:relative;width:96px;height:96px;margin:6px auto 0}
+.mirav{position:absolute;inset:12px;display:grid;place-items:center;border-radius:50%;background:var(--c);color:#fff;font:800 32px Nunito;box-shadow:0 0 0 4px var(--paper),0 6px 18px #0003;animation:miIn .5s var(--gease) both}
+.miric{position:absolute;right:-6px;bottom:-4px;font-size:40px;line-height:1;animation:miPop .5s var(--gease) .6s both}[dir=rtl] .miric{right:auto;left:-6px}
+.mirev.shk .mirav{animation:miIn .5s var(--gease) both,gshk .4s ease 1.1s 2}
+@keyframes miIn{from{opacity:0;transform:scale(.6)}}@keyframes miPop{from{opacity:0;transform:scale(.2) rotate(-30deg)}}
+.mitly{margin-top:10px}
+[data-theme=dark] .mimk.on{color:#c3a9ff}[data-theme=dark] .mist{color:#b998ff}
+@media (prefers-reduced-motion:reduce){.mirav,.miric,.mirev.shk .mirav{animation:none!important}.mimk::before{transition:none}}
+.tcave{position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,#1f6580,#06202e 75%)}
+.tlamp{position:absolute;left:50%;top:50%;width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;background:radial-gradient(circle,#ffe9a866,#ffe9a81a 55%,transparent 70%);z-index:-1;pointer-events:none}
+.te>span{isolation:isolate}.tink{display:inline-block;width:42px;height:42px;border-radius:50%;background:radial-gradient(circle,#2a1238dd,#2a123800 70%)}
 @media (max-width:420px){.grow2{flex-direction:column}.gq{font-size:19px}.gseed{font-size:26px}.gbr{grid-template-columns:minmax(0,7em) 1fr 1.6em}.gtf{width:78px}.gcamps{gap:6px}}
 @media (prefers-reduced-motion:reduce){.gw .ga,.gw .gbar,.gfloat,.gev .gbig,.grx,.arcb *,.gw.gnx>.card,.mkl{animation:none!important}.gsab i{animation-duration:0s!important;display:none}}
 `;(document.head||document.documentElement).appendChild(c)}
@@ -2093,4 +2394,158 @@ chWinN:`Os Naufragadores vencem: {v} navios afundados!`,chWinC:`A tripulação v
 tu_chn1:`{a} é capitão: recebe o canal certo ⭐ e o passa em segredo para {b}.`,tu_chn2:`{b} repassa para {c}… mas um Naufragador escondido pode mudar o canal.`,
 tu_chn3:`O último repasse guia o navio: canal errado, ele afunda. Todos veem a rota, ninguém vê o que os outros passaram.`,tu_chn4:`Debatam e votem: o suspeito é acorrentado ⛓️ e o que ele passa fica público.`,
 tu_chn5:`No fim, acusem em segredo: +2 por Naufragador desmascarado. Mas com navios afundados suficientes, eles vencem.`});
+/* 🐙 Le Mimétique : textes */
+GCH('fr',{n_mim:`Le Mimétique`,d_mim:`Plongée dans le noir : quelqu'un imite les autres`,
+r_mim:`Grotte sous-marine, en temps réel : touche un point pour y nager, ta lampe n'éclaire qu'autour de toi. Ramassez les perles de votre couleur pour atteindre l'objectif. Caché parmi vous, 1 Mimétique (2 dès 7 joueurs) peut prendre l'apparence de quelqu'un et voler ses perles : 3 vols (4 dès 7) ou la fin du temps, et les Mimétiques gagnent. Retenez qui était où, remontez pour débattre et votez : la personne désignée révèle son rôle.`,
+miCrew:`Équipage`,miMim:`Mimétique`,miOut:`Démasqué`,miHint:`Touche un point pour y nager · ramasse les perles de ta couleur`,miHintM:`Touche un point pour nager · 🎭 imite quelqu'un pour voler ses perles`,
+miGoalT:`Perles annoncées / objectif · ✓ = vraiment dans le filet au dernier débat`,miMine:`ramassées`,miStolen:`volées`,miMask:`Imiter`,miMaskQ:`Prendre l'apparence de…`,miAs:`en {n}`,
+miCall:`Débat`,miCallAsk:`Remonter et ouvrir un débat ? Il en reste {v} pour toute la partie.`,miThefts:`vols`,miStole:`volée`,
+miZ:`près de l'épave|sous l'arche|dans les coraux|dans le kelp|près de la cheminée|parmi les méduses|à la cloche`,miZn:`Épave|Arche|Coraux|Kelp|Cheminée|Méduses|Cloche`,
+miLog:`Perles depuis la dernière remontée`,miDeb:`{n} a ouvert un débat`,miNet:`Dans le filet : {a} vraies perles sur {b} annoncées`,miNetD:`L'écart : des fausses récoltes de Mimétique… ou des vols.`,
+miVote:`Qui doit révéler son rôle ?`,miVoteD:`Il faut le plus de voix (au moins 2). Si c'est quelqu'un de l'équipage : −{v} s de plongée.`,miNone:`Personne`,
+miRevM:`{n} était Mimétique ! Ses pouvoirs s'éteignent.`,miRevC:`{n} était de l'équipage… −{v} s de plongée.`,miRev0:`Pas de majorité : personne ne révèle son rôle.`,miBack:`Tout le monde repart de la cloche.`,
+miWinC:`L'équipage l'emporte : le filet est plein !`,miWinC2:`L'équipage l'emporte : tous les Mimétiques sont démasqués !`,miWinS:`Les Mimétiques l'emportent : {v} perles volées !`,miWinM:`Les Mimétiques l'emportent : le temps est écoulé.`,
+miWere:`Les Mimétiques étaient :`,miStM:`perles volées : {a} · fausses récoltes : {b}`,miStC:`perles ramassées : {a}`,
+tu_mim1:`Touche un point (ou glisse le doigt) pour y nager. Ta lampe n'éclaire qu'autour de toi : les autres et les perles n'apparaissent que dans ton halo.`,
+tu_mim2:`Ramasse les perles de ta couleur en passant dessus. De nouvelles perles apparaissent pendant toute la plongée : ensemble, atteignez l'objectif.`,
+tu_mim3:`Le Mimétique 🐙 peut prendre l'apparence de {b} quelques secondes (un nuage d'encre le trahit) et voler ses perles. Le fil annonce : perle de {b} volée près de l'épave.`,
+tu_mim4:`Mais {b} était avec {a}, à l'autre bout ! Quelqu'un l'imitait. Souvenez-vous de qui était où, et guettez les nuages d'encre.`,
+tu_mim5:`📯 Remontez pour débattre (nombre limité) et votez en secret, en changeant d'avis si besoin : la personne désignée révèle son rôle. Mimétique : ses pouvoirs s'éteignent. Erreur : l'équipage perd du temps.`,
+tu_mim6:`L'équipage gagne à l'objectif, ou en démasquant tous les Mimétiques. Les Mimétiques gagnent après assez de vols, ou si le temps s'écoule.`});
+GCH('en',{n_mim:`The Mimic`,d_mim:`A dive in the dark: someone is imitating the others`,
+r_mim:`An underwater cave, in real time: tap a point to swim there; your lamp only lights up around you. Collect pearls of your own colour to reach the goal. Hidden among you, 1 Mimic (2 from 7 players) can take someone's appearance and steal their pearls: 3 thefts (4 from 7 players) or time running out, and the Mimics win. Remember who was where, surface to debate and vote: the chosen person reveals their role.`,
+miCrew:`Crew`,miMim:`Mimic`,miOut:`Unmasked`,miHint:`Tap a point to swim there · collect pearls of your colour`,miHintM:`Tap a point to swim · 🎭 imitate someone to steal their pearls`,
+miGoalT:`Pearls announced / goal · ✓ = really in the net at the last debate`,miMine:`collected`,miStolen:`stolen`,miMask:`Imitate`,miMaskQ:`Take the appearance of…`,miAs:`as {n}`,
+miCall:`Debate`,miCallAsk:`Surface and open a debate? {v} left for the whole game.`,miThefts:`thefts`,miStole:`stolen`,
+miZ:`near the wreck|under the arch|in the corals|in the kelp|near the chimney|among the jellyfish|at the bell`,miZn:`Wreck|Arch|Corals|Kelp|Chimney|Jellyfish|Bell`,
+miLog:`Pearls since the last surfacing`,miDeb:`{n} opened a debate`,miNet:`In the net: {a} real pearls out of {b} announced`,miNetD:`The gap: a Mimic's fake pickups… or thefts.`,
+miVote:`Who should reveal their role?`,miVoteD:`It takes the most votes (at least 2). If it's a crew member: −{v} s of dive time.`,miNone:`Nobody`,
+miRevM:`{n} was a Mimic! Their powers fade out.`,miRevC:`{n} was crew… −{v} s of dive time.`,miRev0:`No majority: nobody reveals their role.`,miBack:`Everyone sets off again from the bell.`,
+miWinC:`The crew wins: the net is full!`,miWinC2:`The crew wins: every Mimic is unmasked!`,miWinS:`The Mimics win: {v} pearls stolen!`,miWinM:`The Mimics win: time is up.`,
+miWere:`The Mimics were:`,miStM:`pearls stolen: {a} · fake pickups: {b}`,miStC:`pearls collected: {a}`,
+tu_mim1:`Tap a point (or drag your finger) to swim there. Your lamp only lights up around you: others and pearls only appear inside your halo.`,
+tu_mim2:`Collect pearls of your colour by swimming over them. New pearls appear throughout the dive: together, reach the goal.`,
+tu_mim3:`The Mimic 🐙 can take {b}'s appearance for a few seconds (a cloud of ink gives it away) and steal their pearls. The feed says: {b}'s pearl stolen near the wreck.`,
+tu_mim4:`But {b} was with {a}, at the other end! Someone was imitating them. Remember who was where, and watch for ink clouds.`,
+tu_mim5:`📯 Surface to debate (limited number) and vote in secret, changing your mind if needed: the chosen person reveals their role. A Mimic loses their powers. A mistake costs the crew time.`,
+tu_mim6:`The crew wins by reaching the goal, or by unmasking every Mimic. The Mimics win after enough thefts, or when time runs out.`});
+GCH('es',{n_mim:`El Mimético`,d_mim:`Buceo a oscuras: alguien imita a los demás`,
+r_mim:`Una cueva submarina, en tiempo real: toca un punto para nadar hasta allí; tu linterna solo alumbra a tu alrededor. Recoged las perlas de vuestro color para alcanzar el objetivo. Escondido entre vosotros, 1 Mimético (2 desde 7 jugadores) puede tomar la apariencia de alguien y robar sus perlas: con 3 robos (4 desde 7) o al acabarse el tiempo, ganan los Miméticos. Recordad quién estaba dónde, subid a debatir y votad: la persona elegida revela su rol.`,
+miCrew:`Tripulación`,miMim:`Mimético`,miOut:`Desenmascarado`,miHint:`Toca un punto para nadar · recoge las perlas de tu color`,miHintM:`Toca un punto para nadar · 🎭 imita a alguien para robar sus perlas`,
+miGoalT:`Perlas anunciadas / objetivo · ✓ = realmente en la red en el último debate`,miMine:`recogidas`,miStolen:`robadas`,miMask:`Imitar`,miMaskQ:`Tomar la apariencia de…`,miAs:`como {n}`,
+miCall:`Debate`,miCallAsk:`¿Subir y abrir un debate? Quedan {v} para toda la partida.`,miThefts:`robos`,miStole:`robada`,
+miZ:`junto al pecio|bajo el arco|entre los corales|en el kelp|junto a la chimenea|entre las medusas|en la campana`,miZn:`Pecio|Arco|Corales|Kelp|Chimenea|Medusas|Campana`,
+miLog:`Perlas desde la última subida`,miDeb:`{n} ha abierto un debate`,miNet:`En la red: {a} perlas reales de {b} anunciadas`,miNetD:`La diferencia: recogidas falsas de un Mimético… o robos.`,
+miVote:`¿Quién debe revelar su rol?`,miVoteD:`Hacen falta más votos que nadie (al menos 2). Si es de la tripulación: −{v} s de buceo.`,miNone:`Nadie`,
+miRevM:`¡{n} era Mimético! Sus poderes se apagan.`,miRevC:`{n} era de la tripulación… −{v} s de buceo.`,miRev0:`Sin mayoría: nadie revela su rol.`,miBack:`Todo el mundo vuelve a salir desde la campana.`,
+miWinC:`¡Gana la tripulación: la red está llena!`,miWinC2:`¡Gana la tripulación: todos los Miméticos desenmascarados!`,miWinS:`¡Ganan los Miméticos: {v} perlas robadas!`,miWinM:`Ganan los Miméticos: se acabó el tiempo.`,
+miWere:`Los Miméticos eran:`,miStM:`perlas robadas: {a} · recogidas falsas: {b}`,miStC:`perlas recogidas: {a}`,
+tu_mim1:`Toca un punto (o desliza el dedo) para nadar hasta allí. Tu linterna solo alumbra a tu alrededor: los demás y las perlas solo aparecen dentro de tu halo.`,
+tu_mim2:`Recoge las perlas de tu color pasando por encima. Aparecen perlas nuevas durante todo el buceo: juntos, alcanzad el objetivo.`,
+tu_mim3:`El Mimético 🐙 puede tomar la apariencia de {b} unos segundos (una nube de tinta lo delata) y robar sus perlas. El registro anuncia: perla de {b} robada junto al pecio.`,
+tu_mim4:`¡Pero {b} estaba con {a}, en la otra punta! Alguien lo imitaba. Recordad quién estaba dónde y vigilad las nubes de tinta.`,
+tu_mim5:`📯 Subid a debatir (número limitado) y votad en secreto, cambiando de opinión si hace falta: la persona elegida revela su rol. Un Mimético pierde sus poderes. Un error le cuesta tiempo a la tripulación.`,
+tu_mim6:`La tripulación gana al alcanzar el objetivo, o desenmascarando a todos los Miméticos. Los Miméticos ganan tras suficientes robos, o si se acaba el tiempo.`});
+GCH('it',{n_mim:`Il Mimetico`,d_mim:`Un'immersione al buio: qualcuno imita gli altri`,
+r_mim:`Una grotta sottomarina, in tempo reale: tocca un punto per nuotarci; la tua lampada illumina solo intorno a te. Raccogliete le perle del vostro colore per raggiungere l'obiettivo. Nascosto tra voi, 1 Mimetico (2 da 7 giocatori) può prendere l'aspetto di qualcuno e rubargli le perle: con 3 furti (4 da 7) o allo scadere del tempo, vincono i Mimetici. Ricordate chi era dove, risalite a discutere e votate: la persona scelta rivela il suo ruolo.`,
+miCrew:`Equipaggio`,miMim:`Mimetico`,miOut:`Smascherato`,miHint:`Tocca un punto per nuotarci · raccogli le perle del tuo colore`,miHintM:`Tocca un punto per nuotare · 🎭 imita qualcuno per rubargli le perle`,
+miGoalT:`Perle annunciate / obiettivo · ✓ = davvero nella rete all'ultimo dibattito`,miMine:`raccolte`,miStolen:`rubate`,miMask:`Imita`,miMaskQ:`Prendere l'aspetto di…`,miAs:`come {n}`,
+miCall:`Dibattito`,miCallAsk:`Risalire e aprire un dibattito? Ne restano {v} per tutta la partita.`,miThefts:`furti`,miStole:`rubata`,
+miZ:`vicino al relitto|sotto l'arco|tra i coralli|nel kelp|vicino al camino|tra le meduse|alla campana`,miZn:`Relitto|Arco|Coralli|Kelp|Camino|Meduse|Campana`,
+miLog:`Perle dall'ultima risalita`,miDeb:`{n} ha aperto un dibattito`,miNet:`Nella rete: {a} perle vere su {b} annunciate`,miNetD:`La differenza: finte raccolte di un Mimetico… o furti.`,
+miVote:`Chi deve rivelare il suo ruolo?`,miVoteD:`Servono più voti di ogni altra scelta (almeno 2). Se è dell'equipaggio: −{v} s di immersione.`,miNone:`Nessuno`,
+miRevM:`{n} era un Mimetico! I suoi poteri si spengono.`,miRevC:`{n} era dell'equipaggio… −{v} s di immersione.`,miRev0:`Nessuna maggioranza: nessuno rivela il suo ruolo.`,miBack:`Tutti ripartono dalla campana.`,
+miWinC:`Vince l'equipaggio: la rete è piena!`,miWinC2:`Vince l'equipaggio: tutti i Mimetici smascherati!`,miWinS:`Vincono i Mimetici: {v} perle rubate!`,miWinM:`Vincono i Mimetici: il tempo è scaduto.`,
+miWere:`I Mimetici erano:`,miStM:`perle rubate: {a} · finte raccolte: {b}`,miStC:`perle raccolte: {a}`,
+tu_mim1:`Tocca un punto (o trascina il dito) per nuotarci. La tua lampada illumina solo intorno a te: gli altri e le perle compaiono solo nel tuo alone.`,
+tu_mim2:`Raccogli le perle del tuo colore passandoci sopra. Nuove perle compaiono per tutta l'immersione: insieme, raggiungete l'obiettivo.`,
+tu_mim3:`Il Mimetico 🐙 può prendere l'aspetto di {b} per qualche secondo (una nuvola d'inchiostro lo tradisce) e rubargli le perle. Il registro annuncia: perla di {b} rubata vicino al relitto.`,
+tu_mim4:`Ma {b} era con {a}, dall'altra parte! Qualcuno lo imitava. Ricordate chi era dove, e tenete d'occhio le nuvole d'inchiostro.`,
+tu_mim5:`📯 Risalite a discutere (numero limitato) e votate in segreto, cambiando idea se serve: la persona scelta rivela il suo ruolo. Un Mimetico perde i suoi poteri. Un errore costa tempo all'equipaggio.`,
+tu_mim6:`L'equipaggio vince raggiungendo l'obiettivo, o smascherando tutti i Mimetici. I Mimetici vincono dopo abbastanza furti, o se il tempo scade.`});
+GCH('de',{n_mim:`Der Mimetiker`,d_mim:`Tauchgang im Dunkeln: jemand ahmt die anderen nach`,
+r_mim:`Eine Unterwasserhöhle, in Echtzeit: tippe auf einen Punkt, um hinzuschwimmen; deine Lampe leuchtet nur um dich herum. Sammelt die Perlen eurer Farbe, um das Ziel zu erreichen. Unter euch versteckt sich 1 Mimetiker (2 ab 7 Leuten), der das Aussehen einer Person annehmen und ihre Perlen stehlen kann: 3 Diebstähle (4 ab 7) oder Zeit abgelaufen, und die Mimetiker gewinnen. Merkt euch, wer wo war, taucht auf, diskutiert und stimmt ab: die gewählte Person zeigt ihre Rolle.`,
+miCrew:`Crew`,miMim:`Mimetiker`,miOut:`Entlarvt`,miHint:`Tippe auf einen Punkt, um hinzuschwimmen · sammle die Perlen deiner Farbe`,miHintM:`Tippe zum Schwimmen · 🎭 ahme jemanden nach, um Perlen zu stehlen`,
+miGoalT:`Gemeldete Perlen / Ziel · ✓ = wirklich im Netz bei der letzten Debatte`,miMine:`gesammelt`,miStolen:`gestohlen`,miMask:`Nachahmen`,miMaskQ:`Das Aussehen annehmen von…`,miAs:`als {n}`,
+miCall:`Debatte`,miCallAsk:`Auftauchen und eine Debatte eröffnen? Noch {v} für das ganze Spiel.`,miThefts:`Diebstähle`,miStole:`gestohlen`,
+miZ:`beim Wrack|unter dem Bogen|in den Korallen|im Seetang|beim Schlot|bei den Quallen|an der Glocke`,miZn:`Wrack|Bogen|Korallen|Seetang|Schlot|Quallen|Glocke`,
+miLog:`Perlen seit dem letzten Auftauchen`,miDeb:`{n} hat eine Debatte eröffnet`,miNet:`Im Netz: {a} echte Perlen von {b} gemeldeten`,miNetD:`Die Lücke: Scheinfunde eines Mimetikers… oder Diebstähle.`,
+miVote:`Wer soll die eigene Rolle zeigen?`,miVoteD:`Es braucht die meisten Stimmen (mindestens 2). Trifft es die Crew: −{v} s Tauchzeit.`,miNone:`Niemand`,
+miRevM:`{n} war Mimetiker! Die Kräfte erlöschen.`,miRevC:`{n} war von der Crew… −{v} s Tauchzeit.`,miRev0:`Keine Mehrheit: niemand zeigt die eigene Rolle.`,miBack:`Alle starten wieder an der Glocke.`,
+miWinC:`Die Crew gewinnt: das Netz ist voll!`,miWinC2:`Die Crew gewinnt: alle Mimetiker sind entlarvt!`,miWinS:`Die Mimetiker gewinnen: {v} Perlen gestohlen!`,miWinM:`Die Mimetiker gewinnen: die Zeit ist um.`,
+miWere:`Die Mimetiker waren:`,miStM:`gestohlene Perlen: {a} · Scheinfunde: {b}`,miStC:`gesammelte Perlen: {a}`,
+tu_mim1:`Tippe auf einen Punkt (oder zieh den Finger), um hinzuschwimmen. Deine Lampe leuchtet nur um dich herum: andere und Perlen erscheinen nur in deinem Lichtkreis.`,
+tu_mim2:`Sammle die Perlen deiner Farbe, indem du darüber schwimmst. Neue Perlen erscheinen während des ganzen Tauchgangs: gemeinsam erreicht ihr das Ziel.`,
+tu_mim3:`Der Mimetiker 🐙 kann ein paar Sekunden wie {b} aussehen (eine Tintenwolke verrät es) und Perlen stehlen. Die Meldung lautet: Perle von {b} beim Wrack gestohlen.`,
+tu_mim4:`Aber {b} war bei {a}, am anderen Ende! Jemand hat {b} nachgeahmt. Merkt euch, wer wo war, und achtet auf Tintenwolken.`,
+tu_mim5:`📯 Taucht auf zur Debatte (begrenzte Zahl) und stimmt geheim ab, umentscheiden erlaubt: die gewählte Person zeigt ihre Rolle. Ein Mimetiker verliert seine Kräfte. Ein Irrtum kostet die Crew Zeit.`,
+tu_mim6:`Die Crew gewinnt mit dem Ziel oder wenn alle Mimetiker entlarvt sind. Die Mimetiker gewinnen nach genug Diebstählen oder wenn die Zeit abläuft.`});
+GCH('ru',{n_mim:`Мимик`,d_mim:`Погружение в темноте: кто-то подражает другим`,
+r_mim:`Подводная пещера, в реальном времени: коснись точки, чтобы плыть туда; фонарь светит только вокруг тебя. Собирайте жемчуг своего цвета, чтобы достичь цели. Среди вас прячется 1 Мимик (2 — от 7 игроков): он может принять облик другого игрока и красть его жемчуг. 3 кражи (4 — от 7) или конец времени — и Мимики побеждают. Запоминайте, кто где был, всплывайте для спора и голосуйте: выбранный игрок раскрывает роль.`,
+miCrew:`Команда`,miMim:`Мимик`,miOut:`Разоблачён`,miHint:`Коснись точки, чтобы плыть · собирай жемчуг своего цвета`,miHintM:`Коснись точки, чтобы плыть · 🎭 подражай кому-то, чтобы красть жемчуг`,
+miGoalT:`Объявленный жемчуг / цель · ✓ = действительно в сети на последнем споре`,miMine:`собрано`,miStolen:`украдено`,miMask:`Подражать`,miMaskQ:`Принять облик…`,miAs:`как {n}`,
+miCall:`Спор`,miCallAsk:`Всплыть и начать спор? Осталось {v} на всю игру.`,miThefts:`краж`,miStole:`украдена`,
+miZ:`у затонувшего корабля|под аркой|в кораллах|в водорослях|у трубы|среди медуз|у колокола`,miZn:`Корабль|Арка|Кораллы|Водоросли|Труба|Медузы|Колокол`,
+miLog:`Жемчуг с последнего всплытия`,miDeb:`{n} начинает спор`,miNet:`В сети: {a} настоящих жемчужин из {b} объявленных`,miNetD:`Разница — это притворные находки Мимика… или кражи.`,
+miVote:`Кто раскроет свою роль?`,miVoteD:`Нужно больше всех голосов (не меньше 2). Если это кто-то из команды: −{v} с погружения.`,miNone:`Никто`,
+miRevM:`{n} — Мимик! Его силы гаснут.`,miRevC:`{n} — из команды… −{v} с погружения.`,miRev0:`Нет большинства: никто не раскрывает роль.`,miBack:`Все снова стартуют от колокола.`,
+miWinC:`Команда побеждает: сеть полна!`,miWinC2:`Команда побеждает: все Мимики разоблачены!`,miWinS:`Мимики побеждают: украдено жемчужин — {v}!`,miWinM:`Мимики побеждают: время вышло.`,
+miWere:`Мимиками были:`,miStM:`украдено: {a} · притворных находок: {b}`,miStC:`собрано жемчуга: {a}`,
+tu_mim1:`Коснись точки (или веди пальцем), чтобы плыть туда. Фонарь светит только вокруг тебя: других и жемчуг видно только в твоём ореоле.`,
+tu_mim2:`Собирай жемчуг своего цвета, проплывая над ним. Новый жемчуг появляется всё погружение: вместе достигните цели.`,
+tu_mim3:`Мимик 🐙 может на несколько секунд принять облик {b} (выдаёт облачко чернил) и украсть его жемчуг. В ленте: жемчужина {b} украдена у затонувшего корабля.`,
+tu_mim4:`Но {b} был с {a} на другом конце! Кто-то ему подражал. Запоминайте, кто где был, и следите за облачками чернил.`,
+tu_mim5:`📯 Всплывайте для спора (число ограничено) и голосуйте тайно, можно передумать: выбранный игрок раскрывает роль. Мимик теряет силы. Ошибка стоит команде времени.`,
+tu_mim6:`Команда побеждает, достигнув цели или разоблачив всех Мимиков. Мимики побеждают после достаточного числа краж или когда время выходит.`});
+GCH('zh',{n_mim:`拟态者`,d_mim:`黑暗中的潜水：有人在模仿别人`,
+r_mim:`实时的海底洞穴：点一下就游过去，你的灯只照亮身边。收集自己颜色的珍珠，一起达成目标。你们之中藏着1名拟态者（7人起2名），能变成别人的样子并偷走那人的珍珠：偷到3颗（7人起4颗）或时间耗尽，拟态者获胜。记住谁在哪里，浮上水面讨论并投票：被选中的人公开身份。`,
+miCrew:`船员`,miMim:`拟态者`,miOut:`已揭穿`,miHint:`点一下就游过去 · 收集自己颜色的珍珠`,miHintM:`点一下就游过去 · 🎭 模仿别人来偷他的珍珠`,
+miGoalT:`已播报珍珠 / 目标 · ✓ = 上次讨论时真正在网里的`,miMine:`已收集`,miStolen:`已偷`,miMask:`模仿`,miMaskQ:`变成……的样子`,miAs:`变成{n}`,
+miCall:`讨论`,miCallAsk:`浮上水面开启讨论？整局还剩{v}次。`,miThefts:`偷窃`,miStole:`被偷`,
+miZ:`在沉船旁|在拱门下|在珊瑚里|在海藻里|在烟囱旁|在水母间|在潜水钟`,miZn:`沉船|拱门|珊瑚|海藻|烟囱|水母|潜水钟`,
+miLog:`上次浮出后的珍珠`,miDeb:`{n}开启了讨论`,miNet:`网里：{b}颗播报中有{a}颗是真的`,miNetD:`差距来自拟态者的假收集……或偷窃。`,
+miVote:`谁该公开身份？`,miVoteD:`需要票数最多（至少2票）。若是船员：潜水时间−{v}秒。`,miNone:`不选`,
+miRevM:`{n}是拟态者！能力熄灭了。`,miRevC:`{n}是船员……潜水时间−{v}秒。`,miRev0:`没有多数：无人公开身份。`,miBack:`所有人从潜水钟重新出发。`,
+miWinC:`船员获胜：网装满了！`,miWinC2:`船员获胜：所有拟态者都被揭穿！`,miWinS:`拟态者获胜：偷走了{v}颗珍珠！`,miWinM:`拟态者获胜：时间到了。`,
+miWere:`拟态者是：`,miStM:`偷走{a}颗 · 假收集{b}次`,miStC:`收集了{a}颗珍珠`,
+tu_mim1:`点一下（或拖动手指）就游过去。你的灯只照亮身边：其他人和珍珠只在你的光圈里出现。`,
+tu_mim2:`游过自己颜色的珍珠就能收集。整个潜水过程中都会出现新珍珠：一起达成目标。`,
+tu_mim3:`拟态者🐙能变成{b}的样子几秒钟（一团墨汁会暴露它），偷走{b}的珍珠。动态显示：{b}的珍珠在沉船旁被偷。`,
+tu_mim4:`可是{b}当时和{a}在另一头！有人在模仿。记住谁在哪里，留意墨汁。`,
+tu_mim5:`📯 浮上水面讨论（次数有限），秘密投票，可以改票：被选中的人公开身份。拟态者失去能力；选错了，船员会损失时间。`,
+tu_mim6:`船员达成目标或揭穿所有拟态者即获胜。拟态者偷够珍珠或时间耗尽即获胜。`});
+GCH('he',{n_mim:`המחקה`,d_mim:`צלילה בחושך: מישהו מחקה את האחרים`,
+r_mim:`מערה תת-ימית, בזמן אמת: נוגעים בנקודה כדי לשחות אליה; הפנס מאיר רק סביבכם. אספו פנינים בצבע שלכם כדי להגיע ליעד. בינכם מסתתר מחקה 1 (2 מ-7 שחקנים) שיכול ללבוש מראה של מישהו ולגנוב את הפנינים שלו: 3 גניבות (4 מ-7) או תום הזמן, והמחקים מנצחים. זכרו מי היה איפה, עלו לדיון והצביעו: מי שנבחר חושף את תפקידו.`,
+miCrew:`צוות`,miMim:`מחקה`,miOut:`נחשף`,miHint:`נגיעה בנקודה כדי לשחות · אספו פנינים בצבע שלכם`,miHintM:`נגיעה כדי לשחות · 🎭 חקו מישהו כדי לגנוב את הפנינים שלו`,
+miGoalT:`פנינים שהוכרזו / יעד · ✓ = באמת ברשת בדיון האחרון`,miMine:`נאספו`,miStolen:`נגנבו`,miMask:`לחקות`,miMaskQ:`ללבוש את המראה של…`,miAs:`בתור {n}`,
+miCall:`דיון`,miCallAsk:`לעלות ולפתוח דיון? נשארו {v} לכל המשחק.`,miThefts:`גניבות`,miStole:`נגנבה`,
+miZ:`ליד הספינה הטבועה|מתחת לקשת|בין האלמוגים|בין האצות|ליד הארובה|בין המדוזות|ליד הפעמון`,miZn:`ספינה|קשת|אלמוגים|אצות|ארובה|מדוזות|פעמון`,
+miLog:`פנינים מאז העלייה האחרונה`,miDeb:`{n} פתח דיון`,miNet:`ברשת: {a} פנינים אמיתיות מתוך {b} שהוכרזו`,miNetD:`הפער: איסופים מזויפים של מחקה… או גניבות.`,
+miVote:`מי יחשוף את תפקידו?`,miVoteD:`צריך הכי הרבה קולות (לפחות 2). אם זה מישהו מהצוות: ‎−{v} שנ׳ צלילה.`,miNone:`אף אחד`,
+miRevM:`{n} היה מחקה! הכוחות כבים.`,miRevC:`{n} היה מהצוות… ‎−{v} שנ׳ צלילה.`,miRev0:`אין רוב: אף אחד לא חושף תפקיד.`,miBack:`כולם יוצאים שוב מהפעמון.`,
+miWinC:`הצוות ניצח: הרשת מלאה!`,miWinC2:`הצוות ניצח: כל המחקים נחשפו!`,miWinS:`המחקים ניצחו: {v} פנינים נגנבו!`,miWinM:`המחקים ניצחו: הזמן נגמר.`,
+miWere:`המחקים היו:`,miStM:`פנינים שנגנבו: {a} · איסופים מזויפים: {b}`,miStC:`פנינים שנאספו: {a}`,
+tu_mim1:`נוגעים בנקודה (או גוררים אצבע) כדי לשחות אליה. הפנס מאיר רק סביבכם: אחרים ופנינים מופיעים רק בתוך ההילה שלכם.`,
+tu_mim2:`אוספים פנינים בצבע שלכם כששוחים מעליהן. פנינים חדשות מופיעות לאורך כל הצלילה: יחד מגיעים ליעד.`,
+tu_mim3:`המחקה 🐙 יכול ללבוש את המראה של {b} לכמה שניות (ענן דיו מסגיר אותו) ולגנוב את הפנינים. ההודעה: פנינה של {b} נגנבה ליד הספינה הטבועה.`,
+tu_mim4:`אבל {b} היה עם {a} בקצה השני! מישהו חיקה. זכרו מי היה איפה, ושימו לב לענני דיו.`,
+tu_mim5:`📯 עולים לדיון (מספר מוגבל) ומצביעים בסוד, אפשר לשנות דעה: מי שנבחר חושף את תפקידו. מחקה מאבד את כוחותיו. טעות עולה לצוות בזמן.`,
+tu_mim6:`הצוות מנצח כשמגיע ליעד או חושף את כל המחקים. המחקים מנצחים אחרי מספיק גניבות או כשהזמן נגמר.`});
+GCH('pt',{n_mim:`O Mimético`,d_mim:`Mergulho no escuro: alguém imita os outros`,
+r_mim:`Uma caverna submarina, em tempo real: toque num ponto para nadar até lá; sua lanterna só ilumina ao seu redor. Recolham as pérolas da sua cor para atingir o objetivo. Escondido entre vocês, 1 Mimético (2 a partir de 7 jogadores) pode assumir a aparência de alguém e roubar as pérolas dessa pessoa: com 3 roubos (4 a partir de 7) ou com o fim do tempo, os Miméticos vencem. Lembrem quem estava onde, subam para debater e votem: a pessoa escolhida revela seu papel.`,
+miCrew:`Tripulação`,miMim:`Mimético`,miOut:`Desmascarado`,miHint:`Toque num ponto para nadar · recolha as pérolas da sua cor`,miHintM:`Toque num ponto para nadar · 🎭 imite alguém para roubar as pérolas`,
+miGoalT:`Pérolas anunciadas / objetivo · ✓ = de fato na rede no último debate`,miMine:`recolhidas`,miStolen:`roubadas`,miMask:`Imitar`,miMaskQ:`Assumir a aparência de…`,miAs:`como {n}`,
+miCall:`Debate`,miCallAsk:`Subir e abrir um debate? Restam {v} para a partida toda.`,miThefts:`roubos`,miStole:`roubada`,
+miZ:`perto do naufrágio|sob o arco|nos corais|na alga|perto da chaminé|entre as águas-vivas|no sino`,miZn:`Naufrágio|Arco|Corais|Alga|Chaminé|Águas-vivas|Sino`,
+miLog:`Pérolas desde a última subida`,miDeb:`{n} abriu um debate`,miNet:`Na rede: {a} pérolas reais de {b} anunciadas`,miNetD:`A diferença: coletas falsas de um Mimético… ou roubos.`,
+miVote:`Quem deve revelar o papel?`,miVoteD:`É preciso ter mais votos (pelo menos 2). Se for da tripulação: −{v} s de mergulho.`,miNone:`Ninguém`,
+miRevM:`{n} era Mimético! Os poderes se apagam.`,miRevC:`{n} era da tripulação… −{v} s de mergulho.`,miRev0:`Sem maioria: ninguém revela o papel.`,miBack:`Todo mundo parte de novo do sino.`,
+miWinC:`A tripulação vence: a rede está cheia!`,miWinC2:`A tripulação vence: todos os Miméticos desmascarados!`,miWinS:`Os Miméticos vencem: {v} pérolas roubadas!`,miWinM:`Os Miméticos vencem: o tempo acabou.`,
+miWere:`Os Miméticos eram:`,miStM:`pérolas roubadas: {a} · coletas falsas: {b}`,miStC:`pérolas recolhidas: {a}`,
+tu_mim1:`Toque num ponto (ou arraste o dedo) para nadar até lá. Sua lanterna só ilumina ao seu redor: os outros e as pérolas só aparecem dentro do seu halo.`,
+tu_mim2:`Recolha as pérolas da sua cor passando por cima delas. Novas pérolas surgem durante todo o mergulho: juntos, atinjam o objetivo.`,
+tu_mim3:`O Mimético 🐙 pode assumir a aparência de {b} por alguns segundos (uma nuvem de tinta o denuncia) e roubar as pérolas. O registro anuncia: pérola de {b} roubada perto do naufrágio.`,
+tu_mim4:`Mas {b} estava com {a}, do outro lado! Alguém imitava. Lembrem quem estava onde e fiquem de olho nas nuvens de tinta.`,
+tu_mim5:`📯 Subam para debater (número limitado) e votem em segredo, podendo mudar de ideia: a pessoa escolhida revela o papel. Um Mimético perde os poderes. Um erro custa tempo à tripulação.`,
+tu_mim6:`A tripulação vence ao atingir o objetivo, ou desmascarando todos os Miméticos. Os Miméticos vencem com roubos suficientes, ou se o tempo acabar.`});
 })();
