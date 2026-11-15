@@ -52,6 +52,8 @@
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="i18n.js?v=20261115f"></script>
 <script src="decks.js?v=3"></script>
+<script src="games.js?v=1"></script><!-- @games -->
+
 <style>
 :root{--sea1:#bdeef0;--sea2:#69c9d3;--deep:#0e5866;--deep2:#0a4652;--paper:#fffaf0;--paper2:#fbf0d9;--edge:#ead6ae;--edge2:#d8bd88;--txt:#3b2a1b;--mut:#8a7660;--acc:#ff8a3d;--acc-d:#d9661f;--acc2:#ffb15c;--ink:#1d8e6c;--sur:#d9661f;--ear:#5869b5;--bad:#d64b3c;--gold:#f2b84b}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -2133,7 +2135,7 @@ function chatHint(h){const d=h&&h.firstElementChild;if(!d||!st)return;const b=do
 function broadcast(msg){for(const id in conns){const c=conns[id];if(c.open)try{c.send(msg)}catch(e){}}}
 function bump(){st.v++;st.updatedAt=Date.now();for(const id in conns){const c=conns[id];if(c.open)try{c.send({t:'state',st:viewFor(c.pname,st)})}catch(e){}}persist();render()}
 /* @qa2 : vue par destinataire : notes sur `name` scellées jusqu'à la fin, votes « Qui de nous » masqués tant que tout le monde n'a pas voté */
-function viewFor(name,s){if(!s||!name)return s;const c=s.cur,seal=!['lobby','end','recap','carnet'].includes(s.phase),wh=c&&c.wo&&!g3WoDone(c);if(!seal&&!wh)return s;const v={...s};
+function viewFor(name,s){if(!s||!name)return s;if(s.phase=='game'||s.phase=='gend')return GHide(name,s);/* @games */const c=s.cur,seal=!['lobby','end','recap','carnet'].includes(s.phase),wh=c&&c.wo&&!g3WoDone(c);if(!seal&&!wh)return s;const v={...s};
  if(seal){if((s.hist||[]).some(h=>h.terr==name&&h.nt))v.hist=s.hist.map(h=>h.terr==name&&h.nt?{...h,nt:Object.fromEntries(Object.keys(h.nt).map(k=>[k,1]))}:h);
   for(const x in s.maps||{}){const l=s.maps[x]&&s.maps[x][name];if(x!=name&&l&&l.some(e=>e.nt)){if(v.maps===s.maps)v.maps={...s.maps};v.maps[x]={...s.maps[x],[name]:l.map(e=>{if(!e.nt)return e;const o={...e};delete o.nt;return o})}}}}
  if(wh){const m=o=>Object.fromEntries(Object.keys(o||{}).map(k=>[k,k==name?o[k]:'']));v.cur={...c,wo:{...c.wo,v:m(c.wo.v)}};if(v.hist||s.hist)v.hist=(v.hist||s.hist).map(h=>h.cid==c.id&&h.wo?{...h,wo:{...h.wo,v:m(h.wo.v)}}:h)}
@@ -2169,7 +2171,8 @@ function kick(name,ban){const p=P(name);if(!isHost||!p||name==st.host)return;
  if(ban){st.banned=st.banned||[];if(!st.banned.includes(name))st.banned.push(name)}
  for(const id in conns){const c=conns[id];if(c.pname==name){try{c.send({t:'err',k:ban?'kicked':'g2Out'})}catch(e){}delete conns[id];setTimeout(()=>{try{c.close()}catch(e){}},500)}}
  st.players=st.players.filter(x=>x!=p);delete st.votes[name];
- if(st.phase!='lobby'&&st.order.includes(name)){const n=st.order.length,left=Math.max(0,st.total-st.turn),xi=st.order.indexOf(name),L=st.L||st.length,b=Math.floor(st.turn/L)%n;
+ if((st.phase=='game'||st.phase=='gend')&&st.order.includes(name))GKick(st,name);/* @games */
+ else if(st.phase!='lobby'&&st.order.includes(name)){const n=st.order.length,left=Math.max(0,st.total-st.turn),xi=st.order.indexOf(name),L=st.L||st.length,b=Math.floor(st.turn/L)%n;
   st.order=st.order.filter(x=>x!=name);if(MODE()=='por'){/* @qa2 : l'île en cours reste la même */if(xi<b){st.turn-=L;if(st.pf!=null)st.pf-=L}else if(xi==b){st.turn=b*L;st.pf=st.turn}st.total=Math.max(st.turn,st.total-L)}else st.total=st.turn+Math.round(left*(n-1)/n);
   if(st.cur&&(st.cur.explorer==name||st.cur.terr==name)){st.cur=null;if(!['end','carnet'].includes(st.phase))st.phase='map'}
   if(st.order.length<2&&!['end','carnet'].includes(st.phase)){st.cur=null;st.phase='end'}
@@ -2220,7 +2223,7 @@ function loadBestSave(){const k=saveKey(st.order);const cands=[LS.get(k,null)];f
  /* game2 : chaque partie repart de cartes vierges ; les anciennes restent dans le carnet (log), les questions déjà vues sont évitées */
  const qs=st.qseen||{};for(const src of [best&&best.used,best&&best.qseen,st.used])for(const t in src||{})qs[t]=[...new Set([...(qs[t]||[]),...src[t]])].slice(-120);
  st.qseen=qs;st.maps={};st.used={};const bl=best&&best.log||[];st.log=bl.length>(st.log||[]).length?bl:(st.log||[])}
-function act(from,a){const s=st;if(!P(from))return;g2Resp(from,a);
+function act(from,a){const s=st;if(!P(from))return;if(GAct(s,from,a))return;/* @games */g2Resp(from,a);
  switch(a.t){
  case 'vote':if(s.phase=='lobby'&&[0,1,2].includes(a.v))s.votes[from]=a.v;break;
  case 'length':if(from==s.host&&s.phase=='lobby'&&[3,5,7].includes(a.v))s.length=a.v;break;
@@ -2543,7 +2546,7 @@ function render(){
  if(!st){home();return}
  const f=captureFocus();
  const v=view();
- const mine=v.mine,key=st.phase+'|'+(st.cur&&st.cur.id)+'|'+st.turn;
+ const mine=v.mine,key=st.phase+'|'+(st.cur&&st.cur.id)+'|'+st.turn+(st.game?'|'+st.gid+'.'+st.game.k:'');/* @games */
  app.classList.toggle('still',key==lastPhaseKey);
  let tb=$('#tb',app),sec=app.querySelector(':scope>section');
  if(!tb||!sec){app.innerHTML='<div id="tb"></div><section></section>';tb=$('#tb',app);sec=app.querySelector(':scope>section')}
@@ -2571,7 +2574,7 @@ function render(){
 function copyInvite(){const url=/^https?:/.test(location.protocol)?'\n'+location.origin+location.pathname+'#'+st.code:'';const t=T('invite',{code:st.code})+url;
  try{navigator.clipboard.writeText(t).then(()=>toast(T('copied')),()=>toast(T('codeIs',{code:st.code})))}catch(e){toast(T('codeIs',{code:st.code}))}}
 function topbar(){
- const ex=st.order.length&&!['lobby','end','recap','carnet'].includes(st.phase)?explorer():null,tr=st.cur&&st.cur.terr;
+ const ex=st.order.length&&!['lobby','end','recap','carnet','game','gend'/* @games */].includes(st.phase)?explorer():null,tr=st.cur&&st.cur.terr;
  const list=(st.order.length&&st.phase!='lobby'?st.order.map(P):st.players).filter(Boolean);
  return `<div class="top"><div class="brand" id="homebtn" role="button" tabindex="0" data-tip="${esc(T('home'))}" aria-label="${esc(T('home'))}">${LOGO(40,'t')}<span>Terra <i>Incognita</i></span>${SIG}</div><button class="code" id="codebtn" data-tip="${esc(T('copyInv'))}" aria-label="${esc(T('copyInv'))}">${st.code}</button>
  <button class="icon" id="mute" data-tip="${esc(T('sound'))}" aria-label="${esc(T('sound'))}">${muted?'🔇':'🔊'}</button>${thmBtn()}<button class="icon" id="help" data-tip="${esc(T('help'))}" aria-label="${esc(T('help'))}">?</button></div>
@@ -2589,7 +2592,8 @@ function view(){
  case 'end':return vEnd();
  case 'pfiche':return vPfiche();
  case 'recap':return vRecap();
- case 'carnet':return vCarnet()}
+ case 'carnet':return vCarnet();
+ case 'game':case 'gend':return GView()/* @games */}
  return {html:''}}
 
 /* ---------- Lobby ---------- */
@@ -2602,7 +2606,7 @@ function vLobby(){
  <button class="ghost wide" id="quit">${T('quit')}</button>`,
  bind(){$('#copy').onclick=copyInvite;$$('[data-vote]').forEach(b=>b.onclick=()=>send({t:'vote',v:+b.dataset.vote}));
   $$('[data-len]').forEach(b=>b.onclick=()=>send({t:'length',v:+b.dataset.len}));
-  $$('[data-mode]').forEach(b=>b.onclick=()=>send({t:'mode',v:b.dataset.mode}));
+  $$('[data-mode]').forEach(b=>b.onclick=()=>send({t:'mode',v:b.dataset.mode}));$$('[data-gsel]').forEach(b=>b.onclick=()=>send({t:'gsel',v:b.dataset.gsel}));/* @games */
   $$('[data-tm]').forEach(b=>b.onclick=()=>send({t:'timer',v:TIM[+b.dataset.tm]}));
   $('#anon')&&($('#anon').onclick=()=>send({t:'anon',v:!st.anon}));g2BindTone();
   $('#start')&&($('#start').onclick=()=>send({t:'start'}));$('#quit').onclick=leave}}}
@@ -2612,9 +2616,10 @@ function gLobbyBody(host,my,on){
  const onl=st.players.filter(p=>p.online),md=st.mode=='mir'&&on!=2?'exp':!st.mode&&on==2?'mir':MODE(),isEsc=md=='esc',mt=Math.min(2,...onl.map(p=>st.votes[p.name]??1));
  const tf=st.timer??1,an=!!st.anon&&on>=3,L=isEsc?2:st.length,est=o=>gEst({n:on,mode:md,meteo:mt,len:st.length,tf,...o}).min,E=est();
  const by=host?'':`<p class="gby">${T('chosenBy',{n:B(st.host)})}</p>`;
+ const GX=GLobby(host,on);if(st.gsel)return GX;/* @games */
  const tile=m=>{const dis=m=='mir'&&on!=2,tag=host?'button':'div';return `<${tag} class="gtile ${md==m?'sel':''}" ${host?`data-mode="${m}" ${dis?'disabled':''}`:''}><span class="gi">${GMI[m]}</span><span class="gt"><b>${T('mo_'+m)}</b><span class="mut">${T(dis?'mirOnly':'mo_'+m+'D')}</span></span><span class="gmin">≈ ${est({mode:m})} min</span></${tag}>`};
  const seg=(items,cur,attr)=>`<div class="gseg">${items.map(([v,l])=>`<button ${attr}="${v}" class="${cur==v?'sel':''}">${l}</button>`).join('')}</div>`;
- return `<div class="card"><h3>${T('modeT')}</h3><div class="gtiles">${host?['exp','esc','por','mir'].map(tile).join(''):tile(md)}</div>${by}</div>
+ return `${GX}<div class="card"><h3>${T('modeT')}</h3><div class="gtiles">${host?['exp','esc','por','mir'].map(tile).join(''):tile(md)}</div>${by}</div>
  <div class="card"><h3>${T('meteoT')}</h3>
   <div class="gmets">${[0,1,2].map(i=>`<button data-vote="${i}" class="gmet ${my==i?'sel':''}"><span class="gmh"><b>${MN(i)}</b><span class="wbars" aria-hidden="true">${[0,1,2].map(j=>`<i class="${j<=i?'on':''}"></i>`).join('')}</span></span><span class="gline">${T('mq'+i)}</span><span class="gbad">${ORDER.map(r=>`<span class="${(R[r].lvl||0)<=i?'':'off'}" data-tip="${esc(RN(r)+' · '+RT(r,1))}">${regionBadge(r,22)}</span>`).join('')}</span></button>`).join('')}</div>
   <div class="status">${st.players.map(p=>`<span class="chip"><span class="dot" style="background:${grad(p.color)}"></span>${esc(p.name)} · ${MN(st.votes[p.name]??1)}</span>`).join('')}</div>
