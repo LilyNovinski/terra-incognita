@@ -1092,6 +1092,10 @@ html[data-theme=dark]{color-scheme:dark}
 [data-theme=dark] .gsel>i::after{background:var(--acc2)}
 [data-theme=dark] .gsel button,[data-theme=dark] .gsel button:hover{background:none}
 [data-theme=dark] .gsel button[aria-checked=true]{color:#fff3df}
+/* @css-qa2 */
+.gsel{grid-template-columns:repeat(2,1fr)}.gsel>i{width:calc((100% - 8px)/2);transition:transform .42s cubic-bezier(.3,1.45,.5,1),opacity .25s}
+.gsel[style*="--i:-1"]>i{opacity:0}
+.gsel.need{animation:gneed .5s ease}@keyframes gneed{30%{box-shadow:inset 0 0 0 2px var(--acc)}60%{transform:translateX(-3px)}80%{transform:translateX(2px)}}
 
 
 
@@ -1814,12 +1818,14 @@ function becomeHost(p,e){
  const mp=P(me.name);if(mp){mp.online=true;mp.peer='host'}
  wireHost(p);
  if(st.phase=='question'&&st.cur)checkAll();
+ if(st.phase=='end'){/* @qa2 : drapeaux anonymes perdus avec l'ancien hôte : à replanter */if(st.anon&&SECF.gid!==st.gid)for(const n in st.flags)if(st.flags[n]===true)st.flags[n]=false;if(MYFL.gid===st.gid&&!st.flags[me.name])gRestore(me.name,{fl:MYFL.v});gFlagsCheck(st)}
+ /* @qa2 : marques de la vue filtrée (notes scellées, votes masqués) : perdues */(st.hist||[]).forEach(h=>{if(h.nt)for(const k in h.nt)if(h.nt[k]===1)delete h.nt[k];if(h.wo&&h.wo.v)for(const k in h.wo.v)if(h.wo.v[k]==='')delete h.wo.v[k]});if(st.cur&&st.cur.wo&&st.cur.wo.v)for(const k in st.cur.wo.v)if(st.cur.wo.v[k]==='')delete st.cur.wo.v[k];
  toast(T('newHost',{n:me.name}));
  bump();window.armTimer&&armTimer();
  /* ceux qui ne sont pas revenus en 12 s passent hors ligne */
  setTimeout(()=>{if(!isHost||peer!==p||!st)return;let ch=false;
   st.players.forEach(x=>{if(x.online&&!isLinked(x.name)){x.online=false;ch=true}});
-  if(ch){if(st.phase=='lobby')st.players=st.players.filter(x=>x.online);if(st.phase=='question'&&st.cur)checkAll();bump()}},12000);
+  if(ch){if(st.phase=='lobby')st.players=st.players.filter(x=>x.online);if(st.phase=='question'&&st.cur)checkAll();gFlagsCheck(st);g3Hurry();bump()}},12000);
  claimBeacon()}
 
 /* phare : reprend l'ID du code pour rediriger les retardataires vers l'hôte actuel */
@@ -1835,7 +1841,7 @@ function handoff(){if(!isHost||!st)return false;
  const h=st.players.find(p=>p.name!=me.name&&p.online&&isLinked(p.name));if(!h)return false;
  const s=JSON.parse(JSON.stringify(st)),mp=s.players.find(p=>p.name==me.name);
  if(s.phase=='lobby'){s.players=s.players.filter(p=>p!=mp);delete s.votes[me.name]}else if(mp)mp.online=false;
- broadcast({t:'handoff',to:h.name,st:s});return true}
+ for(const id in conns){const c=conns[id];if(c.open)try{c.send({t:'handoff',to:h.name,st:c.pname==h.name?s:viewFor(c.pname,s)})}catch(e){}}return true}
 
 /* battement de cœur : ping de l'hôte, détection côté client, hôte isolé qui se découvre remplacé */
 setInterval(()=>{
@@ -1945,7 +1951,13 @@ function chatSync(){let w=$('#chat');
 function chatHint(h){const d=h&&h.firstElementChild;if(!d||!st)return;const b=document.createElement('button');b.type='button';b.className='ch-hb';b.setAttribute('aria-label',T('chT'));b.innerHTML='<span aria-hidden="true">💬</span><i class="ch-badge"></i>';b.onclick=()=>chatToggle();d.appendChild(b);chatBadge()}
 
 function broadcast(msg){for(const id in conns){const c=conns[id];if(c.open)try{c.send(msg)}catch(e){}}}
-function bump(){st.v++;st.updatedAt=Date.now();broadcast({t:'state',st});persist();render()}
+function bump(){st.v++;st.updatedAt=Date.now();for(const id in conns){const c=conns[id];if(c.open)try{c.send({t:'state',st:viewFor(c.pname,st)})}catch(e){}}persist();render()}
+/* @qa2 : vue par destinataire : notes sur `name` scellées jusqu'à la fin, votes « Qui de nous » masqués tant que tout le monde n'a pas voté */
+function viewFor(name,s){if(!s||!name)return s;const c=s.cur,seal=!['lobby','end','recap','carnet'].includes(s.phase),wh=c&&c.wo&&!g3WoDone(c);if(!seal&&!wh)return s;const v={...s};
+ if(seal){if((s.hist||[]).some(h=>h.terr==name&&h.nt))v.hist=s.hist.map(h=>h.terr==name&&h.nt?{...h,nt:Object.fromEntries(Object.keys(h.nt).map(k=>[k,1]))}:h);
+  for(const x in s.maps||{}){const l=s.maps[x]&&s.maps[x][name];if(x!=name&&l&&l.some(e=>e.nt)){if(v.maps===s.maps)v.maps={...s.maps};v.maps[x]={...s.maps[x],[name]:l.map(e=>{if(!e.nt)return e;const o={...e};delete o.nt;return o})}}}}
+ if(wh){const m=o=>Object.fromEntries(Object.keys(o||{}).map(k=>[k,k==name?o[k]:'']));v.cur={...c,wo:{...c.wo,v:m(c.wo.v)}};if(v.hist||s.hist)v.hist=(v.hist||s.hist).map(h=>h.cid==c.id&&h.wo?{...h,wo:{...h.wo,v:m(h.wo.v)}}:h)}
+ return v}
 function relayReact(from,e,o){o=o||{};if(!EMO.includes(e))return;
  const now=Date.now(),b=FX.bud[from]||(FX.bud[from]={v:30,t:now,g:0});b.v=Math.min(30,b.v+(now-b.t)*.02);b.t=now;
  let n=Math.min(10,Math.max(1,Math.floor(+o.n)||1),Math.floor(b.v));if(n<1)return;b.v-=n;
@@ -1977,18 +1989,18 @@ function kick(name,ban){const p=P(name);if(!isHost||!p||name==st.host)return;
  if(ban){st.banned=st.banned||[];if(!st.banned.includes(name))st.banned.push(name)}
  for(const id in conns){const c=conns[id];if(c.pname==name){try{c.send({t:'err',k:ban?'kicked':'g2Out'})}catch(e){}delete conns[id];setTimeout(()=>{try{c.close()}catch(e){}},500)}}
  st.players=st.players.filter(x=>x!=p);delete st.votes[name];
- if(st.phase!='lobby'&&st.order.includes(name)){const n=st.order.length,left=Math.max(0,st.total-st.turn);
-  st.order=st.order.filter(x=>x!=name);st.total=st.turn+Math.round(left*(n-1)/n);
+ if(st.phase!='lobby'&&st.order.includes(name)){const n=st.order.length,left=Math.max(0,st.total-st.turn),xi=st.order.indexOf(name),L=st.L||st.length,b=Math.floor(st.turn/L)%n;
+  st.order=st.order.filter(x=>x!=name);if(MODE()=='por'){/* @qa2 : l'île en cours reste la même */if(xi<b){st.turn-=L;if(st.pf!=null)st.pf-=L}else if(xi==b){st.turn=b*L;st.pf=st.turn}st.total=Math.max(st.turn,st.total-L)}else st.total=st.turn+Math.round(left*(n-1)/n);
   if(st.cur&&(st.cur.explorer==name||st.cur.terr==name)){st.cur=null;if(!['end','carnet'].includes(st.phase))st.phase='map'}
   if(st.order.length<2&&!['end','carnet'].includes(st.phase)){st.cur=null;st.phase='end'}
   else if(st.phase=='map'&&st.turn>=st.total)st.phase='end';
-  if(st.phase=='question'&&st.cur)checkAll()}
+  if(st.phase=='question'&&st.cur)checkAll();gFlagsCheck(st);g3Hurry()}
  toast(T(ban?'g2BanT':'kickedT',{n:name}));bump()}
 function hostDrop(c){if(!conns[c.peer])return;delete conns[c.peer];
  const p=st.players.find(x=>x.peer==c.peer);if(!p)return;
- if(st.phase=='lobby'){st.players=st.players.filter(x=>x!=p);delete st.votes[p.name]}else{p.online=false;if(st.phase=='question')checkAll()}
+ if(st.phase=='lobby'){st.players=st.players.filter(x=>x!=p);delete st.votes[p.name]}else{p.online=false;if(st.phase=='question')checkAll();gFlagsCheck(st);g3Hurry()}
  toast(T('left',{n:p.name}));bump()}
-function send(a){if(isHost)act(me.name,a);else if(hostConn&&hostConn.open)hostConn.send({t:'act',a})}
+function send(a){if(a&&a.t=='flags'&&st)MYFL={gid:st.gid,v:a.v};if(isHost)act(me.name,a);else if(hostConn&&hostConn.open)hostConn.send({t:'act',a})}
 
 /* =========================================================
    RÈGLES (exécutées par l'hôte uniquement)
@@ -2044,7 +2056,7 @@ function act(from,a){const s=st;if(!P(from))return;g2Resp(from,a);
  case 'skip':if(from!=s.host||s.phase=='lobby'||s.phase=='end'||s.phase=='carnet')return;if(s.mode=='mir')s.lp=s.cur&&!s.cur.mir?s.cur.explorer:explorer();s.turn++;s.cur=null;s.phase=s.turn>=s.total?'end':'map';break;
  case 'finish':if(from!=s.host)return;s.cur=null;s.phase='end';break;
  case 'flags':if(s.phase!='end')return;const fv={};for(const n in (a.v||{}))fv[n]=tidy(a.v[n]).slice(0,240);if(s.anon){if(SECF.gid!==s.gid)SECF={gid:s.gid,f:{}};SECF.f[from]=fv;s.flags[from]=true}else s.flags[from]=fv;
-  if(s.order.filter(n=>P(n).online).every(n=>s.flags[n]))gFinish(s);break;
+  gFlagsCheck(s);break;
  case 'again':if(from!=s.host)return;s.phase='lobby';s.votes={};s.cur=null;s.players=s.players.filter(p=>p.online);break;
  case 'mode':if(from!=s.host||s.phase!='lobby'||!['exp','esc','por','mir'].includes(a.v))return;s.mode=a.v;break;
  case 'timer':if(from!=s.host||s.phase!='lobby'||!TIM.includes(a.v))return;s.timer=a.v;break;
@@ -2080,8 +2092,11 @@ function gSec(c){if(SEC.cid!==c.id){SEC={cid:c.id,g:{},k:{},kn:{},ans:undefined,
   (c.cards||[]).forEach(cd=>{if(cd.n)SEC.kn[cd.k]=cd.n})}
  return SEC}
 // nouvel hôte : un client peut renvoyer ce qu'il avait envoyé (myPend), pour ne rien perdre
-window.gPend=()=>myPend;
-window.gRestore=(name,p)=>{try{const c=st&&st.cur;if(!isHost||!c||!p||p.cid!==c.id||st.phase!='question')return;const S=gSec(c);
+let MYFL={gid:null};/* @qa2 */
+window.gPend=()=>st&&MYFL.gid===st.gid?{...myPend,fl:MYFL.v}:myPend;
+window.gRestore=(name,p)=>{try{if(isHost&&st&&p&&p.fl&&st.phase=='end'&&!st.flags[name]&&st.order.includes(name)){act(name,{t:'flags',v:p.fl});return}/* @qa2 */
+ const c=st&&st.cur;if(!isHost||!c||!p||p.cid!==c.id)return;const S=gSec(c);
+ if(st.phase=='judge'){/* @qa2 */if(typeof p.k=='string'&&(c.cards||[]).some(cd=>cd.k===p.k)&&(!S.kn[p.k]||S.kn[p.k]==name)){S.kn[p.k]=name;S.k[name]=p.k}return}if(st.phase!='question')return;
  if(name==c.terr&&p.ans!==undefined&&gValid(c,p.ans)){S.ans=p.ans;c.answered=true}
  else if(name!=c.terr&&p.g!==undefined&&gValid(c,p.g)){gGuess(c,name,{v:p.g,k:p.k});return}checkAll()}catch(e){}};
 function gK(c,v,terr){if(myPend.cid!==c.id)myPend={cid:c.id,k:gSlot()};if(terr)myPend.ans=v;else myPend.g=v;return myPend.k}
@@ -2096,7 +2111,7 @@ function gReveal(c,res,S){S.res=res;c.answer=S.ans??null;c.guesses={};c.result={
 function gJudge(c,a){const S=gSec(c),v=a.v||{},gs=others(c.terr),res={},cards=c.cards||[],used=new Set();
  cards.forEach(cd=>{const n=S.kn[cd.k]||cd.n;if(n&&gs.includes(n))used.add(n)});
  const free=gs.filter(x=>!used.has(x));// secret perdu (changement d'hôte) : on répartit sans rien révéler
- for(const cd of cards){let n=S.kn[cd.k]||cd.n;if(!n||!gs.includes(n))n=free.shift();if(!n||res[n]!==undefined)continue;res[n]=!!v[cd.k];S.g[n]=cd.v;S.k[n]=cd.k}
+ for(const cd of cards){let n=S.kn[cd.k]||cd.n;if(n){if(!gs.includes(n))continue}else n=free.shift();if(!n||res[n]!==undefined)continue;res[n]=!!v[cd.k];S.g[n]=cd.v;S.k[n]=cd.k}
  c.kw=gKw(a.kw);gReveal(c,res,S)}
 function gByName(c){if(SEC.cid===c.id&&SEC.res)return {res:SEC.res,g:SEC.g};
  if(!c.anonR)return {res:c.result||{},g:c.guesses||{}};
@@ -2105,6 +2120,8 @@ function gHist(c){if(!st.hist)st.hist=[];const ok=[],ko=[],rv=[];
  if(c.kind=='ink'||c.kind=='named'){const rb=gByName(c);for(const n in rb.res){(rb.res[n]?ok:ko).push(n);if(rb.res[n]&&c.type=='libre')rv.push({v:String(rb.g[n]).slice(0,140),n})}}
  st.hist.push({terr:c.terr,ex:c.explorer,r:c.r,q:c.q.custom?{c:c.q.q,by:st.anon?null:c.explorer}:{id:c.q.id},type:c.type,answer:c.answer??null,placeName:c.placeName||'',kind:c.kind,
   ok,ko,kw:c.kw||'',rv:shuf(rv),lk:(c.lk||[]).slice()});if(st.hist.length>200)st.hist.shift()}
+/* @qa2 : fin quand tous les drapeaux des personnes en ligne sont plantés (aussi après départ, exclusion, migration) */
+function gFlagsCheck(s){if(s.phase=='end'&&s.order.filter(n=>P(n)&&P(n).online).every(n=>s.flags[n]))gFinish(s)}
 function gFinish(s){if(['recap','carnet'].includes(s.phase))return;let fl=s.flags;
  if(s.anon){fl={};const F=SECF.gid===s.gid?SECF.f:{};for(const [to,t] of shuf(Object.values(F).flatMap(o=>Object.entries(o))))fl[gSlot()]={[to]:t}}
  s.log.push({date:Date.now(),meteo:s.meteo,players:[...s.order],flags:fl,hist:s.hist||[],mode:MODE(),anon:!!s.anon,gid:s.gid,tone:s.tone||0,maps:JSON.parse(JSON.stringify(s.maps||{}))});
@@ -2121,7 +2138,7 @@ function gNextEx(){const o=st.order;if(!o.length)return null;
  return o[st.turn%o.length]}
 function gMirror(s){const c=s.cur;if(s.mode!='mir'||!c||c.mir||c.kind=='door'||s.turn+1>=s.total)return false;
  if(!s.order.includes(c.explorer)||!s.order.includes(c.terr)||!openSet(c.terr,c.explorer)[c.r])return false;
- s.turn++;s.cur={id:'c'+Date.now(),explorer:c.terr,terr:c.explorer,r:c.r,q:c.q.for&&c.q.for!=gOf(c.explorer)?pickQ(c.r,c.explorer):c.q,type:c.type,answer:null,guesses:{},result:null,placeName:'',answered:false,sent:[],mir:true,m1:{t:c.terr,a:c.answer??null}};s.phase='question';return true}
+ s.turn++;const q=c.q.for&&c.q.for!=gOf(c.explorer)?pickQ(c.r,c.explorer):c.q;s.cur={id:'c'+Date.now(),explorer:c.terr,terr:c.explorer,r:c.r,q,type:c.type,answer:null,guesses:{},result:null,placeName:'',answered:false,sent:[],mir:true,...(q===c.q?{m1:{t:c.terr,a:c.answer??null}}:{})};s.phase='question';return true}
 // Timer : durées de base (Normal), multipliées par le facteur
 /* phases où l'on choisit / écrit : sablier large et discret ; phases où l'on regarde : sablier normal */
 const TB={map:150,choix:120,echelle:120,libre:240,ecoute:180,judge:150,reveal:20,name:120,landed:40,end:300,pfiche:20},TCALM={map:1,choix:1,echelle:1,libre:1,ecoute:1,judge:1,name:1,end:1};
@@ -2668,14 +2685,15 @@ function vPfiche(){const L=st.L||st.length,sub=st.order[Math.floor((st.turn-1)/L
    - Duo : Miroir par défaut (chaque question posée aux deux, comparaison des deux réponses), jauge de complicité qui ne baisse jamais, rituel de fin. */
 const G3EI={bottle:'🍾',whirl:'🌀',storm:'⛈️',shell:'🐚',rainbow:'🌈'},G3EL=['whirl','storm','shell','rainbow'],G3WN=20,G3LV=[0,5,12,22,35,50];
 const g3H=cid=>(st.hist||[]).find(h=>h.cid==cid);
-const g3Writers=h=>st.order.filter(n=>n!=h.terr&&P(n)&&P(n).online);
+const g3Pl=id=>{const c=st.cur;return c&&c.id==id&&c.pl||st.order};/* @qa2 : présents au début de l'atterrissage */
+const g3Writers=h=>g3Pl(h.cid).filter(n=>n!=h.terr&&P(n)&&P(n).online);
 const g3Done=h=>g3Writers(h).every(n=>(h.nt||{})[n]!=null||(h.ns||[]).includes(n));
-const g3WoDone=c=>!c.wo||st.order.filter(n=>P(n)&&P(n).online).every(n=>(c.wo.v||{})[n]!=null);
+const g3WoDone=c=>!c.wo||(c.pl||st.order).filter(n=>P(n)&&P(n).online).every(n=>(c.wo.v||{})[n]!=null);
 const g3D=d=>new Date(d).toLocaleDateString(D().loc,{day:'numeric',month:'long'});
 /* hôte : une ancienne question de cette zone, posée lors d'une partie précédente, avec sa réponse */
 function g3PastFor(t,r){const tn=st.tone||0,used=st.used[t]||[],out=[];
  for(const e of st.log||[])for(const h of e.hist||[]){if(h.terr!=t||h.r!=r||!h.q||!h.q.id||h.kind=='door'||used.includes(h.q.id))continue;const q=QBY[h.q.id];
-  if(!q||(q.deck=='coquin'&&tn<1)||(q.deck=='trash'&&tn<2))continue;const rv=h.rv&&h.rv[0],k=h.placeName?'pn':rv?'rv':h.kw?'kw':'',t2=h.placeName||(rv&&(rv.v||rv))||h.kw||'';
+  if(!q||(q.deck=='coquin'&&tn<1)||(q.deck=='trash'&&tn<2)||(q.for&&q.for!=gOf(t)))continue;const rv=h.rv&&h.rv[0],k=h.placeName?'pn':rv?'rv':h.kw?'kw':'',t2=h.placeName||(rv&&(rv.v||rv))||h.kw||'';
   if(h.answer==null&&!t2)continue;out.push({id:h.q.id,p:{a:h.answer??null,t:String(t2).slice(0,140),k,d:e.date}})}
  return out.length?out[rnd(out.length)]:null}
 function g3Pick(s,from,t,custom){const c=s.cur;
@@ -2683,7 +2701,7 @@ function g3Pick(s,from,t,custom){const c=s.cur;
  if(s.turn>=1&&s.turn-(s.evT??-9)>=2&&rnd(100)<24){const L=Object.keys(G3EI).filter(k=>!(k=='whirl'&&s.mode=='mir')&&!(k=='rainbow'&&s.order.length!=2)&&!(k=='shell'&&c.type=='ecoute')&&!(k=='bottle'&&MODE()=='esc'));
   const k=L[rnd(L.length)];c.ev=k;s.evT=s.turn;if(k=='bottle')s.bottles[from]=(s.bottles[from]||0)+1}}
 /* hôte, juste après land() : relie l'entrée d'historique au tour, compare le miroir, programme un « Qui de nous… » */
-function g3Land(c){const s=st,h=s.hist&&s.hist.at(-1);if(!h)return;h.cid=c.id;if(c.ev)h.ev=c.ev;if(c.past)h.past=1;
+function g3Land(c){const s=st,h=s.hist&&s.hist.at(-1);if(!h)return;h.cid=c.id;c.pl=s.order.filter(n=>P(n)&&P(n).online);if(c.ev)h.ev=c.ev;if(c.past)h.past=1;
  const g=others(c.terr).find(n=>mapOf(n,c.terr).length);h.dt=g?mapOf(g,c.terr).at(-1).date:0;
  if(c.kind!='door'&&c.m1&&c.m1.a!=null&&c.answer!=null&&c.type!='libre')h.mm=(c.type=='echelle'?Math.abs(c.answer-c.m1.a)<=1:c.answer==c.m1.a)?1:0;
  const n=s.order.length,want=c.kind!='door'&&!G3EL.includes(c.ev)&&(n==2?(s.mode=='mir'?!!c.mir:s.turn%2==1):s.turn%3==2);
@@ -2706,7 +2724,7 @@ function g3Lv(p){let i=0;while(i<G3LV.length-1&&p>=G3LV[i+1])i++;const N=T('cxL'
 /* ---- vues ---- */
 function g3Steps(k){const L=MODE()=='esc'?['recap','carnet']:['end','recap','carnet'],i=L.indexOf(k),ic={end:'🚩',recap:'⭐',carnet:'📖'};if(i<0)return '';
  return `<div class="g3steps"><span class="g3sx">${T('g3Step',{a:i+1,b:L.length})}</span><div class="g3sl">${L.map((x,j)=>`<span class="${j<i?'done':j==i?'on':''}">${ic[x]} ${T('g3S_'+x)}</span>`).join('<i aria-hidden="true"></i>')}</div></div>`}
-function g3PastTxt(c){const p=c.past;if(!p)return '';if(p.a!=null&&!c.q.custom){const q=LQ(c.q);return c.type=='choix'?(q.o||[])[p.a]||'':p.a+' / 10'}
+function g3PastTxt(c){const p=c.past;if(!p)return '';if(p.a!=null&&!c.q.custom){const q=LQ(c.q,c.terr);return c.type=='choix'?String((q.o||[])[p.a]||'').replaceAll('{Y}',c.terr):p.a+' / 10'}
  return p.k=='pn'?'✨ '+p.t:p.k=='kw'?'📌 '+p.t:QQ(p.t)}
 function g3PastBox(c){const p=c.past;if(!p)return '';const same=p.a!=null&&c.answer!=null?(c.type=='echelle'?Math.abs(c.answer-p.a)<=1:c.answer==p.a):null;
  return `<div class="g3pastc" data-g3a="a${c.id}${st.phase}"><span class="g3pi" aria-hidden="true">🕰️</span><div><span class="mut">${T('g3PastWas',{d:g3D(p.d)})}</span><br><b>${esc(g3PastTxt(c))}</b></div>${same==null?'':`<span class="g3tag ${same?'same':'moved'}">${T(same?'g3Same':'g3Moved')}</span>`}</div>`}
@@ -2718,12 +2736,12 @@ function g3RevealExtra(c){let h=c.past?g3PastBox(c):'';
   h+=`<div class="g3mir g3mv-${k}" data-g3a="m${c.id}"><p class="mut c">${T('g3MirT')}</p><div class="g3mrow"><div>${DOT(c.m1.t)}<span class="mut">${esc(c.m1.t)}</span><b>${sh(c.m1.a)}</b></div><span class="g3mvs" aria-hidden="true">${k=='diff'?'🌗':'🔗'}</span><div>${DOT(c.terr)}<span class="mut">${esc(c.terr)}</span><b>${sh(c.answer)}</b></div></div><p class="g3mv">${T('g3Mm_'+k)}</p></div>`}
  return h}
 /* suggestions de note, tirées de la réponse */
-function g3Sugg(c){const q=c.q.custom?null:LQ(c.q),out=[];
+function g3Sugg(c){const q=c.q.custom?null:LQ(c.q,c.terr),out=[];
  if(c.placeName)out.push(c.placeName);
  if(c.answer!=null&&q){if(c.type=='choix'&&q.o)out.push(q.o[c.answer]);else if(c.type=='echelle')out.push(trimQ(q.q)+' → '+c.answer+'/10')}
  if(c.kw)out.push(c.kw);
  if(c.type=='libre')for(const n in c.result||{})if(c.result[n]&&c.guesses[n]!=null)out.push(String(c.guesses[n]));
- return [...new Set(out.map(x=>qaCut(tidy(x),80)).filter(Boolean))].slice(0,4)}
+ return [...new Set(out.map(x=>qaCut(tidy(String(x).replaceAll('{Y}',c.terr)),80)).filter(Boolean))].slice(0,4)}
 function g3NoteCard(c,h){const ws=st.order.filter(n=>n!=c.terr),nt=h.nt||{},ns=h.ns||[],k='note:'+c.id;
  const chips=`<div class="g3wr">${ws.map(n=>`<span class="chip ${P(n)&&P(n).online?'':'off'}">${DOT(n)}${esc(n)} ${nt[n]?'<span class="g3ok">📌</span>':ns.includes(n)?'<span class="mut">–</span>':'<span class="g3pen">✍️</span>'}</span>`).join('')}</div>`;
  const head=sub=>`<p class="g3nh"><span class="g3ni" aria-hidden="true">📝</span><span><b>${T('g3NoteT',{n:NS(c.terr)})}</b>${sub?`<br><span class="mut">${T('g3NoteD')}</span>`:''}</span></p>`;
@@ -2737,7 +2755,7 @@ function g3NoteCard(c,h){const ws=st.order.filter(n=>n!=c.terr),nt=h.nt||{},ns=h
  ${sg.length?`<div class="g3sug">${sg.map(x=>`<button type="button" data-g3s="${esc(x)}">${esc(x)}</button>`).join('')}</div>`:''}
  <input data-d="${k}" maxlength="140" placeholder="${esc(T('g3NotePh'))}" aria-label="${esc(T('g3NoteT',{n:c.terr}))}">
  <div class="g3row"><button class="ghost" id="g3skip">${T('g3Skip')}</button><button class="pri" id="g3pin">📌 ${T('g3Pin')}</button></div>${ws.length>1?chips:''}</div>`}
-function g3WhoCard(c){const w=c.wo,v=w.v||{},on=st.order.filter(n=>P(n)&&P(n).online),all=on.every(n=>v[n]!=null),my=v[me.name],pr=T('woQ').split('|')[w.i%G3WN]||'';let body;
+function g3WhoCard(c){const w=c.wo,v=w.v||{},all=g3WoDone(c),my=v[me.name],pr=T('woQ').split('|')[w.i%G3WN]||'';let body;
  if(my==null&&st.order.includes(me.name)&&!all)body=`<div class="g3wb">${st.order.map(n=>`<button type="button" data-g3w="${esc(n)}">${DOT(n)}${n==me.name?T('g3Me'):esc(n)}</button>`).join('')}</div>`;
  else if(!all)body=`<p class="mut c typing g3wwait">${T('g3WoWait')}<span><i></i><i></i><i></i></span></p>`;
  else{const t={};Object.values(v).forEach(x=>t[x]=(t[x]||0)+1);const mx=Math.max(...Object.values(t)),top=Object.keys(t).filter(x=>t[x]==mx);
@@ -2818,7 +2836,7 @@ function ask(msg,ok){return new Promise(res=>{
  const m=$('.modal'),close=v=>{m.classList.add('closing');document.removeEventListener('keydown',k);setTimeout(()=>{$('#modal').textContent=''},240);res(v)},k=e=>{if(e.key=='Escape')close(false)};
  document.addEventListener('keydown',k);$('#ano').onclick=()=>close(false);$('#ayes').onclick=()=>close(true);m.onclick=e=>{if(e.target==m)close(false)};$('#ayes').focus()})}
 /* === gender : choix à l'accueil (Femme / Homme / Neutre), mémorisé avec le prénom === */
-const GOPT=['f','m','n'];
+const GOPT=['f','m'];/* @qa2 : Femme ou Homme ; un ancien 'n' reste toléré mais doit être remplacé à l'accueil */
 function gPick(){const g=GN(me.g),i=GOPT.indexOf(g);return `<div class="gsel" role="radiogroup" aria-label="${esc(T('gT'))}" style="--i:${i}"><i aria-hidden="true"></i>${GOPT.map(x=>`<button type="button" role="radio" data-gx="${x}" aria-checked="${x==g}">${T('g_'+x)}</button>`).join('')}</div><p class="ghint">${T(g=='n'?'gD0':'gD')}</p>`}
 function gBind(){$$('[data-gx]').forEach(b=>b.onclick=()=>{me.g=GN(b.dataset.gx);LS.set('terra:me',{...LS.get('terra:me',{}),color:me.color,g:me.g});
  const w=b.parentNode;w.style.setProperty('--i',GOPT.indexOf(me.g));w.querySelectorAll('[data-gx]').forEach(x=>x.setAttribute('aria-checked',x==b));
@@ -2838,7 +2856,7 @@ function home(){
  bindDD($('#lang'),v=>{setLang(v);render()});
  $$('[data-c]').forEach(b=>b.onclick=()=>{me.color=b.dataset.c;$$('[data-c]').forEach(x=>x.classList.toggle('on',x==b));const d=$('#mydot');d.style.background=grad(me.color);d.animate([{transform:'scale(.4)'},{transform:'scale(1.4)'},{transform:'scale(1)'}],{duration:450,easing:'cubic-bezier(.3,1.6,.5,1)'})});
  gBind();
- const ok=()=>{me.name=qaCut(chTidy($('#nm').value),20);if(!me.name){err(T('needName'));$('#nm').focus();return false}LS.set('terra:me',me);return true};
+ const ok=()=>{me.name=qaCut(chTidy($('#nm').value),20);if(!me.name){err(T('needName'));$('#nm').focus();return false}if(!GOPT.includes(me.g)){err(T('gNeed'));const g=$('.gsel');if(g){g.classList.remove('need');void g.offsetWidth;g.classList.add('need');g.querySelector('button').focus()}return false}LS.set('terra:me',me);return true};
  $('#nm').oninput=()=>{err('');me.name=$('#nm').value.slice(0,20);$('#myname').textContent=$('#nm').value.trim()||T('you')};
  $('#create').onclick=()=>ok()&&createGame();
  $('#join').onclick=()=>{if(!ok())return;const c=$('#code').value.trim().toUpperCase();if(c.length!=4)return err(T('code4'));joinGame(c)};
