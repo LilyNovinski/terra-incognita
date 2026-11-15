@@ -1198,6 +1198,8 @@ html{scroll-padding-bottom:calc(var(--hintH,0px) + 12px)}
 .hint>div>span:nth-child(2){flex:1 1 170px!important;min-width:0}
 .hint>div>span:nth-child(2)+*{margin-inline-start:auto}
 @media (max-width:520px){.hint{padding:8px 10px calc(10px + env(safe-area-inset-bottom))}.hint>div{padding:10px 12px;gap:8px 10px}}
+#app>.ghost,#app>section>.ghost{display:block;width:fit-content;max-width:100%;margin-inline:auto;padding:8px 18px;border-radius:99px}
+[data-theme=dark] #app>.ghost,[data-theme=dark] #app>section>.ghost{background:#ffffff12;opacity:1}
 html:not([data-theme=dark]) #app>.ghost,html:not([data-theme=dark]) #app>section>.ghost{display:block;width:fit-content;max-width:100%;margin-inline:auto;padding:8px 18px;border-radius:99px;background:#fffaf0e6;color:var(--deep2);opacity:1;box-shadow:0 2px 0 #0e586626}
 html:not([data-theme=dark]) #app>.ghost:hover,html:not([data-theme=dark]) #app>section>.ghost:hover{background:#fff}
 html:not([data-theme=dark]) .banner .serif{color:var(--deep2);text-shadow:0 0 10px #fffffff0,0 0 3px #fff,0 2px 0 #fff}
