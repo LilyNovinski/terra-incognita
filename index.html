@@ -707,6 +707,19 @@ body::before{display:none}
  #sky .mg{animation:sk-mg 8s ease-in-out infinite alternate!important}
  #sky .jel{animation:sk-jel 24s ease-in-out infinite alternate!important}
 }
+/* --- eau WebGL + profondeur (flou par plans) --- */
+#sky canvas.wgl{position:absolute;left:0;top:0;width:100%;height:100%;display:block}
+#sky.gl .orb,#sky.gl .rays,#sky.gl .surf,#sky.gl .mg{display:none}
+#sky.gl .dn{opacity:.55}
+#sky .cl.f{bottom:15vh;width:min(20vw,230px);filter:blur(2.6px) saturate(.7);opacity:.55}
+#sky .cl.f svg>path:first-child,#sky .cl.m svg>path:first-child{display:none}
+#sky .cl.f.l{left:20vw}#sky .cl.f.r{right:18vw}
+#sky .cl.m{bottom:6vh;width:min(28vw,320px);filter:blur(1.1px) saturate(.85);opacity:.82}
+#sky .cl.m.l{left:9vw}#sky .cl.m.r{right:8vw}
+#sky .haze{left:0;right:0;bottom:0;pointer-events:none}
+#sky .haze.f{height:34vh;background:linear-gradient(transparent,color-mix(in srgb,var(--w2) 45%,transparent) 55%,transparent)}
+#sky .haze.m{height:18vh;background:linear-gradient(transparent,color-mix(in srgb,var(--w2) 25%,transparent))}
+@media (max-width:600px){#sky .cl.f{width:34vw;bottom:13vh}#sky .cl.f.l{left:8vw}#sky .cl.f.r{right:6vw}#sky .cl.m{width:44vw;bottom:5vh}#sky .cl.m.l{left:-6vw}#sky .cl.m.r{right:-6vw}}
 /* --- logo vectoriel --- */
 .logo .lgn{display:none}
 [data-theme=dark] .logo .lgn{display:inline}[data-theme=dark] .logo .lgd{display:none}
@@ -1534,8 +1547,94 @@ setTheme(document.documentElement.dataset.theme=='dark'?'dark':'light');
  const back=[[3,30,W],[9,22,W],[90,34,W],[96,24,W]].map(alg).join(''),front=[[15,18,W],[84,20,W]].map(alg).join('');
  const F1=[[40,46,52,'--f1'],[56,34,66,'--f2',1],[66,28,80,'--f1']].slice(0,sm?2:3).map(fish).join('');
  const J=[[16,30,sm?38:46],[74,44,34]].slice(0,sm?1:2).map(jel).join('');
- s.insertAdjacentHTML('afterbegin',sp('orb','')+sp('rays','',rays)+sp('surf','',surf)+mg+J+F1+sp('dn','',sv('0 0 1000 260',dunes,'xMidYMax slice'))+back+
+ /* plans de profondeur : loin = petit, flou, voilé ; milieu = un peu flou ; près = net */
+ const deep=sp('cl f l','',sv('0 0 400 260',Rr))+sp('cl f r','',sv('0 0 400 260',L))+sp('haze f','')+sp('cl m l','',sv('0 0 400 260',L))+sp('cl m r','',sv('0 0 400 260',Rr))+sp('haze m','');
+ s.insertAdjacentHTML('afterbegin',sp('orb','')+sp('rays','',rays)+sp('surf','',surf)+mg+J+F1+sp('dn','',sv('0 0 1000 260',dunes,'xMidYMax slice'))+deep+back+
   sp('cl l','',sv('0 0 400 260',L))+sp('cl r','',sv('0 0 400 260',Rr))+front+glw);
+ /* ---------- eau réaliste : WebGL derrière le décor (repli : dégradé CSS) ---------- */
+ const cv=document.createElement('canvas');cv.className='wgl';let gl=null,U={};
+ try{gl=cv.getContext('webgl',{alpha:false,antialias:false,depth:false,stencil:false,powerPreference:'low-power'})}catch(e){}
+ if(gl){const FS=`#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+uniform vec2 uR,uP;uniform float uT,uN,uS;
+float h21(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
+float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h21(i),h21(i+vec2(1.,0.)),f.x),mix(h21(i+vec2(0.,1.)),h21(i+1.),f.x),f.y);}
+float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<4;i++){s+=a*vn(p);p=p*2.03+vec2(17.1,9.2);a*=.5;}return s;}
+float caus(vec2 p,float t){vec2 i=p;float c=1.;for(int n=0;n<4;n++){float k=t*(1.-3.5/float(n+1));i=p+vec2(cos(k-i.x)+sin(k+i.y),sin(k-i.y)+cos(k+i.x));c+=1./length(vec2(p.x/(sin(i.x+k)/.005),p.y/(cos(i.y+k)/.005)));}c/=4.;c=1.17-pow(c,1.4);return clamp(pow(abs(c),8.),0.,1.5);}
+void main(){
+ vec2 uv=vec2(gl_FragCoord.x/uR.x,1.-gl_FragCoord.y/uR.y);float as=uR.x/uR.y,t=uT,y=uv.y,N=uN;
+ vec3 K=vec3(1.6,.42,.3);
+ vec3 L0=mix(vec3(1.45,1.18,1.08),vec3(.26,.4,.66),N);
+ vec3 lc=mix(vec3(1.,.97,.88),vec3(.78,.87,1.),N);
+ float dep=.12+y*1.8;
+ vec3 col=L0*exp(-K*dep)*(1.-.18*y);
+ col*=.965+.07*fbm(uv*vec2(as,1.)*2.6+vec2(t*.018,-t*.012));
+ vec2 src=vec2(uS+uP.x*.04,-.22);vec2 v=(uv-src)*vec2(as,1.);float ds=length(v),an=atan(v.x,v.y);
+ float r=smoothstep(.45,.95,vn(vec2(an*8.+t*.045,t*.035)))*.6+smoothstep(.55,1.,vn(vec2(an*17.-t*.035,4.+t*.03)))*.45;
+ r*=.6+.4*fbm(vec2(an*3.,ds*2.2-t*.07));
+ r*=exp(-ds*1.35)*smoothstep(1.2,.3,abs(an))*smoothstep(.02,.16,y);
+ col+=lc*r*exp(-K*y*.9)*mix(.42,.15,N);
+ if(y<.4){
+  float d=clamp(y/.3,0.,1.),z=.5/(1.08-d);
+  vec2 q=vec2((uv.x-.5)*as*z,z*1.8)*2.6+vec2(t*.05,t*.02);
+  float n=fbm(q*1.1+vec2(t*.1,-t*.07));
+  float rp=caus(q*.7+vec2(60.),t*.4);
+  float e=length(vec2((uv.x-.5-uP.x*.02)*as/max(.8,as*.52),(y+.06)/.2))+((n-.5)*.1+(rp-.3)*.02)*smoothstep(.02,.12,y);
+  float win=1.-smoothstep(.93,1.,e);
+  vec2 so=(uv-vec2(uS,.04))*vec2(as,1.);
+  vec3 sky=mix(vec3(.5,.76,.82),vec3(.11,.2,.34),N)*(1.+.3*exp(-length(so)*3.));
+  vec3 tir=col*mix(.88,.78,N)+lc*rp*mix(.07,.03,N)*(1.-d);
+  vec3 inn=sky*(.86+.22*min(rp,1.))+lc*min(rp,1.)*.1;
+  float ring=exp(-pow((e-.965)*22.,2.))*mix(.32,.14,N);
+  vec3 sf=mix(tir,inn,win)+lc*ring*(.7+.6*n);
+  float fade=1.-smoothstep(.3,1.,d);
+  col=mix(col,sf,fade);
+  vec2 dp=so+(vec2(fbm(q*2.1+t*.4),fbm(q*2.1-t*.37+3.))-.5)*mix(.045,.03,N);
+  float rr=length(dp);
+  float disk=smoothstep(mix(.046,.022,N),mix(.032,.016,N),rr);
+  float glow=exp(-rr*mix(9.,13.,N))*mix(.6,.42,N);
+  float spk=pow(vn(q*9.+vec2(t*1.6,-t*1.2)),11.)*exp(-rr*5.)*mix(5.,3.,N);
+  col+=mix(vec3(1.,.98,.9),vec3(.93,.96,1.),N)*(disk*1.15+glow+spk)*fade*win;
+ }
+ if(y>.62){
+  float fz=clamp((y-.62)/.38,0.,1.);
+  vec2 fq=vec2((uv.x-.5)*as,1.)/(fz*.95+.25)*1.05+uP*.35;
+  float w=smoothstep(.64,.95,y);
+  vec3 sand=mix(vec3(.88,.82,.64),vec3(.28,.36,.46),N);
+  float rip=.94+.06*sin(fq.y*8.+fbm(fq*1.4)*5.);
+  vec3 fl=sand*rip*L0*exp(-K*(.45+1.5*(1.-fz)));
+  col=mix(col,fl,w*(.15+.6*fz));
+  if(fz>.25){float c1=caus(fq*1.2-vec2(20.),t*.36),c2=caus(fq*1.6-vec2(23.,17.),-t*.29+7.);
+   col+=lc*min(min(c1,c2),1.)*w*exp(-K*(.35+1.2*(1.-fz)))*mix(.26,.07,N)*smoothstep(.3,.95,fz);}
+ }
+ vec2 vg=uv-.5;col*=1.-.3*dot(vg,vg)*mix(1.,1.6,N);
+ col+=(h21(gl_FragCoord.xy+fract(t*7.))-.5)/160.;
+ gl_FragColor=vec4(col,1.);
+}`;
+  const sh=(ty,src)=>{const o=gl.createShader(ty);gl.shaderSource(o,src);gl.compileShader(o);return gl.getShaderParameter(o,gl.COMPILE_STATUS)?o:null};
+  const vs=sh(gl.VERTEX_SHADER,'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}'),fs=sh(gl.FRAGMENT_SHADER,FS);let pr=null;
+  if(vs&&fs){pr=gl.createProgram();gl.attachShader(pr,vs);gl.attachShader(pr,fs);gl.linkProgram(pr);if(!gl.getProgramParameter(pr,gl.LINK_STATUS))pr=null}
+  if(pr){gl.useProgram(pr);gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer());gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+   const l=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(l);gl.vertexAttribPointer(l,2,gl.FLOAT,false,0,0);for(const k of ['uR','uT','uN','uP','uS'])U[k]=gl.getUniformLocation(pr,k)}else gl=null}
+ if(!gl)return;
+ s.insertBefore(cv,s.firstChild);s.classList.add('gl');
+ const RM=matchMedia('(prefers-reduced-motion: reduce)').matches,t0=performance.now();
+ let N=document.documentElement.dataset.theme=='dark'?1:0,NT=N,lw=0,lh=0,run=false,last=0;
+ /* taille : seulement si la largeur change ou si la hauteur change beaucoup (la barre d'adresse mobile ne recrée rien) */
+ const size=()=>{const w=s.clientWidth||innerWidth,h=s.clientHeight||innerHeight;if(w==lw&&Math.abs(h-lh)<h*.25)return;lw=w;lh=h;
+  const k=Math.min(sm?.5:.9,Math.sqrt(420000/(w*h)));cv.width=Math.max(1,Math.round(w*k));cv.height=Math.max(1,Math.round(h*k));gl.viewport(0,0,cv.width,cv.height)};
+ const draw=(now,dt)=>{if(!gl)return;N+=(NT-N)*(RM?1:Math.min(1,dt*2.5));
+  gl.uniform2f(U.uR,cv.width,cv.height);gl.uniform1f(U.uT,((now-t0)/1000)%3600);gl.uniform1f(U.uN,N);gl.uniform2f(U.uP,0,0);gl.uniform1f(U.uS,.8);gl.drawArrays(gl.TRIANGLES,0,3)};
+ const step=now=>{if(!run)return;requestAnimationFrame(step);if(now-last<40)return;const dt=last?Math.min(.1,(now-last)/1000):.04;last=now;draw(now,dt)};
+ const start=()=>{if(RM){draw(performance.now(),.04);return}if(!run){run=true;last=0;requestAnimationFrame(step)}};
+ size();start();
+ addEventListener('resize',()=>{size();draw(performance.now(),0)},{passive:true});
+ document.addEventListener('visibilitychange',()=>{if(document.hidden)run=false;else start()});
+ new MutationObserver(()=>{NT=document.documentElement.dataset.theme=='dark'?1:0;RM&&draw(performance.now(),0)}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+ cv.addEventListener('webglcontextlost',e=>{e.preventDefault();gl=null;s.classList.remove('gl');cv.remove()});
 })();
 function ambient(s){
  const star=(x,y,d)=>`<path class="tw" style="animation-delay:${d}s" d="M${x},${y-9}L${x+2.2},${y-2.2}L${x+9},${y}L${x+2.2},${y+2.2}L${x},${y+9}L${x-2.2},${y+2.2}L${x-9},${y}L${x-2.2},${y-2.2}Z" fill="#fff"/>`;
