@@ -1168,6 +1168,29 @@ body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 input,textarea,.bigcode,.bigcode span{-webkit-user-select:text;user-select:text}
 img,svg{-webkit-user-drag:none;user-drag:none}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+/* @css-ux2 : barre d'aide compacte, contenu jamais sous .hint, contrastes, éléments vides, menu exclure */
+#app{padding-bottom:calc(var(--hintH,104px) + 20px)}
+html{scroll-padding-bottom:calc(var(--hintH,0px) + 12px)}
+.sheet,#go,.g2heart,.reacts,#g3pin{scroll-margin-bottom:calc(var(--hintH,0px) + 16px)}
+.hint>div{flex-wrap:wrap;row-gap:8px;justify-content:flex-end}
+.hint>div>span:nth-child(2){flex:1 1 170px!important;min-width:0}
+.hint>div>span:nth-child(2)+*{margin-inline-start:auto}
+@media (max-width:520px){.hint{padding:8px 10px calc(10px + env(safe-area-inset-bottom))}.hint>div{padding:10px 12px;gap:8px 10px}}
+html:not([data-theme=dark]) #app>.ghost,html:not([data-theme=dark]) #app>section>.ghost{display:block;width:fit-content;max-width:100%;margin-inline:auto;padding:8px 18px;border-radius:99px;background:#fffaf0e6;color:var(--deep2);opacity:1;box-shadow:0 2px 0 #0e586626}
+html:not([data-theme=dark]) #app>.ghost:hover,html:not([data-theme=dark]) #app>section>.ghost:hover{background:#fff}
+html:not([data-theme=dark]) .banner .serif{color:var(--deep2);text-shadow:0 0 10px #fffffff0,0 0 3px #fff,0 2px 0 #fff}
+html:not([data-theme=dark]) .banner .mut{display:inline-block;max-width:100%;padding:4px 12px;border-radius:12px;background:#fffaf0d9;color:var(--deep2);opacity:1}
+.pri,[data-theme=dark] .pri{background:linear-gradient(180deg,#c8500f,#a8400a);border-color:#8a3207;box-shadow:0 5px 0 #8a3207,0 10px 20px #a8400a40;text-shadow:0 1px 1px #5a200566}
+.pri:hover,[data-theme=dark] .pri:hover{background:linear-gradient(180deg,#d0560f,#b0440a);border-color:#8a3207}
+.pri:active{box-shadow:0 2px 0 #8a3207}
+.gauge:not(.on){visibility:hidden}
+.tmr.calm .tplus{display:none}
+.tmr.calm .tring{opacity:.75}
+.tmr.calm .tring::after{content:"⏳";position:relative;font-size:16px;line-height:1}
+.g2km,[data-theme=dark] .g2km{border-color:var(--acc)}
+.chip .kick{--kkb:#f3e5cc;width:40px;height:40px;margin:-9px -13px -9px -5px;background:radial-gradient(circle,var(--kkb) 10.5px,transparent 11.5px)!important}
+[data-theme=dark] .chip .kick{--kkb:#26475f}
+.chip .kick:hover,[data-theme=dark] .chip .kick:hover{--kkb:#e2603e}
 </style>
 </head>
 <body>
@@ -2965,6 +2988,14 @@ function home(){
  if(code&&!me.name)$('#nm').focus();
  if(!LS.get('terra:tuto',0)&&!$('.modal'))tutorial()}
 
+/* @js-ux2 : hauteur réelle de .hint (--hintH), menu exclure refermable, aria-pressed, défilement vers « Explorer » */
+{const km=()=>{const m=$('#g2km');m&&m.remove()},ro=window.ResizeObserver&&new ResizeObserver(es=>{for(const e of es)document.documentElement.style.setProperty('--hintH',(e.target.isConnected?e.target.offsetHeight:0)+'px')});
+ let reg=null;const r0=render;
+ render=function(){km();r0.apply(this,arguments);
+  const h=$('.hint');if(h&&ro&&!h._ro){h._ro=1;ro.observe(h)}document.documentElement.style.setProperty('--hintH',(h?h.offsetHeight:0)+'px');
+  $$('[data-j]').forEach(b=>b.setAttribute('aria-pressed',b.classList.contains('sel')));
+  const r=typeof ui!='undefined'&&ui.region;if(r&&r!==reg)setTimeout(()=>{const g=$('#go');if(!g)return;const b=g.getBoundingClientRect().bottom,lim=innerHeight-(($('.hint')||{}).offsetHeight||0)-12;if(b>lim||b<0)g.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth',block:'nearest'})},420);reg=r};
+ addEventListener('scroll',km,{passive:true,capture:true});document.addEventListener('keydown',e=>{if(e.key=='Escape')km()},true)}
 render();
 </script>
 </body>
