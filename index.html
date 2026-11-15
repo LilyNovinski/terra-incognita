@@ -1842,10 +1842,15 @@ function fxBind(b){const e=b.dataset.e;let t1=0,t2=0,down=false,rdy=false;
  b.onpointercancel=b.onpointerleave=clr;b.oncontextmenu=ev=>ev.preventDefault();
  b.onclick=ev=>{if(ev.detail===0)react(e,b)}}
 /* double-tap sur une carte : ❤️ à l'endroit du tap, visible par tout le monde */
-document.addEventListener('pointerup',ev=>{if(ev.pointerType=='mouse'&&ev.button!==0)return;
- const tg=ev.target;if(!tg.closest||!tg.closest('.card,.guess,.banner')||tg.closest('button,input,textarea,a,.reacts,.dd,[contenteditable]')||!$('.reacts')){FX.dt=null;return}
+/* sur PC : le vrai double-clic du système (délai réglé par Windows/macOS) et pas de sélection de texte au 2e clic */
+const dtOk=tg=>tg&&tg.closest&&tg.closest('.card,.guess,.banner')&&!tg.closest('button,input,textarea,a,.reacts,.dd,[contenteditable],select,label')&&$('.reacts');
+const dtFire=ev=>{try{getSelection().removeAllRanges()}catch(e){}if(me&&st&&(isHost||(hostConn&&hostConn.open)))react('❤️',null,{k:'tap',x:+(ev.clientX/innerWidth).toFixed(3),y:+(ev.clientY/innerHeight).toFixed(3)})};
+document.addEventListener('mousedown',ev=>{if(ev.detail>1&&dtOk(ev.target))ev.preventDefault()});
+document.addEventListener('dblclick',ev=>{if(dtOk(ev.target))dtFire(ev)});
+document.addEventListener('pointerup',ev=>{if(ev.pointerType=='mouse')return;
+ const tg=ev.target;if(!dtOk(tg)){FX.dt=null;return}
  const now=Date.now(),p=FX.dt;
- if(p&&now-p.t<320&&Math.hypot(ev.clientX-p.x,ev.clientY-p.y)<40){FX.dt=null;try{getSelection().removeAllRanges()}catch(e){}
+ if(p&&now-p.t<380&&Math.hypot(ev.clientX-p.x,ev.clientY-p.y)<40){FX.dt=null;try{getSelection().removeAllRanges()}catch(e){}
   if(me&&st&&(isHost||(hostConn&&hostConn.open)))react('❤️',null,{k:'tap',x:+(ev.clientX/innerWidth).toFixed(3),y:+(ev.clientY/innerHeight).toFixed(3)})}
  else FX.dt={t:now,x:ev.clientX,y:ev.clientY}});
 const reactBar=()=>`<div class="reacts">${EMO.map(e=>`<button data-e="${e}">${e}</button>`).join('')}</div>`;
@@ -2300,11 +2305,11 @@ function gMirror(s){const c=s.cur;if(s.mode!='mir'||!c||c.mir||c.kind=='door'||s
  s.turn++;const q=c.q.for&&c.q.for!=gOf(c.explorer)?pickQ(c.r,c.explorer):c.q;s.cur={id:'c'+Date.now(),explorer:c.terr,terr:c.explorer,r:c.r,q,type:c.type,answer:null,guesses:{},result:null,placeName:'',answered:false,sent:[],mir:true,...(q===c.q?{m1:{t:c.terr,a:c.answer??null}}:{})};s.phase='question';return true}
 // Timer : durées de base (Normal), multipliées par le facteur
 /* phases où l'on choisit / écrit : sablier large et discret ; phases où l'on regarde : sablier normal */
-const TB={map:150,choix:120,echelle:120,libre:240,ecoute:180,judge:150,reveal:20,name:120,landed:40,end:300,pfiche:20},TCALM={map:1,choix:1,echelle:1,libre:1,ecoute:1,judge:1,name:1,end:1};
+const TB={map:240,choix:180,echelle:180,libre:360,ecoute:300,judge:240,reveal:45,name:180,landed:90,end:480,pfiche:40},TCALM={map:1,choix:1,echelle:1,libre:1,ecoute:1,judge:1,name:1,end:1};
 const gKey=s=>s.phase+'|'+(s.cur&&s.cur.id)+'|'+s.turn+'|'+(s.cur&&s.cur.grace||0);
 function tmDur(){const s=st,f=TF();let k=s.phase,soft=false;
- if(k=='pfiche')return {d:20,soft:false};if(!f)return null;
- if(k=='question'){if(s.cur.grace)return {d:15,soft:false};k=s.cur.type;soft=k=='ecoute'}else if(k=='judge')soft=true;
+ if(k=='pfiche')return {d:40,soft:false};if(!f)return null;
+ if(k=='question'){if(s.cur.grace)return {d:30,soft:false};k=s.cur.type;soft=k=='ecoute'}else if(k=='judge')soft=true;
  let d=TB[k];if(d==null)return null;if(MODE()=='esc'&&(k=='reveal'||k=='landed'))d/=2;return {d:d*f,soft,calm:!!TCALM[k]&&!s.cur?.grace}}
 function tmSync(){const s=st;if(!s||!isHost)return false;let ch=false;
  if(s.anon&&s.phase=='map'&&s.order.filter(n=>P(n)&&P(n).online).length<3){s.anon=false;ch=true}if(s.phase!='lobby'&&g2Track(s))ch=true;
