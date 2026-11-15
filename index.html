@@ -2956,7 +2956,9 @@ function g3LandedCards(c){const h=g3H(c.id);let o='';
  if(c.ev&&G3EL.includes(c.ev))o+=`<div class="card g3evc g3ev-${c.ev}" data-g3a="L${c.id}"><span class="g3evi" aria-hidden="true">${G3EI[c.ev]}</span><p>${T('evL_'+c.ev,{n:B(c.ev=='shell'?c.terr:c.explorer)})}</p></div>`;
  if(c.past&&c.type=='ecoute')o+=`<div class="card">${g3PastBox(c)}</div>`;
  if(h&&c.kind!='door')o+=g3NoteCard(c,h);
- if(c.wo)o+=g3WhoCard(c);
+ /* une chose à la fois : le vote « Qui de nous » n'apparaît qu'une fois ta note épinglée ou passée (direct pour la personne explorée, qui n'écrit pas) */
+ const nd=!h||c.kind=='door'||c.terr==me.name||!st.order.includes(me.name)||(h.nt||{})[me.name]!=null||(h.ns||[]).includes(me.name);
+ if(c.wo&&nd&&ui.g3ed!=c.id)o+=g3WhoCard(c);
  return o}
 function g3LandedHint(c,can){const h=g3H(c.id);if(!can||!h||c.kind=='door')return {};const ws=g3Writers(h);if(!ws.length)return {};
  const d=ws.filter(n=>(h.nt||{})[n]!=null||(h.ns||[]).includes(n)).length;if(d>=ws.length&&g3WoDone(c))return {};return {hint:T('g3HintWait',{a:d,b:ws.length})}}
