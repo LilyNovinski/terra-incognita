@@ -721,16 +721,13 @@ body::before{display:none}
 #sky .haze.m{height:18vh;background:linear-gradient(transparent,color-mix(in srgb,var(--w2) 25%,transparent))}
 @media (max-width:600px){#sky .cl.f{width:34vw;bottom:13vh}#sky .cl.f.l{left:8vw}#sky .cl.f.r{right:6vw}#sky .cl.m{width:44vw;bottom:5vh}#sky .cl.m.l{left:-6vw}#sky .cl.m.r{right:-6vw}}
 /* ombres qui passent sur le fond */
-#sky .shd{left:0;bottom:1vh;width:min(62vw,720px);aspect-ratio:300/110;opacity:var(--shdo,.38);filter:blur(6px);animation:sk-shd 95s linear infinite;animation-delay:-20s}
+#sky .shd{left:0;bottom:1vh;width:min(62vw,720px);aspect-ratio:300/110;opacity:var(--shdo,.38);filter:blur(6px);transform-origin:50% 100%;will-change:transform}
 #sky .shd>span{inset:0;transform:scaleY(.55) skewX(-14deg);transform-origin:50% 100%}
 #sky .shd svg{fill:var(--shdc,#0b3b4a)}
-#sky .shd.m{bottom:7vh;width:min(36vw,400px);aspect-ratio:200/120;animation-duration:70s;animation-delay:-55s;animation-name:sk-shdr}
+#sky .shd.m{bottom:7vh;width:min(20vw,220px);aspect-ratio:112/204}
 #sky .shd.m>span{animation:sk-flap 6s ease-in-out infinite alternate}
 [data-theme=dark] #sky{--shdo:.55;--shdc:#02071a}
-@keyframes sk-shd{0%{transform:translateX(-60vw)}100%{transform:translateX(160vw)}}
-@keyframes sk-shdr{0%{transform:translateX(150vw) scaleX(-1)}100%{transform:translateX(-50vw) scaleX(-1)}}
-@keyframes sk-flap{0%{transform:scaleY(.55) skewX(-10deg) scaleX(1)}100%{transform:scaleY(.46) skewX(-16deg) scaleX(.9)}}
-@media (prefers-reduced-motion:reduce){#sky .shd{animation-duration:240s!important}}
+@keyframes sk-flap{0%{transform:scaleY(.34) skewX(-10deg)}100%{transform:scaleY(.26) skewX(-16deg)}}
 /* --- logo vectoriel --- */
 .logo .lgn{display:none}
 [data-theme=dark] .logo .lgn{display:inline}[data-theme=dark] .logo .lgd{display:none}
@@ -1598,8 +1595,16 @@ setTheme(document.documentElement.dataset.theme=='dark'?'dark':'light');
  /* plans de profondeur : loin = petit, flou, voilé ; milieu = un peu flou ; près = net */
  /* ombres de grandes créatures qui glissent sur le sol (baleine, raie manta) */
  const whale=sv('0 0 300 110','<path d="M8 58C40 22 120 18 190 34S262 52 276 44l18-20c4 10 2 26-8 36 10 8 14 22 8 32l-20-18c-20 14-80 24-150 16S20 82 8 58Z"/><path d="M120 74l-24 30 40-22Z"/>');
- const manta=sv('0 0 200 120','<path d="M100 20C116 20 128 34 134 46 160 40 186 46 198 62 170 66 146 76 130 90 122 100 112 104 100 104S78 100 70 90C54 76 30 66 2 62 14 46 40 40 66 46 72 34 84 20 100 20Z"/><path d="M100 104v16" stroke="#000" stroke-width="3" fill="none"/>');
+ const manta=sv('14 -202 112 204','<g transform="rotate(-90)"><path d="M100 20C116 20 128 34 134 46 160 40 186 46 198 62 170 66 146 76 130 90 122 100 112 104 100 104S78 100 70 90C54 76 30 66 2 62 14 46 40 40 66 46 72 34 84 20 100 20Z"/><path d="M100 104v16" stroke="#000" stroke-width="3" fill="none"/></g>');
  const shades=sp('shd w','',sp('','',whale))+sp('shd m','',sp('','',manta));
+ /* passages aléatoires : sens, vitesse, taille, hauteur et attente changent à chaque fois (WAAPI : continue pendant le défilement) */
+ const RMs=matchMedia('(prefers-reduced-motion: reduce)').matches,rnd=(a,b)=>a+Math.random()*(b-a);
+ const swim=el=>{const left=Math.random()<.5,k=rnd(.7,1.3),W=innerWidth,w=(el.offsetWidth||300)*k,fl=left?1:-1,m=el.classList.contains('m');
+  el.style.bottom=rnd(m?4:0,m?12:6).toFixed(1)+'vh';
+  const a=el.animate([{transform:`translateX(${left?W+w*.2:-w*1.3}px) scale(${k*fl},${k})`},{transform:`translateX(${left?-w*1.3:W+w*.2}px) scale(${k*fl},${k})`}],
+   {duration:rnd(50,110)*1000*(RMs?2:1)/k,easing:'linear',fill:'both'});
+  a.onfinish=()=>{a.cancel();el.style.visibility='hidden';setTimeout(()=>{el.style.visibility='';swim(el)},rnd(6,40)*1000)}};
+ setTimeout(()=>$$('#sky .shd').forEach((el,i)=>{el.style.visibility='hidden';setTimeout(()=>{el.style.visibility='';swim(el)},rnd(1,i?30:12)*1000)}),50);
  const deep=sp('cl f l','',sv('0 0 400 260',Rr))+sp('cl f r','',sv('0 0 400 260',L))+sp('haze f','')+sp('cl m l','',sv('0 0 400 260',L))+sp('cl m r','',sv('0 0 400 260',Rr))+sp('haze m','');
  s.insertAdjacentHTML('afterbegin',sp('orb','')+sp('rays','',rays)+sp('surf','',surf)+mg+J+F1+sp('dn','',sv('0 0 1000 260',dunes,'xMidYMax slice'))+shades+deep+back+
   sp('cl l','',sv('0 0 400 260',L))+sp('cl r','',sv('0 0 400 260',Rr))+front+glw);
