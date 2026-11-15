@@ -128,7 +128,7 @@ W.GLobby=function(host,on,E){const sel=st.gsel&&GAMES[st.gsel]?st.gsel:'';
   let ti='';if(G.ties){const L=(st.gtie||[]).filter(k=>k.split('|').every(p=>st.players.some(x=>x.name==p))),ps=st.players.filter(p=>p.online).map(p=>p.name);
    ti=`<h3 class="gh">🔗 ${GT('mtieT')}</h3><p class="gsub">${GT('mtieD')}</p>${L.length?`<div class="gties">${L.map(k=>`<span class="gtie">${k.split('|').map(B).join(' 🔗 ')}${host?`<button class="gtx" data-gtie="${esc(k)}" aria-label="✕">✕</button>`:''}</span>`).join('')}</div>`:host?'':`<p class="gval">${GT('mtie0')}</p>`}
    ${host&&ps.length>1?`<p class="gsub">${GT('mtieH')}</p><div class="gtiep">${ps.map(p=>`<button class="ghost ${GV.tie==p?'sel':''}" data-gtp="${esc(p)}">${esc(p)}</button>`).join('')}</div>`:''}`}
-  h+=(G.tone?g2ToneCard(host):'')+`<div class="card"><p class="grule">${GT(rk)}</p>${ok?'':`<p class="err">${GT('needP',{a:G.min,b:G.max})}</p>`}${tm}${ti}
+  h+=(G.tone?g2ToneCard(host):'')+`<div class="card"><p class="grule">${GT(rk)}</p>${G.tut?`<button class="ghost gtutb" data-gtut="${sel}">📖 ${GT('tuB')}</button>`:''}${ok?'':`<p class="err">${GT('needP',{a:G.min,b:G.max})}</p>`}${tm}${ti}
   ${host?`<button class="pri wide" id="start" ${ok?'':'disabled'}>${GT('play',{g:GT('n_'+sel)})}</button>`:`<p class="gby">${GT('waitHost')}</p>`}</div>`}
  return h};
 /* liens connus : clics délégués (le salon est rendu par index.html) */
@@ -578,6 +578,99 @@ GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,ties:true,MK
   return `<h3 class="gh3">✨ ${GT('mconst')}</h3>${svg}<p class="mut arclg">${GT('mlegend')}</p>${tr.length?`<div class="mktr">${tr.map(([p,v],i)=>`<p class="ga" ${dl(i,.4)}>${B(p)} ${GT('mbetr')} ${v.map(B).join(', ')}</p>`).join('')}</div>`:`<p class="gnote">${GT('mnobetr')}</p>`}`},
  fin(s){return{pts:s.game.sc}}};
 
+/* =====================================================================
+   📖 TUTORIELS ANIMÉS — une mini-démo scriptée par jeu (pièces factices qui bougent, étape par étape).
+   Ouvert par le « ? » du haut (contexte : jeu en cours, ou jeu choisi au salon) et par « Les règles en images » au salon.
+   Scène = 300×180 (coordonnées px), éléments .te animés en transform/opacity seulement ; mouvement réduit : état final fixe.
+   Chaque étape rejoue sa scène en boucle tant qu'on ne passe pas à la suite ; on ne ferme que par « J'ai compris ».
+   ===================================================================== */
+const TU={c:['#ef8354','#2fa894','#9b7be8','#d9a520'],
+ n:()=>{const v=String(GT('tun')||'Ana|Ben|Cléo|Dan').split('|');return v.length>3?v:['Ana','Ben','Cléo','Dan']},
+ w:()=>String(GT('tuw')||'').split('|'),
+ /* élément positionné : x,y en px de scène ; c = a (apparaît) | p (pop) | m (glisse depuis --x/--y) | o (disparaît à --o) | k (secousse) */
+ e(x,y,h,d,c,st){return `<div class="te ${c||'a'}" style="left:${(x/3).toFixed(2)}%;top:${(y/1.8).toFixed(2)}%;--d:${d||0}s;${st||''}"><span>${h}</span></div>`},
+ /* glisse de (x0,y0) vers (x,y) */
+ mv(x0,y0,x,y,h,d,c,st){return TU.e(x,y,h,d,'m '+(c||''),`--x:${x0-x}px;--y:${y0-y}px;${st||''}`)},
+ av(i,lab){const n=TU.n()[i]||'?';return `<b class="tav" style="--c:${TU.c[i]}">${esc([...n][0])}</b>${lab===false?'':`<small class="tnm">${esc(n)}</small>`}`},
+ pt(v,cl){return `<b class="tpt ${cl||''}">${v}</b>`},
+ cd(h,cl){return `<i class="tcd ${cl||''}">${h}</i>`},
+ dot(i){return `<i class="tdot" style="--c:${TU.c[i]}"></i>`},
+ bt(i){return `<i class="tbt" style="--c:${TU.c[i]}">⛵</i>`}};
+/* hexagones de l'Archipel en miniature : centre + 1 anneau */
+const TUH=[[150,90],[195,90],[172.5,51],[127.5,51],[105,90],[127.5,129],[172.5,129]];
+const tuHex=(dead,hl)=>`<svg class="tub" viewBox="0 0 300 180">${TUH.map(([x,y],i)=>{const p=[0,1,2,3,4,5].map(k=>{const a=Math.PI/180*(60*k-30);return (x+25*Math.cos(a)).toFixed(1)+','+(y+25*Math.sin(a)).toFixed(1)}).join(' ');
+ return `<polygon points="${p}" class="${i?'r1':'c0'}${dead&&i?' tdead':''}${hl===i?' thl':''}"/>`}).join('')}</svg>`;
+const TUS={
+ bot:[
+  {k:'tu_bot1',s:()=>[0,1,2].map(i=>TU.e(60+90*i,150,TU.av(i))+TU.e(60+90*i,104,'✉️',.3+.25*i,'p')+TU.mv(60+90*i,104,150,40,'✉️',1.3+.2*i,'o','--op0:0;--o:'+(1.9+.2*i)+'s')).join('')+TU.e(150,40,'🍾',1,'p big')},
+  {k:'tu_bot2',s:()=>TU.e(150,30,'🍾',0,'a big')+TU.e(150,78,TU.cd('🗼 💤'),.5,'p')+[0,1,2].map(i=>TU.e(60+90*i,150,TU.av(i))+TU.e(60+90*i,112,'❓',1.1+.15*i,'p')).join('')},
+  {k:'tu_bot3',s:()=>TU.e(150,30,TU.cd('🗼 💤'))+[0,1,2].map(i=>TU.e(60+90*i,150,TU.av(i))).join('')+TU.mv(60,150,140,108,TU.dot(0),.4)+TU.mv(240,150,160,108,TU.dot(2),.8)+TU.e(150,78,'✅',1.5,'p')+TU.e(60,104,TU.pt('+2'),1.9,'p')+TU.e(240,104,TU.pt('+2'),2,'p')},
+  {k:'tu_bot4',x:'n',s:()=>TU.e(80,40,TU.cd('🔍 ❌❌❌'),.2,'p')+TU.e(80,95,TU.av(1,false),.2)+TU.e(80,140,TU.pt('+3'),.9,'p')+TU.e(220,40,TU.cd('🔍 ✅❌❌'),1.3,'p')+TU.e(220,95,TU.av(1,false),1.3)+TU.e(220,140,TU.pt('+1'),1.9,'p')},
+  {k:'tu_bot5',x:'2',s:()=>[0,1].map(i=>TU.e(80+140*i,150,TU.av(i))+[0,1,2].map(j=>TU.e(48+140*i+32*j,104,TU.cd(j==2?'🎭':'✅'),.3+.2*j+.6*i,'p')).join('')).join('')+TU.e(80,62,TU.pt('+2'),2,'p')+TU.e(220,62,TU.pt('+2'),2.3,'p')}],
+ pha:[
+  {k:'tu_pha1',s:()=>TU.e(40,95,'🗼',0,'a big')+TU.e(55,95,'<i class="tbeam"></i>',.3)+TU.e(205,95,TU.cd('❓🏝️'),.7,'p')},
+  {k:'tu_pha2',x:'n',s:()=>[0,1,2,3].map(i=>TU.e(45+70*i,150,TU.av(i))).join('')+TU.mv(45,150,185,98,TU.dot(0),.3)+TU.mv(115,150,45,98,TU.dot(1),.5)+TU.mv(185,150,185,84,TU.dot(2),.7)+TU.mv(255,150,185,70,TU.dot(3),.9)},
+  {k:'tu_pha3',x:'n',s:()=>TU.e(30,30,'🗼')+TU.e(38,32,'<i class="tbeam sm"></i>',.2)+[0,1,2,3].map(i=>TU.e(45+70*i,150,TU.av(i))).join('')+TU.e(185,98,TU.dot(0))+TU.e(45,98,TU.dot(1))+TU.e(185,84,TU.dot(2))+TU.e(185,70,TU.dot(3))+[0,2,3].map((i,j)=>TU.e(45+70*i,118,TU.pt('+1'),1+.2*j,'p')).join('')},
+  {k:'tu_pha4',x:'2',s:()=>TU.e(90,140,TU.av(0))+TU.e(210,140,TU.av(1))+TU.mv(90,140,210,96,TU.dot(0),.3)+TU.e(90,60,TU.cd('🔮 '+TU.dot(1)),1,'p')+TU.mv(210,140,210,82,TU.dot(1),1.6)+TU.e(90,96,TU.pt('+1'),2.3,'p')}],
+ vag:[
+  {k:'tu_vag1',s:()=>TU.e(150,36,TU.cd(esc(TU.w()[0]||'')),0,'p')+[0,1,2].map(i=>TU.e(60+90*i,150,TU.av(i))+TU.e(60+90*i,108,'✏️',.6+.2*i,'p')).join('')},
+  {k:'tu_vag2',x:'n',s:()=>TU.e(150,30,TU.cd(esc(TU.w()[0]||'')))+[0,1,2].map(i=>TU.e(60+90*i,150,TU.av(i))+TU.e(60+90*i,102,TU.cd(esc(TU.w()[i<2?1:2]||'')),.3+.3*i,'p')).join('')},
+  {k:'tu_vag3',x:'n',s:()=>TU.e(150,30,TU.cd(esc(TU.w()[0]||'')))+[0,1,2].map(i=>TU.e(60+90*i,150,TU.av(i))+TU.e(60+90*i,102,TU.cd(esc(TU.w()[i<2?1:2]||''),i<2?'ok':''))).join('')+TU.e(105,102,'🔗',.4,'p')+TU.e(60,66,TU.pt('+2'),.9,'p')+TU.e(150,66,TU.pt('+2'),1,'p')+TU.e(240,66,TU.pt('0','no'),1.3,'p')},
+  {k:'tu_vag4',x:'2',s:()=>TU.e(80,150,TU.av(0))+TU.e(220,150,TU.av(1))+TU.e(80,104,TU.cd(esc(TU.w()[1]||'')),.2,'p')+TU.e(220,104,TU.cd(esc(TU.w()[2]||'')),.4,'p')+TU.e(150,50,TU.cd('🌉 '+esc(TU.w()[3]||''),'ok'),1.2,'p')+TU.e(150,86,TU.pt('+1'),1.9,'p')}],
+ rad:[
+  {k:'tu_rad1',s:()=>TU.e(80,85,TU.cd('🐬','big'),.2,'p')+TU.e(150,85,'⚖️',.5,'p')+TU.e(220,85,TU.cd('🕊️','big'),.8,'p')},
+  {k:'tu_rad2',x:'n',s:()=>[0,1,2,3].map(i=>TU.e(45+70*i,150,TU.av(i))+TU.e(45+70*i,104,TU.cd('🤫'),.3+.15*i,'p')+TU.e(45+70*i,62,'🎯',1.2+.15*i,'p')).join('')},
+  {k:'tu_rad3',x:'n',s:()=>TU.e(150,24,TU.cd('🐬 3 – 1 🕊️'),0,'p')+[0,1,2,3].map(i=>TU.e(45+70*i,150,TU.av(i))+TU.e(45+70*i,104,TU.cd(i<3?'🐬':'🕊️'),.3)+TU.e(45+70*i,64,TU.pt(i<3?'+1':'+2'),1+.2*i,'p')).join('')},
+  {k:'tu_rad4',x:'2',s:()=>TU.e(90,150,TU.av(0))+TU.e(210,150,TU.av(1))+TU.e(90,104,TU.cd('🐬'),.2,'p')+TU.e(90,60,TU.cd('🔮 🕊️'),.7,'p')+TU.e(210,104,TU.cd('🕊️'),1.4,'p')+TU.e(150,60,TU.pt('+1'),2,'p')}],
+ pec:[
+  {k:'tu_pec1',d:6,s:()=>`<i class="tsea"></i>`+TU.e(150,40,'👜',0,'p big')+['🦪','🦪','🦪','🦪','🦪','🪼','🪼','🦈','🦈','🦈','🦈','🦈'].map((x,i)=>TU.e(40+20*i,92,x,.5+.12*i,'p')).join('')+[0,1,2].map(i=>TU.mv(75+75*i,0,75+75*i,150,TU.av(i,false),2+.2*i)).join('')},
+  {k:'tu_pec2',s:()=>`<i class="tsea"></i>`+TU.e(30,28,'👜')+TU.mv(30,28,150,48,'🦪<sub>3</sub>',.2)+[0,1,2].map(i=>TU.e(75+75*i,125,TU.av(i,false))+TU.e(75+75*i,160,TU.cd('🕸️ 0'),0,'o','--o:1.2s')+TU.e(75+75*i,160,TU.cd('🕸️ 3','ok'),1.2+.15*i,'p')).join('')},
+  {k:'tu_pec3',s:()=>`<i class="tsea"></i>`+TU.e(268,22,'🧰')+[0,2].map(i=>TU.e(75+75*i,125,TU.av(i,false))+TU.e(75+75*i,160,TU.cd('🕸️ 3'))+TU.e(75+75*i,92,'🤿',1.6,'p')).join('')+TU.mv(150,125,150,22,TU.av(1,false),.4)+TU.e(150,160,TU.cd('🕸️ 3'),0,'o','--o:.9s')+TU.mv(150,160,268,48,TU.cd('3','ok'),1,'','--op0:0')},
+  {k:'tu_pec4',d:6,s:()=>`<i class="tsea"></i>`+TU.e(150,22,TU.av(1,false))+TU.e(268,22,'🧰')+TU.e(268,48,TU.cd('3','ok'))+TU.e(110,60,'🦈',.2,'p')+TU.e(110,84,TU.pt('1/2','no'),.5,'p')+TU.e(190,60,'🦈',1.8,'p k')+[0,2].map(i=>TU.e(75+75*i,125,TU.av(i,false))+TU.e(75+75*i,160,TU.cd('🕸️ 7'),0,'o','--o:2.4s')+TU.e(75+75*i,160,TU.cd('🕸️ 0','no'),2.5,'p')).join('')},
+  {k:'tu_pec5',s:()=>`<i class="tsea"></i>`+TU.e(75,125,TU.av(0,false))+TU.e(225,125,TU.av(2,false))+TU.e(75,160,TU.cd('🕸️ 8'),0,'o','--o:1.4s')+TU.e(75,160,TU.cd('🕸️ 4','no'),1.5,'p')+TU.e(225,160,TU.cd('🕸️ 5'))+TU.mv(150,40,75,92,'🪼',.3)+TU.e(122,92,TU.pt('−½','no'),1.5,'p')},
+  {k:'tu_pec6',s:()=>`<i class="tsea"></i>`+TU.e(75,22,TU.av(0,false))+TU.e(150,22,TU.av(1,false))+TU.e(225,125,TU.av(2,false))+TU.mv(150,40,225,80,'🦪<sub>4</sub>',.3)+TU.e(268,80,TU.pt('×2'),1,'p')+TU.e(225,160,TU.cd('🕸️ 5'),0,'o','--o:1.5s')+TU.e(225,160,TU.cd('🕸️ 13','ok'),1.6,'p')},
+  {k:'tu_pec7',s:()=>[0,1,2].map(i=>TU.e(75+75*i,140,TU.av(i))+TU.e(75+75*i,90,'🧰',.2+.2*i,'p')+TU.e(75+75*i,58,TU.pt([12,9,15][i]),.9+.3*i,'p')).join('')+TU.e(225,26,'👑',2,'p')},
+  {k:'tu_pec8',x:'2',s:()=>`<i class="tsea"></i>`+TU.e(110,125,TU.av(0,false))+TU.mv(190,0,190,125,'🐟',.2,'big')+TU.e(190,160,TU.cd('🕸️ 8'),1,'p')+TU.mv(190,125,190,24,'🐟',1.8,'big')}],
+ arc:[
+  {k:'tu_arc1',s:()=>tuHex()+TU.e(105,90,TU.bt(0),.4,'p')+TU.e(195,90,TU.bt(1),.6,'p')+TU.e(105,64,TU.av(0,false),.8,'p sm')+TU.e(195,64,TU.av(1,false),.9,'p sm')},
+  {k:'tu_arc2',s:()=>tuHex()+TU.e(105,90,TU.bt(0))+TU.e(195,90,TU.bt(1))+TU.e(40,40,TU.cd('🂠'),.2,'p')+TU.e(260,40,TU.cd('🂠'),.4,'p')+TU.e(40,40,TU.cd('↗️','ok'),1.5,'p')+TU.e(260,40,TU.cd('🏝️','ok'),1.7,'p')+TU.e(150,160,'⏳',.8,'p')},
+  {k:'tu_arc3',s:()=>tuHex(0,3)+TU.e(127.5,51,'<i class="tring"></i>',.2,'p')+TU.mv(105,90,127.5,51,TU.bt(0),1)+TU.e(127.5,24,TU.av(0,false),1.6,'p sm')},
+  {k:'tu_arc4',s:()=>tuHex()+TU.e(127.5,56,'🏝️',.8,'p')+TU.e(127.5,44,TU.bt(0))+TU.e(127.5,18,TU.av(0,false),0,'a sm')},
+  {k:'tu_arc5',d:6,s:()=>tuHex()+TU.e(172.5,56,'🏝️',0,'o','--o:2.6s')+TU.e(172.5,56,'🌊',2.7,'p')+TU.e(172.5,44,TU.bt(0))+TU.e(172.5,18,TU.av(0,false),0,'a sm')+TU.e(195,90,TU.bt(1),0,'o','--o:1.6s')+TU.mv(195,90,172.5,129,TU.bt(1),1.6,'','--op0:0')+TU.e(212,70,'🛡️',.4,'p o','--o:1.6s')+TU.e(150,160,TU.pt('💥','no'),2.7,'p')},
+  {k:'tu_arc6',s:()=>tuHex(0,0)+TU.e(105,90,TU.bt(0),0,'a k2')+TU.e(195,90,TU.bt(1),0,'a k2')+TU.mv(115,90,138,90,'➡️',.3)+TU.mv(185,90,162,90,'⬅️',.3)+TU.e(150,90,'💥',1.2,'p big')},
+  {k:'tu_arc7',d:6,s:()=>tuHex(1)+TU.e(150,92,'🏝️')+TU.e(195,92,'🏝️',0,'o','--o:2.4s')+TU.e(150,66,TU.pt('+3'),.4,'p')+TU.e(195,66,TU.pt('+2'),.7,'p')+TU.e(127.5,103,TU.pt('+2'),1,'p')+TU.e(127.5,129,'🏝️',0,'o','--o:2.4s')+TU.e(150,165,'🌊 🌊 🌊',2.2,'p')}],
+ msk:[
+  {k:'tu_msk1',s:()=>TU.e(150,145,TU.av(0))+TU.e(150,112,'🎭',.3,'p')+TU.e(80,50,'🐙',.8,'p big')+TU.e(220,50,'🦀',1.1,'p big')+TU.e(80,86,'?',1.3,'p')+TU.e(220,86,'?',1.4,'p')},
+  {k:'tu_msk2',s:()=>TU.e(150,145,TU.av(0))+TU.e(150,40,'🐙',0,'a big')+TU.mv(150,120,150,78,TU.cd('💬 …'),.3)+TU.e(100,110,TU.cd('🤝'),1.3,'p')+TU.e(200,110,TU.cd('🔒'),1.5,'p')},
+  {k:'tu_msk3',s:()=>TU.e(80,80,'🐙',0,'a big')+TU.e(220,80,'🎭',0,'a big')+TU.e(80,130,TU.cd('🤝'),.2,'p')+TU.e(220,130,TU.cd('🤝'),.4,'p')+TU.e(80,40,TU.pt('+4'),1,'p')+TU.e(220,40,TU.pt('+4'),1.1,'p')+TU.e(150,80,'🔗',1.5,'p big')},
+  {k:'tu_msk4',s:()=>TU.e(80,80,'🐙',0,'a big')+TU.e(220,80,'🎭',0,'a big')+TU.e(80,130,TU.cd('🤝'),.2,'p')+TU.e(220,130,TU.cd('🔒'),.4,'p')+TU.e(80,40,TU.pt('+1','no'),1,'p')+TU.e(220,40,TU.pt('+4'),1.1,'p')+TU.e(252,62,'🦈',1.7,'p')},
+  {k:'tu_msk5',s:()=>TU.e(80,80,'🐙',0,'a big')+TU.e(112,62,'🦈')+TU.e(220,80,'🎭',0,'a big')+TU.e(80,130,TU.cd('🔒'),.2,'p')+TU.e(220,130,TU.cd('🔒'),.4,'p')+TU.e(80,40,TU.pt('+2'),1,'p')+TU.e(220,40,TU.pt('+2'),1.1,'p')+TU.e(258,62,'✓',1.7,'p')},
+  {k:'tu_msk6',d:7,s:()=>TU.e(70,140,TU.av(0))+TU.e(230,140,TU.av(1))+TU.e(150,40,TU.cd('16','ok'),0,'p')+
+   [['🤝','🤝','+8','+8',.3,1.9],['🗡️','🤝','+16','0',2.1,3.7],['🗡️','🗡️','−8','−8',3.9,0]].map(([a,b,x,y,d,o])=>{const O=o?'p o':'p';return TU.e(70,100,TU.cd(a),d,O,'--o:'+o+'s')+TU.e(230,100,TU.cd(b),d+.1,O,'--o:'+o+'s')+TU.e(70,72,TU.pt(x,x[0]=='−'?'no':''),d+.6,O,'--o:'+o+'s')+TU.e(230,72,TU.pt(y,y[0]=='−'||y=='0'?'no':''),d+.7,O,'--o:'+o+'s')}).join('')}]};
+for(const id in TUS)if(GAMES[id])GAMES[id].tut=TUS[id];
+const GTU={id:null,i:0,t:null};
+W.GTut=function(id){const G=GAMES[id];if(!G||!G.tut||typeof document=='undefined')return false;
+ const nOn=(()=>{try{return st&&st.phase=='game'&&st.order?st.order.length:st.players.filter(p=>p.online).length}catch(e){return 3}})();
+ const L=G.tut.filter(x=>!x.x||(x.x=='2'?nOn==2:nOn!=2));GTU.id=id;GTU.i=0;
+ const box=$('#modal');if(!box)return false;
+ box.innerHTML=`<div class="modal gtu" role="dialog" aria-modal="true" aria-label="${esc(GT('n_'+id))}"><div class="card"><div class="tuh"><span>${G.icon}</span><b>${GT('n_'+id)}</b></div>
+  <div class="tus" aria-hidden="true"></div><p class="tucap" aria-live="polite"></p><div class="steps">${L.map((_,j)=>`<i data-s="${j}"></i>`).join('')}</div>
+  <div class="row"><button class="ghost" id="tuag"></button><button class="pri" id="tunx"></button></div></div></div>`;
+ const nm=TU.n(),tw=TU.w(),V={a:nm[0],b:nm[1],c:nm[2],d:nm[3],w0:tw[0],w1:tw[1],w2:tw[2],w3:tw[3]};
+ const show=j=>{clearTimeout(GTU.t);GTU.i=j;const S=L[j],stg=$('.gtu .tus');if(!stg)return;
+  stg.innerHTML=`<div class="tusc">${S.s()}</div>`;$('.gtu .tucap').innerHTML=esc(GT(S.k,V));
+  $$('.gtu .steps i').forEach((el,k)=>el.className=k==j?'on':k<j?'done':'');
+  const last=j==L.length-1;$('#tunx').textContent=last?GT('tuOk'):T('next');$('#tuag').textContent=last&&L.length>1?'↺ '+GT('tuAll'):'↺ '+GT('tuAgain');
+  if(!RM())GTU.t=setTimeout(()=>{if($('.gtu')&&GTU.i==j)show(j)},(S.d||5)*1000)};/* la scène rejoue en boucle */
+ const close=()=>{clearTimeout(GTU.t);const m=$('.gtu');if(!m)return;m.classList.add('closing');setTimeout(()=>{if($('.gtu'))$('#modal').textContent=''},240)};
+ $$('.gtu .steps i').forEach(el=>el.onclick=()=>show(+el.dataset.s));
+ $('#tuag').onclick=()=>show(GTU.i==L.length-1&&L.length>1?0:GTU.i);
+ $('#tunx').onclick=()=>GTU.i<L.length-1?show(GTU.i+1):close();
+ show(0);return true};
+/* @games : « ? » contextuel — dans un jeu (ou un jeu choisi au salon) il ouvre la démo de ce jeu, sinon le tutoriel de l'Expédition */
+W.GHelp=function(){try{const id=(st.phase=='game'||st.phase=='gend')&&st.game?st.game.id:st.phase=='lobby'?st.gsel:null;return id?W.GTut(id):false}catch(e){return false}};
+if(typeof document!='undefined')document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('[data-gtut]');if(t)W.GTut(t.dataset.gtut)});
+
 /* ---------- styles (injectés) ---------- */
 if(typeof document!='undefined'){const c=document.createElement('style');c.id='games-css';c.textContent=`
 .gw{--gease:cubic-bezier(.22,1,.36,1)}
@@ -739,6 +832,42 @@ section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) b
 .mkl{animation:fi .5s ease both}.still .mkl{animation:none}
 .mktr p{margin:4px 0;font:600 14px Nunito;text-align:center}
 [data-theme=dark] .mkc.p{border-color:#2c7a62}[data-theme=dark] .mkc.g{border-color:#7a4a2a}
+/* 📖 tutoriels animés */
+.gtu .tuh{display:flex;align-items:center;justify-content:center;gap:8px;font-size:18px;margin-bottom:10px}.gtu .tuh span{font-size:26px}
+.gtu .tus{position:relative;width:min(300px,100%);aspect-ratio:300/180;margin:0 auto;border-radius:18px;overflow:hidden;background:var(--paper2);box-shadow:inset 0 0 0 2px var(--edge)}
+.gtu .tusc{position:absolute;inset:0}
+.gtu .tucap{min-height:3.2em;margin:12px 4px 0;font-size:15px;line-height:1.4}
+.gtu .row{display:flex;gap:10px;justify-content:center}.gtu .row button{flex:1}
+.te{position:absolute;width:0;height:0}.te>span{position:absolute;left:0;top:0;transform:translate(-50%,-50%);display:inline-flex;flex-direction:column;align-items:center;gap:1px;font-size:22px;line-height:1;white-space:nowrap}
+.te.big>span{font-size:36px}.te.sm>span{font-size:15px}
+.tav{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--c);color:#fff;font-size:15px;box-shadow:0 2px 0 #0002}
+.te.sm .tav{width:22px;height:22px;font-size:12px}
+.tnm{font-size:11px;font-weight:600;color:var(--mut)}
+.tpt{display:inline-block;padding:2px 8px;border-radius:10px;background:var(--ok,#2fa894);color:#fff;font-size:14px}.tpt.no{background:var(--bad)}
+.tcd{display:inline-block;padding:5px 9px;border-radius:10px;background:var(--paper);box-shadow:0 0 0 1.5px var(--edge),0 3px 0 var(--edge);font-style:normal;font-size:15px;color:var(--txt)}
+.tcd.big{font-size:30px;padding:8px 14px}.tcd.ok{box-shadow:0 0 0 2px var(--ok,#2fa894),0 3px 0 var(--edge)}.tcd.no{box-shadow:0 0 0 2px var(--bad),0 3px 0 var(--edge)}
+.te sub{font-size:11px;font-weight:700}
+.tbt{font-style:normal;display:inline-block;padding:0 2px 1px;border-bottom:4px solid var(--c);border-radius:3px;line-height:1.1}
+.tdot{display:inline-block;width:14px;height:14px;border-radius:50%;background:var(--c);box-shadow:0 0 0 2px var(--paper)}
+.tbeam{display:block;width:170px;height:34px;transform-origin:0 50%;margin-left:170px;background:linear-gradient(90deg,#ffe9a8cc,#ffe9a800);clip-path:polygon(0 40%,100% 0,100% 100%,0 60%)}
+.tbeam.sm{width:165px;margin-left:165px;transform:rotate(19deg)}
+.tring{display:block;width:44px;height:44px;border-radius:50%;box-shadow:0 0 0 3px var(--acc)}
+.tsea{position:absolute;inset:38px 0 0;background:linear-gradient(180deg,#5fb7d433,#1f5f8a55)}
+.tub{position:absolute;inset:0;width:100%;height:100%}.tub polygon{fill:#7ec4d955;stroke:var(--edge);stroke-width:1.5}.tub .c0{fill:#7ec4d999}.tub .thl{stroke:var(--acc);stroke-width:2.5}
+.tub .tdead{animation:tuDead .6s 2.2s both}
+.te.a{animation:tuIn .45s var(--d) both}.te.p{animation:tuPop .45s var(--d) both}.te.m{animation:tuMv .8s cubic-bezier(.4,0,.2,1) var(--d) both}
+.te.o{animation:tuOut .35s var(--o) forwards}.te.p.o{animation:tuPop .45s var(--d) both,tuOut .35s var(--o) forwards}.te.m.o{animation:tuMv .8s cubic-bezier(.4,0,.2,1) var(--d) both,tuOut .35s var(--o) forwards}
+.te.p.k{animation:tuPop .45s var(--d) both,tuShake .45s calc(var(--d) + .45s) 2}.te.k2{animation:tuShake .4s 1.2s 2}
+@keyframes tuIn{from{opacity:0;transform:translateY(8px)}}
+@keyframes tuPop{0%{opacity:0;transform:scale(.3)}70%{opacity:1;transform:scale(1.12)}100%{opacity:1;transform:none}}
+@keyframes tuMv{0%{transform:translate(var(--x),var(--y));opacity:var(--op0,1)}1%{opacity:1}100%{transform:none;opacity:1}}
+@keyframes tuOut{to{opacity:0;transform:scale(.8)}}
+@keyframes tuShake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+@keyframes tuDead{to{opacity:.25}}
+[data-theme=dark] .gtu .tus{background:#0b1c2d;box-shadow:inset 0 0 0 2px #26475f}[data-theme=dark] .tcd{background:#16324a;box-shadow:0 0 0 1.5px #2c5574,0 3px 0 #06121f}[data-theme=dark] .tub polygon{fill:#2d6a8a55;stroke:#2c5574}[data-theme=dark] .tub .c0{fill:#2d6a8aaa}
+.gtutb{margin-top:10px}
+@media (prefers-reduced-motion:reduce){.te,.te>span,.tub .tdead{animation:none!important}.te.o{display:none}.te.m{transform:none}}
+
 @media (max-width:420px){.grow2{flex-direction:column}.gq{font-size:19px}.gseed{font-size:26px}.gbr{grid-template-columns:minmax(0,7em) 1fr 1.6em}.gtf{width:78px}.gcamps{gap:6px}}
 @media (prefers-reduced-motion:reduce){.gw .ga,.gw .gbar,.gfloat,.gev .gbig,.grx,.arcb *,.gw.gnx>.card,.mkl{animation:none!important}.gsab i{animation-duration:0s!important;display:none}}
 `;(document.head||document.documentElement).appendChild(c)}
@@ -1236,4 +1365,357 @@ GMK2('pt',{r_msk:`Em cada rodada (de 4 a 6, ninguém sabe quantas) você está m
 mrep:`Costume: vocês já tinham dividido juntos, rende menos.`,mfinC:`Ambos Dividir: divide-se. Um só Rouba: leva tudo, menos 4 por 🦈. Ambos Roubam: −8 cada.`,
 mshT:`Já guardou contra alguém que dividia`,mshD:`já traiu alguém que dividia. Guardar contra um 🦈 não te marca.`,myshk:`Você carrega {v} 🦈: −{v} no fim.`,
 mtieM:`Laço conhecido: o seu frente a frente vale a média da rodada.`,mtieT:`Laços conhecidos`,mtieD:`Casal, colegas de casa…: o frente a frente deles vale a média da rodada e eles nunca se enfrentam na final. Se conhecer não dá vantagem.`,mtieH:`Toque em dois nomes para ligá-los (ou desligar).`,mtie0:`Nenhum laço declarado.`});
+/* 📖 Tutoriels animés : légendes (noms et mots d'exemple localisés) */
+const GTUT=(l,o)=>Object.assign(GI18N[l].ui,o);
+GTUT('fr',{tuB:`Les règles en images`,tuOk:`J'ai compris`,tuAgain:`Revoir`,tuAll:`Depuis le début`,tun:`Ana|Ben|Cléo|Dan`,tuw:`Plage|Sable|Soleil|Été`,
+tu_bot1:`Chacun écrit en secret 2 ou 3 choses vraies sur soi, glissées dans des bouteilles.`,
+tu_bot2:`Les bouteilles s'ouvrent une à une, sans nom : « J'ai déjà dormi dans un phare. » Qui l'a écrite ?`,
+tu_bot3:`{a} et {c} votent pour {b}… c'était bien {b} : +2 chacune.`,
+tu_bot4:`Personne ne trouve ton anecdote ? +3 pour toi. Seulement une partie ? +1.`,
+tu_bot5:`À deux : écris 3 anecdotes, vraies ou inventées. Bonne devinette : +2 ; bluff qui passe : +2.`,
+tu_pha1:`Une question s'allume : « Qui de nous partirait vivre seul sur une île ? »`,
+tu_pha2:`Chacun vote pour la personne qui colle le mieux, même soi-même.`,
+tu_pha3:`Le phare éclaire la majorité : {c}. Ceux qui ont voté {c} gagnent +1.`,
+tu_pha4:`À deux : choisis l'un de vous, puis prédis le choix de l'autre. Bien vu : +1.`,
+tu_vag1:`Un mot apparaît : « {w0} ». Écris vite le premier mot qui te vient.`,
+tu_vag2:`{a} et {b} écrivent « {w1} », {c} écrit « {w2} ».`,
+tu_vag3:`+1 par personne qui a écrit le même mot que toi, +1 de plus si vous êtes pile deux : {a} et {b} gagnent +2.`,
+tu_vag4:`À deux : le même mot = +2. Sinon, trouvez un mot-pont qui relie les deux (« {w3} ») : +1.`,
+tu_rad1:`Tu préfères nager avec les dauphins 🐬 ou voler avec les mouettes 🕊️ ?`,
+tu_rad2:`Choisis en secret, puis parie sur ce que choisira la majorité.`,
+tu_rad3:`🐬 l'emporte 3 à 1. Bon pari : +1 ; bon pari alors que toi tu étais dans la minorité : +2, comme {d}.`,
+tu_rad4:`À deux : choisis, puis devine le choix de l'autre. Bien vu : +1.`,
+tu_pec1:`Tout le monde plonge ensemble. Le sac commun est visible de tous : 12 perles 🦪, 2 méduses 🪼, 5 requins 🦈.`,
+tu_pec2:`Chaque perle tirée va dans le filet de CHAQUE plongeur encore en bas : ici +3 pour tous.`,
+tu_pec3:`Après chaque tirage, chacun choisit en secret : replonger, ou remonter. {b} remonte : son filet passe à l'abri dans son coffre.`,
+tu_pec4:`Le 1er requin ne fait rien… mais au 2e, ceux encore en bas perdent tout leur filet et la manche s'arrête.`,
+tu_pec5:`La méduse pique le plus gros filet encore en bas : il perd la moitié.`,
+tu_pec6:`Seul au fond ? Chaque perle compte double !`,
+tu_pec7:`Après 3 ou 4 manches, on ouvre les coffres, secrets jusque-là : le plus riche gagne.`,
+tu_pec8:`À deux, le Mérou 🐟 plonge avec vous : il remonte à 8 perles, ou dès 4 après un requin.`,
+tu_arc1:`Une petite mer d'hexagones. Chacun a un bateau ⛵ sur le bord.`,
+tu_arc2:`Chaque tour, tout le monde donne un ordre en secret ; tout se dévoile et se joue en même temps.`,
+tu_arc3:`Naviguer : touche une case voisine, ton bateau s'y rend.`,
+tu_arc4:`Bâtir : touche ta propre case pour y poser un îlot 🏝️.`,
+tu_arc5:`Couler : sur l'îlot d'un autre, touche ta case. Impossible tant que son bateau est dessus ou à côté 🛡️ ; s'il s'éloigne, l'îlot coule.`,
+tu_arc6:`Deux ordres sur la même case s'annulent : personne n'y va.`,
+tu_arc7:`Tous les 4 tours, chaque îlot rapporte ses perles (3 au centre, moins vers le bord), puis la marée engloutit le bord. Le plus de perles gagne.`,
+tu_msk1:`Chaque manche, tu es masqué face à 1 ou 2 joueurs : tu vois leur masque 🐙, jamais leur nom.`,
+tu_msk2:`Écris-leur un message anonyme, puis choisis en secret : 🤝 Partager ou 🔒 Garder.`,
+tu_msk3:`🤝 + 🤝 : 4 chacun, et un lien de plus dans ton réseau (bonus dès la 2e personne).`,
+tu_msk4:`🔒 face à 🤝 : 4 pour toi, 1 pour l'autre… et un 🦈 que tous verront (−1 à la fin).`,
+tu_msk5:`🔒 + 🔒 : 2 chacun. Garder face à un 🦈 ne te marque pas.`,
+tu_msk6:`Finale à 16 points : les deux partagent, 8 chacun ; un seul vole, tout pour lui ; les deux volent, −8 chacun.`});
+GTUT('en',{tuB:`Rules in pictures`,tuOk:`Got it`,tuAgain:`Replay`,tuAll:`From the start`,tun:`Ana|Ben|Cleo|Dan`,tuw:`Beach|Sand|Sun|Summer`,
+tu_bot1:`Everyone secretly writes 2 or 3 true things about themselves, slipped into bottles.`,
+tu_bot2:`The bottles open one by one, with no name: "I once slept in a lighthouse." Who wrote it?`,
+tu_bot3:`{a} and {c} vote for {b}… and it was {b}: +2 each.`,
+tu_bot4:`Nobody finds your story? +3 for you. Only some do? +1.`,
+tu_bot5:`Two players: write 3 stories, true or made up. Right guess: +2; bluff that works: +2.`,
+tu_pha1:`A question lights up: "Who among us would go live alone on an island?"`,
+tu_pha2:`Everyone votes for the person who fits best, even themselves.`,
+tu_pha3:`The lighthouse shines on the majority: {c}. Everyone who voted {c} gets +1.`,
+tu_pha4:`Two players: pick one of you, then predict the other's pick. Right: +1.`,
+tu_vag1:`A word appears: "{w0}". Quickly write the first word that comes to mind.`,
+tu_vag2:`{a} and {b} write "{w1}", {c} writes "{w2}".`,
+tu_vag3:`+1 for each person who wrote the same word as you, +1 more if there are exactly two of you: {a} and {b} get +2.`,
+tu_vag4:`Two players: same word = +2. Otherwise, find a bridge word linking both ("{w3}"): +1.`,
+tu_rad1:`Would you rather swim with dolphins 🐬 or fly with seagulls 🕊️?`,
+tu_rad2:`Choose in secret, then bet on what the majority will choose.`,
+tu_rad3:`🐬 wins 3 to 1. Right bet: +1; right bet while you were in the minority: +2, like {d}.`,
+tu_rad4:`Two players: choose, then guess the other's choice. Right: +1.`,
+tu_pec1:`Everyone dives together. The shared bag is visible to all: 12 pearls 🦪, 2 jellyfish 🪼, 5 sharks 🦈.`,
+tu_pec2:`Each pearl drawn goes into the net of EVERY diver still down: here +3 for all.`,
+tu_pec3:`After each draw, everyone secretly chooses: dive again, or surface. {b} surfaces: the net goes safely into the chest.`,
+tu_pec4:`The 1st shark does nothing… but at the 2nd, those still down lose their whole net and the round ends.`,
+tu_pec5:`The jellyfish stings the biggest net still down: it loses half.`,
+tu_pec6:`Alone at the bottom? Every pearl counts double!`,
+tu_pec7:`After 3 or 4 rounds, the chests open, secret until then: the richest wins.`,
+tu_pec8:`With two players, the Grouper 🐟 dives with you: it surfaces at 8 pearls, or at 4 after a shark.`,
+tu_arc1:`A small sea of hexagons. Everyone has a boat ⛵ on the edge.`,
+tu_arc2:`Each turn, everyone gives an order in secret; then all are revealed and played at once.`,
+tu_arc3:`Sail: tap a neighbouring cell and your boat goes there.`,
+tu_arc4:`Build: tap your own cell to put an islet 🏝️ there.`,
+tu_arc5:`Sink: on someone else's islet, tap your cell. Impossible while their boat is on it or next to it 🛡️; if it leaves, the islet sinks.`,
+tu_arc6:`Two orders on the same cell cancel out: nobody goes there.`,
+tu_arc7:`Every 4 turns, each islet yields its pearls (3 in the centre, fewer towards the edge), then the tide swallows the edge. Most pearls wins.`,
+tu_msk1:`Each round, you're masked facing 1 or 2 players: you see their mask 🐙, never their name.`,
+tu_msk2:`Write them an anonymous message, then secretly choose: 🤝 Share or 🔒 Keep.`,
+tu_msk3:`🤝 + 🤝: 4 each, and one more link in your network (bonus from the 2nd person).`,
+tu_msk4:`🔒 against 🤝: 4 for you, 1 for them… and a 🦈 everyone will see (−1 at the end).`,
+tu_msk5:`🔒 + 🔒: 2 each. Keeping against a 🦈 doesn't mark you.`,
+tu_msk6:`Final for 16 points: both share, 8 each; one steals, all for them; both steal, −8 each.`});
+GTUT('es',{tuB:`Las reglas en imágenes`,tuOk:`Entendido`,tuAgain:`Repetir`,tuAll:`Desde el principio`,tun:`Ana|Ben|Cleo|Dan`,tuw:`Playa|Arena|Sol|Verano`,
+tu_bot1:`Cada uno escribe en secreto 2 o 3 cosas verdaderas sobre sí, metidas en botellas.`,
+tu_bot2:`Las botellas se abren una a una, sin nombre: «Una vez dormí en un faro». ¿Quién la escribió?`,
+tu_bot3:`{a} y {c} votan por {b}… y era {b}: +2 cada una.`,
+tu_bot4:`¿Nadie descubre tu anécdota? +3 para ti. ¿Solo una parte? +1.`,
+tu_bot5:`A dos: escribe 3 anécdotas, verdaderas o inventadas. Acierto: +2; farol que cuela: +2.`,
+tu_pha1:`Se enciende una pregunta: «¿Quién de nosotros se iría a vivir solo a una isla?»`,
+tu_pha2:`Cada uno vota a la persona que mejor encaja, incluso a sí mismo.`,
+tu_pha3:`El faro ilumina a la mayoría: {c}. Quienes votaron a {c} ganan +1.`,
+tu_pha4:`A dos: elige a uno de los dos y predice la elección del otro. Acierto: +1.`,
+tu_vag1:`Aparece una palabra: «{w0}». Escribe rápido la primera que se te ocurra.`,
+tu_vag2:`{a} y {b} escriben «{w1}», {c} escribe «{w2}».`,
+tu_vag3:`+1 por cada persona que escribió lo mismo que tú, +1 más si sois justo dos: {a} y {b} ganan +2.`,
+tu_vag4:`A dos: misma palabra = +2. Si no, buscad una palabra puente que una ambas («{w3}»): +1.`,
+tu_rad1:`¿Prefieres nadar con delfines 🐬 o volar con gaviotas 🕊️?`,
+tu_rad2:`Elige en secreto y luego apuesta por lo que elegirá la mayoría.`,
+tu_rad3:`🐬 gana 3 a 1. Apuesta acertada: +1; acertada estando tú en la minoría: +2, como {d}.`,
+tu_rad4:`A dos: elige y adivina la elección del otro. Acierto: +1.`,
+tu_pec1:`Todos bucean juntos. La bolsa común es visible para todos: 12 perlas 🦪, 2 medusas 🪼, 5 tiburones 🦈.`,
+tu_pec2:`Cada perla sacada va a la red de CADA buceador que sigue abajo: aquí +3 para todos.`,
+tu_pec3:`Tras cada tirada, cada uno elige en secreto: seguir buceando o subir. {b} sube: su red queda a salvo en su cofre.`,
+tu_pec4:`El 1.er tiburón no hace nada… pero con el 2.º, quienes siguen abajo pierden toda su red y la ronda termina.`,
+tu_pec5:`La medusa pica la red más grande que sigue abajo: pierde la mitad.`,
+tu_pec6:`¿Solo en el fondo? ¡Cada perla cuenta doble!`,
+tu_pec7:`Tras 3 o 4 rondas se abren los cofres, secretos hasta entonces: gana el más rico.`,
+tu_pec8:`A dos, el Mero 🐟 bucea con vosotros: sube con 8 perlas, o con 4 tras un tiburón.`,
+tu_arc1:`Un pequeño mar de hexágonos. Cada uno tiene un barco ⛵ en el borde.`,
+tu_arc2:`Cada turno, todos dan una orden en secreto; luego todo se revela y se juega a la vez.`,
+tu_arc3:`Navegar: toca una casilla vecina y tu barco va allí.`,
+tu_arc4:`Construir: toca tu propia casilla para poner un islote 🏝️.`,
+tu_arc5:`Hundir: en el islote de otro, toca tu casilla. Imposible mientras su barco esté encima o al lado 🛡️; si se aleja, el islote se hunde.`,
+tu_arc6:`Dos órdenes sobre la misma casilla se anulan: nadie va.`,
+tu_arc7:`Cada 4 turnos, cada islote da sus perlas (3 en el centro, menos hacia el borde) y la marea se traga el borde. Gana quien tenga más perlas.`,
+tu_msk1:`Cada ronda estás enmascarado frente a 1 o 2 jugadores: ves su máscara 🐙, nunca su nombre.`,
+tu_msk2:`Escríbeles un mensaje anónimo y elige en secreto: 🤝 Compartir o 🔒 Guardar.`,
+tu_msk3:`🤝 + 🤝: 4 cada uno y un vínculo más en tu red (bonus desde la 2.ª persona).`,
+tu_msk4:`🔒 frente a 🤝: 4 para ti, 1 para el otro… y un 🦈 que todos verán (−1 al final).`,
+tu_msk5:`🔒 + 🔒: 2 cada uno. Guardar frente a un 🦈 no te marca.`,
+tu_msk6:`Final por 16 puntos: ambos comparten, 8 cada uno; uno roba, todo para él; ambos roban, −8 cada uno.`});
+GTUT('it',{tuB:`Le regole per immagini`,tuOk:`Ho capito`,tuAgain:`Rivedi`,tuAll:`Dall'inizio`,tun:`Ana|Ben|Cleo|Dan`,tuw:`Spiaggia|Sabbia|Sole|Estate`,
+tu_bot1:`Ognuno scrive in segreto 2 o 3 cose vere su di sé, infilate nelle bottiglie.`,
+tu_bot2:`Le bottiglie si aprono una a una, senza nome: «Una volta ho dormito in un faro». Chi l'ha scritto?`,
+tu_bot3:`{a} e {c} votano {b}… ed era proprio {b}: +2 a testa.`,
+tu_bot4:`Nessuno indovina il tuo aneddoto? +3 per te. Solo una parte? +1.`,
+tu_bot5:`In due: scrivi 3 aneddoti, veri o inventati. Indovinato: +2; bluff riuscito: +2.`,
+tu_pha1:`Si accende una domanda: «Chi di noi andrebbe a vivere da solo su un'isola?»`,
+tu_pha2:`Ognuno vota la persona più adatta, anche se stesso.`,
+tu_pha3:`Il faro illumina la maggioranza: {c}. Chi ha votato {c} prende +1.`,
+tu_pha4:`In due: scegli uno di voi, poi prevedi la scelta dell'altro. Giusto: +1.`,
+tu_vag1:`Appare una parola: «{w0}». Scrivi subito la prima che ti viene in mente.`,
+tu_vag2:`{a} e {b} scrivono «{w1}», {c} scrive «{w2}».`,
+tu_vag3:`+1 per ogni persona che ha scritto la tua stessa parola, +1 in più se siete esattamente in due: {a} e {b} prendono +2.`,
+tu_vag4:`In due: stessa parola = +2. Altrimenti trovate una parola ponte che le unisca («{w3}»): +1.`,
+tu_rad1:`Preferisci nuotare con i delfini 🐬 o volare con i gabbiani 🕊️?`,
+tu_rad2:`Scegli in segreto, poi scommetti su cosa sceglierà la maggioranza.`,
+tu_rad3:`🐬 vince 3 a 1. Scommessa giusta: +1; giusta mentre tu eri in minoranza: +2, come {d}.`,
+tu_rad4:`In due: scegli, poi indovina la scelta dell'altro. Giusto: +1.`,
+tu_pec1:`Tutti si immergono insieme. Il sacco comune è visibile a tutti: 12 perle 🦪, 2 meduse 🪼, 5 squali 🦈.`,
+tu_pec2:`Ogni perla pescata va nella rete di OGNI sub ancora sott'acqua: qui +3 per tutti.`,
+tu_pec3:`Dopo ogni estrazione, ognuno sceglie in segreto: rituffarsi o risalire. {b} risale: la sua rete va al sicuro nel forziere.`,
+tu_pec4:`Il 1° squalo non fa nulla… ma al 2°, chi è ancora sotto perde tutta la rete e la manche finisce.`,
+tu_pec5:`La medusa punge la rete più grande ancora sott'acqua: perde metà.`,
+tu_pec6:`Solo sul fondo? Ogni perla vale doppio!`,
+tu_pec7:`Dopo 3 o 4 manche si aprono i forzieri, segreti fino ad allora: vince il più ricco.`,
+tu_pec8:`In due, la Cernia 🐟 si immerge con voi: risale a 8 perle, o a 4 dopo uno squalo.`,
+tu_arc1:`Un piccolo mare di esagoni. Ognuno ha una barca ⛵ sul bordo.`,
+tu_arc2:`Ogni turno tutti danno un ordine in segreto; poi tutto si rivela e si gioca insieme.`,
+tu_arc3:`Navigare: tocca una casella vicina e la tua barca ci va.`,
+tu_arc4:`Costruire: tocca la tua casella per metterci un isolotto 🏝️.`,
+tu_arc5:`Affondare: sull'isolotto di un altro, tocca la tua casella. Impossibile finché la sua barca è sopra o accanto 🛡️; se si allontana, l'isolotto affonda.`,
+tu_arc6:`Due ordini sulla stessa casella si annullano: nessuno ci va.`,
+tu_arc7:`Ogni 4 turni ogni isolotto rende le sue perle (3 al centro, meno verso il bordo), poi la marea inghiotte il bordo. Vince chi ha più perle.`,
+tu_msk1:`Ogni manche sei mascherato davanti a 1 o 2 giocatori: vedi la loro maschera 🐙, mai il nome.`,
+tu_msk2:`Scrivi loro un messaggio anonimo, poi scegli in segreto: 🤝 Condividi o 🔒 Tieni.`,
+tu_msk3:`🤝 + 🤝: 4 a testa e un legame in più nella tua rete (bonus dalla 2ª persona).`,
+tu_msk4:`🔒 contro 🤝: 4 per te, 1 per l'altro… e uno 🦈 che tutti vedranno (−1 alla fine).`,
+tu_msk5:`🔒 + 🔒: 2 a testa. Tenere contro uno 🦈 non ti marchia.`,
+tu_msk6:`Finale da 16 punti: entrambi condividono, 8 a testa; uno ruba, tutto a lui; entrambi rubano, −8 a testa.`});
+GTUT('de',{tuB:`Regeln in Bildern`,tuOk:`Verstanden`,tuAgain:`Nochmal`,tuAll:`Von vorn`,tun:`Ana|Ben|Cleo|Dan`,tuw:`Strand|Sand|Sonne|Sommer`,
+tu_bot1:`Alle schreiben heimlich 2 oder 3 wahre Dinge über sich, die in Flaschen landen.`,
+tu_bot2:`Die Flaschen öffnen sich nacheinander, ohne Namen: „Ich habe mal in einem Leuchtturm geschlafen." Wer war's?`,
+tu_bot3:`{a} und {c} stimmen für {b}… und es war {b}: je +2.`,
+tu_bot4:`Niemand errät deine Anekdote? +3 für dich. Nur ein Teil? +1.`,
+tu_bot5:`Zu zweit: schreib 3 Anekdoten, wahr oder erfunden. Richtig geraten: +2; Bluff klappt: +2.`,
+tu_pha1:`Eine Frage leuchtet auf: „Wer von uns würde allein auf eine Insel ziehen?"`,
+tu_pha2:`Alle stimmen für die Person, die am besten passt, auch für sich selbst.`,
+tu_pha3:`Der Leuchtturm strahlt die Mehrheit an: {c}. Wer {c} gewählt hat, bekommt +1.`,
+tu_pha4:`Zu zweit: wähle einen von euch und sag die Wahl des anderen voraus. Richtig: +1.`,
+tu_vag1:`Ein Wort erscheint: „{w0}". Schreib schnell das erste Wort, das dir einfällt.`,
+tu_vag2:`{a} und {b} schreiben „{w1}", {c} schreibt „{w2}".`,
+tu_vag3:`+1 pro Person mit demselben Wort wie du, +1 extra, wenn ihr genau zwei seid: {a} und {b} bekommen +2.`,
+tu_vag4:`Zu zweit: gleiches Wort = +2. Sonst findet ein Brückenwort, das beide verbindet („{w3}"): +1.`,
+tu_rad1:`Lieber mit Delfinen schwimmen 🐬 oder mit Möwen fliegen 🕊️?`,
+tu_rad2:`Wähle geheim und wette dann, was die Mehrheit wählt.`,
+tu_rad3:`🐬 gewinnt 3 zu 1. Richtige Wette: +1; richtig, obwohl du in der Minderheit warst: +2, wie {d}.`,
+tu_rad4:`Zu zweit: wähle und errate die Wahl des anderen. Richtig: +1.`,
+tu_pec1:`Alle tauchen zusammen. Der gemeinsame Beutel ist für alle sichtbar: 12 Perlen 🦪, 2 Quallen 🪼, 5 Haie 🦈.`,
+tu_pec2:`Jede gezogene Perle landet im Netz JEDER Person, die noch unten ist: hier +3 für alle.`,
+tu_pec3:`Nach jedem Zug wählen alle geheim: weitertauchen oder auftauchen. {b} taucht auf: das Netz kommt sicher in die Truhe.`,
+tu_pec4:`Der 1. Hai tut nichts… aber beim 2. verlieren alle, die noch unten sind, ihr ganzes Netz und die Runde endet.`,
+tu_pec5:`Die Qualle sticht das größte Netz unten: es verliert die Hälfte.`,
+tu_pec6:`Allein am Grund? Jede Perle zählt doppelt!`,
+tu_pec7:`Nach 3 oder 4 Runden öffnen sich die bis dahin geheimen Truhen: die reichste gewinnt.`,
+tu_pec8:`Zu zweit taucht der Zackenbarsch 🐟 mit: er taucht bei 8 Perlen auf, nach einem Hai schon bei 4.`,
+tu_arc1:`Ein kleines Meer aus Sechsecken. Jede Person hat ein Boot ⛵ am Rand.`,
+tu_arc2:`Jede Runde geben alle geheim einen Befehl; dann wird alles aufgedeckt und gleichzeitig ausgeführt.`,
+tu_arc3:`Segeln: tippe ein Nachbarfeld an, dein Boot fährt dorthin.`,
+tu_arc4:`Bauen: tippe dein eigenes Feld an, um eine Insel 🏝️ zu setzen.`,
+tu_arc5:`Versenken: auf der Insel eines anderen tippst du dein Feld an. Geht nicht, solange sein Boot darauf oder daneben ist 🛡️; fährt es weg, versinkt die Insel.`,
+tu_arc6:`Zwei Befehle auf dasselbe Feld heben sich auf: niemand fährt hin.`,
+tu_arc7:`Alle 4 Runden bringt jede Insel ihre Perlen (3 in der Mitte, weniger zum Rand), dann verschluckt die Flut den Rand. Die meisten Perlen gewinnen.`,
+tu_msk1:`Jede Runde stehst du maskiert 1 oder 2 Leuten gegenüber: du siehst ihre Maske 🐙, nie ihren Namen.`,
+tu_msk2:`Schreib ihnen eine anonyme Nachricht und wähle dann geheim: 🤝 Teilen oder 🔒 Behalten.`,
+tu_msk3:`🤝 + 🤝: je 4 und eine Verbindung mehr in deinem Netz (Bonus ab der 2. Person).`,
+tu_msk4:`🔒 gegen 🤝: 4 für dich, 1 für die andere Person… und ein 🦈, den alle sehen (−1 am Ende).`,
+tu_msk5:`🔒 + 🔒: je 2. Behalten gegen einen 🦈 markiert dich nicht.`,
+tu_msk6:`Finale um 16 Punkte: beide teilen, je 8; einer stiehlt, alles für ihn; beide stehlen, je −8.`});
+GTUT('ru',{tuB:`Правила в картинках`,tuOk:`Понятно`,tuAgain:`Ещё раз`,tuAll:`С начала`,tun:`Аня|Бен|Клео|Дэн`,tuw:`Пляж|Песок|Солнце|Лето`,
+tu_bot1:`Каждый тайно пишет 2–3 правдивых факта о себе — они уплывают в бутылках.`,
+tu_bot2:`Бутылки открываются по одной, без имени: «Однажды я ночевал(а) в маяке». Кто это написал?`,
+tu_bot3:`{a} и {c} голосуют за {b}… и это действительно {b}: каждой +2.`,
+tu_bot4:`Никто не угадал твою историю? Тебе +3. Угадала только часть? +1.`,
+tu_bot5:`Вдвоём: напиши 3 истории, правдивые или выдуманные. Угадал(а): +2; удачный блеф: +2.`,
+tu_pha1:`Загорается вопрос: «Кто из нас уехал бы жить один на остров?»`,
+tu_pha2:`Каждый голосует за того, кто подходит лучше всего, даже за себя.`,
+tu_pha3:`Маяк освещает большинство: {c}. Все, кто голосовал за {c}, получают +1.`,
+tu_pha4:`Вдвоём: выбери одного из вас и предскажи выбор другого. Угадал(а): +1.`,
+tu_vag1:`Появляется слово: «{w0}». Быстро напиши первое, что пришло в голову.`,
+tu_vag2:`{a} и {b} пишут «{w1}», {c} пишет «{w2}».`,
+tu_vag3:`+1 за каждого, кто написал то же слово, и ещё +1, если вас ровно двое: {a} и {b} получают +2.`,
+tu_vag4:`Вдвоём: одинаковое слово = +2. Иначе найдите слово-мост между ними («{w3}»): +1.`,
+tu_rad1:`Что лучше: плавать с дельфинами 🐬 или летать с чайками 🕊️?`,
+tu_rad2:`Выбери тайно, затем поставь на то, что выберет большинство.`,
+tu_rad3:`🐬 побеждает 3:1. Верная ставка: +1; верная, хотя сам(а) был(а) в меньшинстве: +2, как {d}.`,
+tu_rad4:`Вдвоём: выбери и угадай выбор другого. Угадал(а): +1.`,
+tu_pec1:`Все ныряют вместе. Общий мешок виден всем: 12 жемчужин 🦪, 2 медузы 🪼, 5 акул 🦈.`,
+tu_pec2:`Каждая вытянутая жемчужина идёт в сеть КАЖДОГО, кто ещё внизу: здесь всем +3.`,
+tu_pec3:`После каждого вытягивания все тайно выбирают: нырять дальше или всплыть. {b} всплывает: сеть уходит в сундук, в безопасность.`,
+tu_pec4:`1-я акула ничего не делает… но на 2-й все, кто внизу, теряют всю сеть, и раунд заканчивается.`,
+tu_pec5:`Медуза жалит самую большую сеть внизу: та теряет половину.`,
+tu_pec6:`Один на дне? Каждая жемчужина считается дважды!`,
+tu_pec7:`Через 3–4 раунда открываются сундуки, до этого тайные: побеждает самый богатый.`,
+tu_pec8:`Вдвоём с вами ныряет Групер 🐟: он всплывает на 8 жемчужинах, а после акулы — уже на 4.`,
+tu_arc1:`Маленькое море из шестиугольников. У каждого лодка ⛵ на краю.`,
+tu_arc2:`Каждый ход все тайно отдают приказ; затем всё раскрывается и выполняется одновременно.`,
+tu_arc3:`Плыть: нажми соседнюю клетку — лодка поплывёт туда.`,
+tu_arc4:`Строить: нажми свою клетку, чтобы поставить островок 🏝️.`,
+tu_arc5:`Топить: на чужом островке нажми свою клетку. Нельзя, пока его лодка на нём или рядом 🛡️; уплывёт — островок утонет.`,
+tu_arc6:`Два приказа на одну клетку отменяют друг друга: туда никто не идёт.`,
+tu_arc7:`Каждые 4 хода каждый островок приносит жемчуг (3 в центре, меньше к краю), затем прилив поглощает край. Больше всех жемчуга — победа.`,
+tu_msk1:`Каждый раунд ты в маске против 1 или 2 игроков: видишь их маску 🐙, но не имя.`,
+tu_msk2:`Напиши им анонимное сообщение, затем тайно выбери: 🤝 Делиться или 🔒 Оставить.`,
+tu_msk3:`🤝 + 🤝: по 4 и ещё одна связь в твоей сети (бонус со 2-го человека).`,
+tu_msk4:`🔒 против 🤝: тебе 4, другому 1… и 🦈, которую все увидят (−1 в конце).`,
+tu_msk5:`🔒 + 🔒: по 2. Оставить против 🦈 — не помечает тебя.`,
+tu_msk6:`Финал на 16 очков: оба делятся — по 8; один крадёт — всё ему; оба крадут — по −8.`});
+GTUT('zh',{tuB:`图解规则`,tuOk:`明白了`,tuAgain:`再看一遍`,tuAll:`从头开始`,tun:`安娜|本|克莱奥|丹`,tuw:`海滩|沙子|太阳|夏天`,
+tu_bot1:`每人秘密写下2到3件关于自己的真事，装进漂流瓶。`,
+tu_bot2:`瓶子一个个打开，没有名字：“我曾经在灯塔里睡过一晚。”是谁写的？`,
+tu_bot3:`{a}和{c}投给{b}……果然是{b}：各+2。`,
+tu_bot4:`没人猜中你的故事？你+3。只有部分人猜中？+1。`,
+tu_bot5:`两人局：写3个故事，可真可假。猜对+2；骗过对方+2。`,
+tu_pha1:`一个问题亮起：“我们中谁会独自去岛上生活？”`,
+tu_pha2:`每人投给最符合的人，也可以投自己。`,
+tu_pha3:`灯塔照亮多数：{c}。投给{c}的人各+1。`,
+tu_pha4:`两人局：选你们中的一个，再预测对方的选择。猜对+1。`,
+tu_vag1:`出现一个词：“{w0}”。快写下你想到的第一个词。`,
+tu_vag2:`{a}和{b}写了“{w1}”，{c}写了“{w2}”。`,
+tu_vag3:`每有一人和你写得一样+1，正好两人相同再+1：{a}和{b}各+2。`,
+tu_vag4:`两人局：同一个词+2。否则找一个连接两词的桥梁词（“{w3}”）：+1。`,
+tu_rad1:`你更愿意和海豚一起游泳🐬，还是和海鸥一起飞翔🕊️？`,
+tu_rad2:`秘密选择，然后押注多数人会选什么。`,
+tu_rad3:`🐬以3比1获胜。押对+1；自己在少数派却押对+2，比如{d}。`,
+tu_rad4:`两人局：做选择，再猜对方的选择。猜对+1。`,
+tu_pec1:`大家一起下潜。公共袋子人人可见：12颗珍珠🦪、2只水母🪼、5条鲨鱼🦈。`,
+tu_pec2:`每抽出一颗珍珠，都会放进每个仍在水下的人的网里：这里每人+3。`,
+tu_pec3:`每次抽完，大家秘密选择：继续下潜或上浮。{b}上浮：网里的珍珠安全放进宝箱。`,
+tu_pec4:`第1条鲨鱼无事发生……但第2条出现时，仍在水下的人失去整张网，本轮结束。`,
+tu_pec5:`水母会蛰水下最大的那张网：它失去一半。`,
+tu_pec6:`独自在海底？每颗珍珠都算双倍！`,
+tu_pec7:`3或4轮后打开一直保密的宝箱：最富有的人获胜。`,
+tu_pec8:`两人局时，石斑鱼🐟和你们一起下潜：它在8颗珍珠时上浮，遇到鲨鱼后4颗就上浮。`,
+tu_arc1:`一片小小的六边形海域。每人在边缘有一艘船⛵。`,
+tu_arc2:`每回合，大家秘密下达命令；然后全部揭晓并同时执行。`,
+tu_arc3:`航行：点击相邻格子，你的船就开过去。`,
+tu_arc4:`建造：点击你所在的格子，放下一座小岛🏝️。`,
+tu_arc5:`击沉：在别人的小岛上点击你的格子。只要对方的船在岛上或旁边🛡️就不行；它一离开，小岛就沉了。`,
+tu_arc6:`两个命令指向同一格会互相抵消：谁都去不了。`,
+tu_arc7:`每4回合，每座小岛产出珍珠（中心3颗，越靠边越少），然后潮水吞没边缘。珍珠最多者获胜。`,
+tu_msk1:`每轮你戴着面具面对1或2名玩家：你只看到他们的面具🐙，看不到名字。`,
+tu_msk2:`给他们写一条匿名消息，然后秘密选择：🤝分享或🔒独占。`,
+tu_msk3:`🤝+🤝：各得4分，你的人脉多一条联系（从第2个人起有奖励）。`,
+tu_msk4:`🔒对🤝：你得4分，对方1分……还会带上人人可见的🦈（结束时−1）。`,
+tu_msk5:`🔒+🔒：各2分。对🦈独占不会给你打标记。`,
+tu_msk6:`16分决赛：都分享各8分；一人偷全归他；都偷各−8。`});
+GTUT('he',{tuB:`החוקים בתמונות`,tuOk:`הבנתי`,tuAgain:`שוב`,tuAll:`מההתחלה`,tun:`אנה|בן|קלאו|דן`,tuw:`חוף|חול|שמש|קיץ`,
+tu_bot1:`כל אחד כותב בסוד 2 או 3 דברים אמיתיים על עצמו, שנכנסים לבקבוקים.`,
+tu_bot2:`הבקבוקים נפתחים אחד אחד, בלי שם: „פעם ישנתי במגדלור". מי כתב?`,
+tu_bot3:`{a} ו{c} מצביעות ל{b}… וזה באמת {b}: ‎+2 לכל אחת.`,
+tu_bot4:`אף אחד לא מגלה את הסיפור שלך? ‎+3 לך. רק חלק? ‎+1.`,
+tu_bot5:`בשניים: כתבו 3 סיפורים, אמיתיים או מומצאים. ניחוש נכון: ‎+2; בלוף שעובד: ‎+2.`,
+tu_pha1:`שאלה נדלקת: „מי מאיתנו היה עובר לגור לבד על אי?"`,
+tu_pha2:`כל אחד מצביע למי שהכי מתאים, גם לעצמו.`,
+tu_pha3:`המגדלור מאיר את הרוב: {c}. מי שהצביע ל{c} מקבל ‎+1.`,
+tu_pha4:`בשניים: בחרו אחד מכם, ואז נחשו את הבחירה של השני. נכון: ‎+1.`,
+tu_vag1:`מופיעה מילה: „{w0}". כתבו מהר את המילה הראשונה שעולה לכם.`,
+tu_vag2:`{a} ו{b} כותבים „{w1}", {c} כותבת „{w2}".`,
+tu_vag3:`‎+1 על כל מי שכתב את אותה מילה כמוך, ועוד ‎+1 אם אתם בדיוק שניים: {a} ו{b} מקבלים ‎+2.`,
+tu_vag4:`בשניים: אותה מילה = ‎+2. אחרת, מצאו מילת גשר שמחברת ביניהן („{w3}"): ‎+1.`,
+tu_rad1:`מה עדיף: לשחות עם דולפינים 🐬 או לעוף עם שחפים 🕊️?`,
+tu_rad2:`בחרו בסוד, ואז המרו על מה שהרוב יבחר.`,
+tu_rad3:`🐬 מנצח 3 מול 1. הימור נכון: ‎+1; הימור נכון כשאתם במיעוט: ‎+2, כמו {d}.`,
+tu_rad4:`בשניים: בחרו, ואז נחשו את הבחירה של השני. נכון: ‎+1.`,
+tu_pec1:`כולם צוללים יחד. השק המשותף גלוי לכולם: 12 פנינים 🦪, 2 מדוזות 🪼, 5 כרישים 🦈.`,
+tu_pec2:`כל פנינה שנשלפת נכנסת לרשת של כל מי שעדיין למטה: כאן ‎+3 לכולם.`,
+tu_pec3:`אחרי כל שליפה, כל אחד בוחר בסוד: להמשיך לצלול או לעלות. {b} עולה: הרשת עוברת בבטחה לתיבה.`,
+tu_pec4:`הכריש הראשון לא עושה כלום… אבל בשני, מי שעדיין למטה מאבד את כל הרשת והסבב נגמר.`,
+tu_pec5:`המדוזה עוקצת את הרשת הגדולה ביותר למטה: היא מאבדת חצי.`,
+tu_pec6:`לבד בקרקעית? כל פנינה שווה כפול!`,
+tu_pec7:`אחרי 3 או 4 סבבים פותחים את התיבות, סודיות עד אז: העשיר ביותר מנצח.`,
+tu_pec8:`בשניים, הדקר 🐟 צולל איתכם: הוא עולה ב־8 פנינים, או כבר ב־4 אחרי כריש.`,
+tu_arc1:`ים קטן של משושים. לכל אחד סירה ⛵ בקצה.`,
+tu_arc2:`בכל תור כולם נותנים פקודה בסוד; ואז הכול נחשף ומתבצע בבת אחת.`,
+tu_arc3:`להפליג: הקישו על משבצת שכנה והסירה תגיע אליה.`,
+tu_arc4:`לבנות: הקישו על המשבצת שלכם כדי להניח אי 🏝️.`,
+tu_arc5:`להטביע: על אי של מישהו אחר, הקישו על המשבצת שלכם. אי אפשר כל עוד הסירה שלו עליו או לידו 🛡️; אם היא מתרחקת, האי טובע.`,
+tu_arc6:`שתי פקודות לאותה משבצת מבטלות זו את זו: אף אחד לא מגיע.`,
+tu_arc7:`כל 4 תורות כל אי מניב פנינים (3 במרכז, פחות לכיוון הקצה), ואז הגאות בולעת את הקצה. מי שאוסף הכי הרבה פנינים מנצח.`,
+tu_msk1:`בכל סבב את/ה במסכה מול 1 או 2 שחקנים: רואים את המסכה שלהם 🐙, אף פעם לא את השם.`,
+tu_msk2:`כתבו להם הודעה אנונימית, ואז בחרו בסוד: 🤝 לחלוק או 🔒 לשמור.`,
+tu_msk3:`🤝 + 🤝: 4 לכל אחד, ועוד קשר ברשת שלך (בונוס מהאדם השני).`,
+tu_msk4:`🔒 מול 🤝: 4 לך, 1 לשני… ו־🦈 שכולם יראו (‎−1 בסוף).`,
+tu_msk5:`🔒 + 🔒: 2 לכל אחד. שמירה מול 🦈 לא מסמנת אותך.`,
+tu_msk6:`גמר על 16 נקודות: שניהם חולקים, 8 לכל אחד; אחד גונב, הכול שלו; שניהם גונבים, ‎−8 לכל אחד.`});
+GTUT('pt',{tuB:`As regras em imagens`,tuOk:`Entendi`,tuAgain:`Rever`,tuAll:`Do começo`,tun:`Ana|Ben|Cleo|Dan`,tuw:`Praia|Areia|Sol|Verão`,
+tu_bot1:`Cada um escreve em segredo 2 ou 3 coisas verdadeiras sobre si, colocadas em garrafas.`,
+tu_bot2:`As garrafas se abrem uma a uma, sem nome: "Já dormi num farol." Quem escreveu?`,
+tu_bot3:`{a} e {c} votam em {b}… e era {b} mesmo: +2 para cada uma.`,
+tu_bot4:`Ninguém descobre a sua história? +3 para você. Só uma parte? +1.`,
+tu_bot5:`A dois: escreva 3 histórias, verdadeiras ou inventadas. Acerto: +2; blefe que cola: +2.`,
+tu_pha1:`Uma pergunta acende: "Quem de nós iria morar sozinho numa ilha?"`,
+tu_pha2:`Cada um vota na pessoa que mais combina, até em si mesmo.`,
+tu_pha3:`O farol ilumina a maioria: {c}. Quem votou em {c} ganha +1.`,
+tu_pha4:`A dois: escolha um de vocês e preveja a escolha do outro. Acertou: +1.`,
+tu_vag1:`Aparece uma palavra: "{w0}". Escreva rápido a primeira que vier à cabeça.`,
+tu_vag2:`{a} e {b} escrevem "{w1}", {c} escreve "{w2}".`,
+tu_vag3:`+1 por pessoa que escreveu a mesma palavra que você, +1 a mais se forem exatamente dois: {a} e {b} ganham +2.`,
+tu_vag4:`A dois: mesma palavra = +2. Senão, achem uma palavra-ponte que ligue as duas ("{w3}"): +1.`,
+tu_rad1:`Você prefere nadar com golfinhos 🐬 ou voar com gaivotas 🕊️?`,
+tu_rad2:`Escolha em segredo e aposte no que a maioria vai escolher.`,
+tu_rad3:`🐬 vence por 3 a 1. Aposta certa: +1; certa estando você na minoria: +2, como {d}.`,
+tu_rad4:`A dois: escolha e adivinhe a escolha do outro. Acertou: +1.`,
+tu_pec1:`Todos mergulham juntos. O saco comum é visível a todos: 12 pérolas 🦪, 2 águas-vivas 🪼, 5 tubarões 🦈.`,
+tu_pec2:`Cada pérola sorteada vai para a rede de CADA mergulhador ainda no fundo: aqui +3 para todos.`,
+tu_pec3:`Após cada sorteio, cada um escolhe em segredo: mergulhar de novo ou subir. {b} sobe: a rede vai segura para o baú.`,
+tu_pec4:`O 1º tubarão não faz nada… mas no 2º, quem ainda está no fundo perde a rede inteira e a rodada acaba.`,
+tu_pec5:`A água-viva queima a maior rede ainda no fundo: ela perde metade.`,
+tu_pec6:`Sozinho no fundo? Cada pérola vale o dobro!`,
+tu_pec7:`Depois de 3 ou 4 rodadas, os baús se abrem, secretos até então: o mais rico vence.`,
+tu_pec8:`A dois, a Garoupa 🐟 mergulha com vocês: sobe com 8 pérolas, ou com 4 depois de um tubarão.`,
+tu_arc1:`Um pequeno mar de hexágonos. Cada um tem um barco ⛵ na borda.`,
+tu_arc2:`A cada turno, todos dão uma ordem em segredo; depois tudo é revelado e jogado ao mesmo tempo.`,
+tu_arc3:`Navegar: toque numa casa vizinha e seu barco vai até lá.`,
+tu_arc4:`Construir: toque na sua própria casa para colocar uma ilhota 🏝️.`,
+tu_arc5:`Afundar: na ilhota de outro, toque na sua casa. Impossível enquanto o barco dele estiver em cima ou ao lado 🛡️; se ele se afastar, a ilhota afunda.`,
+tu_arc6:`Duas ordens para a mesma casa se anulam: ninguém vai.`,
+tu_arc7:`A cada 4 turnos, cada ilhota rende suas pérolas (3 no centro, menos perto da borda), depois a maré engole a borda. Quem tiver mais pérolas vence.`,
+tu_msk1:`Em cada rodada você está mascarado diante de 1 ou 2 jogadores: vê a máscara 🐙, nunca o nome.`,
+tu_msk2:`Escreva uma mensagem anônima e escolha em segredo: 🤝 Dividir ou 🔒 Guardar.`,
+tu_msk3:`🤝 + 🤝: 4 para cada e mais um laço na sua rede (bônus a partir da 2ª pessoa).`,
+tu_msk4:`🔒 contra 🤝: 4 para você, 1 para o outro… e um 🦈 que todos verão (−1 no fim).`,
+tu_msk5:`🔒 + 🔒: 2 para cada. Guardar contra um 🦈 não marca você.`,
+tu_msk6:`Final valendo 16 pontos: os dois dividem, 8 cada; um rouba, tudo para ele; os dois roubam, −8 cada.`});
 })();
