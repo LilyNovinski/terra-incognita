@@ -44,6 +44,22 @@ function gPool(s,k,n){const t=+s.tone||0,w=t==2?[.3,.3,.4]:t==1?[.55,.45,0]:[1,0
   return a.filter(x=>SI.has(id(...x))).sort((x,y)=>SI.get(id(...y))-SI.get(id(...x))).concat(a.filter(x=>!SI.has(id(...x))))}),out=[];
  for(let j=0;j<n;j++){let r=Math.random(),p=0;while(p<2&&(r-=w[p])>0)p++;if(!P3[p].length)p=P3.findIndex(x=>x.length);if(p<0)break;out.push(P3[p].pop())}
  gSeenAdd(out.map(x=>id(...x)));return shuf(out)}
+/* 📜 LIVRE DE BORD : temps forts des parties, gardés sur l'appareil de l'hôte (comme terra:seenG), du plus ancien au
+   plus récent. Chaque fin NORMALE de partie ajoute au plus 2 lignes {t,g,k,n} : vainqueur·e(s) (pas en coop, pas si
+   plus de 2 ex æquo) + 1 temps fort propre au jeu (GAMES[id].log(s) → candidats, un seul tiré au sort).
+   On ne montre que les lignes dont TOUTES les personnes citées sont là. Trois clins d'œil, pas plus :
+   salon (st.clog, 5 lignes repliées), 1re étape d'un jeu (son dernier temps fort), Le Phare (≤ 1 question « souvenir »). */
+const GLOGK='terra:logG';
+function gLog(){try{const a=JSON.parse(localStorage.getItem(GLOGK)||'[]');return Array.isArray(a)?a.filter(e=>e&&GAMES[e.g]&&e.k&&Array.isArray(e.n)&&e.n.length):[]}catch(e){return[]}}
+function gLogAdd(L){if(!L.length)return;try{localStorage.setItem(GLOGK,JSON.stringify(gLog().concat(L).slice(-150)))}catch(e){}}
+const gLogFor=names=>{const S=new Set(names);return gLog().filter(e=>e.n.every(x=>S.has(x))).reverse()};
+const gClog=s=>gLogFor((s.players||[]).filter(p=>p.online).map(p=>p.name)).slice(0,5).map(({g,k,n})=>({g,k,n}));
+const gLogT=e=>{const v={g:GT('n_'+e.g)};(e.n||[]).forEach((x,i)=>v['ab'[i]]=B(x));return GT('lg_'+e.k,v)};
+function gLogGame(s,r){if(typeof localStorage=='undefined')return;const g=s.game,G=GAMES[g.id],L=[];
+ if(!r.coop&&s.order.length>1){const P=r.pts||g.sc,mx=Math.max(...s.order.map(p=>P[p]||0)),w=s.order.filter(p=>(P[p]||0)==mx);
+  if(mx>0&&w.length<=2&&w.length<s.order.length)L.push({k:w.length>1?'win2':'win',n:w})}
+ const c=G.log?(G.log(s)||[]).filter(e=>e&&e.n&&e.n.length&&e.n.every(x=>s.order.includes(x))):[];if(c.length)L.push(c[Math.floor(Math.random()*c.length)]);
+ const t=Date.now();gLogAdd(L.map(e=>({t,g:g.id,k:e.k,n:e.n})));s.clog=gClog(s)}
 
 /* ---------- moteur ---------- */
 const gOn=s=>s.order.filter(n=>{const p=P(n);return p&&p.online!==false});
@@ -54,10 +70,12 @@ function gWait(g,sec,st,rv){const f=gTF();sec=Math.round(sec*(f||1));g.st=st;g.k
 const gLate=g=>g.dl>0&&Date.now()>g.dl;
 const gNeed=s=>{const g=s.game;return gOn(s).filter(n=>!g.need||g.need.includes(n))};
 const gAll=s=>gNeed(s).every(n=>s.game.done[n]);
-function gFin(s){const g=s.game,r=GAMES[g.id].fin(s)||{};s.gres={pts:r.pts||g.sc,coop:r.coop||null};g.dl=0;s.phase='gend'}
+function gFin(s){const g=s.game,r=GAMES[g.id].fin(s)||{};s.gres={pts:r.pts||g.sc,coop:r.coop||null};g.dl=0;s.phase='gend';if(g.over)try{gLogGame(s,r)}catch(e){}}
 function gCheck(s){const g=s.game;let i=0;
  while(s.phase=='game'&&g.dl&&(gAll(s)||gLate(g))&&i++<6){g.dl=0;GAMES[g.id].next(s);if(g.over){gFin(s);break}}}
-function gStart(s){const id=s.gsel;s.game={id,k:0,r:0,n:0,sc:{},done:{},rx:{}};s.order.forEach(n=>s.game.sc[n]=0);s.gres=null;s.phase='game';s.gid=Date.now().toString(36);GAMES[id].init(s);gCheck(s)}
+function gStart(s){const id=s.gsel;s.game={id,k:0,r:0,n:0,sc:{},done:{},rx:{}};s.order.forEach(n=>s.game.sc[n]=0);s.gres=null;s.phase='game';s.gid=Date.now().toString(36);GAMES[id].init(s);
+ /* 📜 clin d'œil : le dernier temps fort de CE jeu entre ces personnes, en tête de la 1re étape (sauf si Le Phare en pose déjà un) */
+ try{const g=s.game,e=!g.lq&&typeof localStorage!='undefined'&&gLogFor(s.order).find(e=>e.g==id);if(e)g.nod={k:e.k,n:e.n}}catch(e){}gCheck(s)}
 /* @games : appelé en tête de act() ; true = géré ici */
 W.GAct=function(s,from,a){const t=a&&a.t;
  if(t=='gsel'){if(from==s.host&&s.phase=='lobby'&&(!a.v||GAMES[a.v])){s.gsel=a.v||null;bump()}return true}
@@ -107,7 +125,7 @@ W.GView=function(){const s=isHost?GHide(meN(),st):st,g=s.game;if(!g||!GAMES[g.id
  const rk='r_'+g.id+(two&&GI18N.fr.ui['r_'+g.id+'2']?'2':'');
  const head=`<div class="ghd"><span class="gic">${G.icon}</span><b>${GT('n_'+g.id)}</b>${g.n?`<span class="grd">${Math.min(g.r+1,g.n)} / ${g.n}</span>`:''}${meN()==s.host?`<button class="gstop" id="gstop" aria-label="${esc(GT('stopAsk'))}" data-tip="${esc(GT('stopAsk'))}">✕</button>`:''}</div>
  ${g.dl>0?`<div class="gsab" aria-hidden="true"><i style="animation-duration:${g.sec}s;animation-delay:-${Math.max(0,g.sec-rem).toFixed(2)}s"></i></div>`:''}
- ${g.k<=1?`<p class="grule">${GT(rk)}</p>`:''}`;
+ ${g.k<=1?`<p class="grule">${GT(rk)}</p>${g.nod?`<p class="gnod ga" ${dl(2)}>📜 ${GT('lgLast',{t:gLogT({g:g.id,...g.nod})})}</p>`:''}`:''}`;
  const h={...gHint(s),...v};const ob=v.bind;
  return{...h,html:`<div class="gw g-${g.id}${g.k>1?' gnx':''}">${head}${v.html}</div>`,bind(){
   $('#gok')&&($('#gok').onclick=()=>gs({ok:1}));$('#gstop')&&($('#gstop').onclick=()=>ask(GT('stopAsk'),GT('stop')).then(v=>v&&send({t:'gx',v:'stop'})));
@@ -129,6 +147,10 @@ W.GLobby=function(host,on,E){const sel=st.gsel&&GAMES[st.gsel]?st.gsel:'';
  const tile=id=>{const G=GAMES[id],ok=!id||on<=G.max,tag=host?'button':'div';
   return `<${tag} class="gtile ggt ${sel==id?'sel':''}" ${host?`data-gsel="${id}" ${ok?'':'disabled'}`:''}><span class="gi">${id?G.icon:'⛵'}</span><span class="gt"><b>${id?GT('n_'+id):GT('exp')}</b><span class="mut">${id?GT('d_'+id):GT('expD')}</span></span><span class="gtags">${(id?G.tags:['social']).map(t=>`<i class="gtg-${t}">${GT('t_'+t)}</i>`).join('')}</span><span class="gmin">≈ ${id?G.dur:(E||'?')} min · ${id?G.min:2}–${id?G.max:8} 👤</span></${tag}>`};
  let h=`<div class="card"><h3>🎲 ${GT('room')}</h3><div class="gtiles">${host?['',...Object.keys(GAMES)].map(tile).join(''):tile(sel)}</div>${host?'':`<p class="gby">${T('chosenBy',{n:B(st.host)})}</p>`}</div>`;
+ /* 📜 livre de bord : l'hôte le recalcule pour les personnes présentes (envoyé au prochain bump) */
+ if(host&&typeof localStorage!='undefined')try{const c=gClog(st);if(JSON.stringify(c)!==JSON.stringify(st.clog||[])){st.clog=c;setTimeout(()=>{try{bump()}catch(e){}},0)}}catch(e){}
+ const CL=(st.clog||[]).filter(e=>GAMES[e.g]);
+ if(CL.length)h+=`<details class="card glog" ${GV.lgo?'open':''}><summary>📜 ${GT('lgT')}<span class="glgn">${CL.length}</span></summary><ul>${CL.map((e,i)=>`<li class="ga" ${dl(i)}><span class="glgi">${GAMES[e.g].icon}</span><span>${gLogT(e)}</span></li>`).join('')}</ul></details>`;
  if(sel){const G=GAMES[sel],ok=on>=G.min&&on<=G.max,rk='r_'+sel+(on==2&&GI18N.fr.ui['r_'+sel+'2']?'2':'');
   let tm='';try{if(!G.rt){const tf=st.timer??1;tm=`<h3 class="gh">${T('timerT')}</h3>${host?`<div class="gseg">${TIM.map((v,i)=>`<button data-tm="${i}" class="${v==tf?'sel':''}">${T('tm'+i)}</button>`).join('')}</div>`:`<p class="gval">${T('tm'+TIM.indexOf(tf))}</p>`}<p class="gsub">${T(tf?'timerD':'timer0D')}</p>`}}catch(e){}
   let ti='';if(G.ties){const L=(st.gtie||[]).filter(k=>k.split('|').every(p=>st.players.some(x=>x.name==p))),ps=st.players.filter(p=>p.online).map(p=>p.name);
@@ -138,7 +160,8 @@ W.GLobby=function(host,on,E){const sel=st.gsel&&GAMES[st.gsel]?st.gsel:'';
   ${host?`<button class="pri wide" id="start" ${ok?'':'disabled'}>${GT('play',{g:GT('n_'+sel)})}</button>`:`<p class="gby">${GT('waitHost')}</p>`}</div>`}
  return h};
 /* liens connus : clics délégués (le salon est rendu par index.html) */
-if(typeof document!='undefined')document.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('[data-gtp],[data-gtie]');if(!t)return;
+if(typeof document!='undefined')document.addEventListener('click',e=>{const lg=e.target.closest&&e.target.closest('.glog>summary');if(lg){GV.lgo=!lg.parentNode.open;return}
+ const t=e.target.closest&&e.target.closest('[data-gtp],[data-gtie]');if(!t)return;
  if(t.dataset.gtie!=null){send({t:'gtie',v:t.dataset.gtie.split('|')});return}
  const p=t.dataset.gtp;if(!GV.tie||GV.tie==p){GV.tie=GV.tie==p?null:p;render();return}const a=GV.tie;GV.tie=null;send({t:'gtie',v:[a,p]});render()});
 
@@ -215,7 +238,13 @@ GAMES.bot={icon:'🍾',min:2,max:8,dur:10,tags:['social'],tone:true,
    Fin : portrait du groupe (titres récoltés par chacun·e). Ton : réserves tout public / coquine / trash.
    ===================================================================== */
 GAMES.pha={icon:'🗼',min:2,max:8,dur:5,tags:['social'],tone:true,
- init(s){const g=s.game;g.n=s.order.length<=4?10:12;g.q=gPool(s,'pha',g.n);g.n=g.q.length;g.v={};g.p={};g.res=[];gWait(g,30,'v')},
+ /* 📜 question « souvenir » : au plus 1 par partie (60 %), tirée d'un vrai temps fort récent entre les personnes présentes */
+ LQ:{win:'w',prlC:'c',chnC:'c',mimC:'c',prlH:'s',prlD:'s',chnW:'s',chnW2:'s',mimW:'s',mimW2:'s',mskS:'v',mskB:'v',mskP:'t'},
+ init(s){const g=s.game;g.n=s.order.length<=4?10:12;g.q=gPool(s,'pha',g.n);g.n=g.q.length;g.v={};g.p={};g.res=[];
+  try{const L=typeof localStorage!='undefined'?gLogFor(s.order).filter(e=>this.LQ[e.k]).slice(0,3):[];
+   if(L.length&&g.n>=4&&Math.random()<.6){const e=L[Math.floor(Math.random()*L.length)];g.lq={g:e.g,k:e.k,n:e.n};g.q[1+Math.floor(Math.random()*(g.n-2))]=['@']}}catch(e){}
+  gWait(g,30,'v')},
+ qt(g,q){return q&&q[0]=='@'&&g.lq?GT('lq_'+this.LQ[g.lq.k],{a:B(g.lq.n[0])}):esc(GC('pha',q))},
  act(s,from,a){const g=s.game,two=s.order.length==2;if(g.st!='v'||g.done[from])return;
   if(s.order.includes(a.v))g.v[from]=a.v;if(two&&s.order.includes(a.p))g.p[from]=a.p;
   if(g.v[from]&&(!two||g.p[from]))g.done[from]=1;return true},
@@ -227,7 +256,7 @@ GAMES.pha={icon:'🗼',min:2,max:8,dur:5,tags:['social'],tone:true,
   g.r++;if(g.r>=g.n){g.over=1;return}g.v={};g.p={};gWait(g,30,'v')},
  hide(g,n){return g.st=='v'?{...g,v:hideOwn(g.v,n),p:hideOwn(g.p,n)}:g},
  view(s){const g=s.game,m=meN(),two=s.order.length==2,o=two&&s.order.find(x=>x!=m);
-  const q=`<p class="gpre">${GT(two?'pq2':'pq')}</p><p class="gq ga">${esc(GC('pha',g.q[g.r]))}</p>`;
+  const cq=g.q[g.r],q=`${cq&&cq[0]=='@'&&g.lq?`<p class="gnod ga">📜 ${gLogT(g.lq)}</p>`:''}<p class="gpre">${GT(two?'pq2':'pq')}</p><p class="gq ga">${this.qt(g,cq)}</p>`;
   if(g.st=='v')return{html:`<div class="card c">${q}${pick(s.order,g.v[m],'data-gv')}${two?`<p class="gq2">${GT('ppred',{n:B(o)})}</p>${pick(s.order,g.p[m],'data-gp')}`:''}</div>`,
    bind(){$$('[data-gv]').forEach(x=>x.onclick=()=>gs({v:x.dataset.gv}));$$('[data-gp]').forEach(x=>x.onclick=()=>gs({p:x.dataset.gp}))}};
   const r=g.res[g.r]||{c:{},v:{},p:{}},mx=Math.max(1,...Object.values(r.c));
@@ -236,7 +265,7 @@ GAMES.pha={icon:'🗼',min:2,max:8,dur:5,tags:['social'],tone:true,
   return{html:`<div class="card">${q}${rows.map(([n,c],i)=>`<div class="gbr ga ${r.tops.includes(n)?'gtop':''}" ${dl(i,.1)}><span class="gnm">${DT(n)}${esc(n)}</span><span class="gbt"><i class="gbar" style="width:${c/mx*100}%;animation-delay:${.2+i*.07}s"></i></span><b>${c||''}</b></div>`).join('')}
    ${r.tops.length?'':`<p class="gnote">${GT('pnone')}</p>`}</div>`,bind(){if(r.tops.includes(m)&&!RM())sparkles($('.gbr.gtop'),10)}}},
  endView(s){const g=s.game,t={};g.res.forEach(r=>r.tops.forEach(n=>(t[n]=t[n]||[]).push(r.q)));
-  return `<h3 class="gh3">🗼 ${GT('pport')}</h3>${s.order.map((n,i)=>`<div class="gport ga" ${dl(i,.3)}><b>${DT(n)}${esc(n)}</b>${(t[n]||[]).length?`<ul>${t[n].map(q=>`<li>${esc(GC('pha',q))}</li>`).join('')}</ul>`:`<p class="mut">${GT('pnone')}</p>`}</div>`).join('')}`},
+  return `<h3 class="gh3">🗼 ${GT('pport')}</h3>${s.order.map((n,i)=>`<div class="gport ga" ${dl(i,.3)}><b>${DT(n)}${esc(n)}</b>${(t[n]||[]).length?`<ul>${t[n].map(q=>`<li>${this.qt(g,q)}</li>`).join('')}</ul>`:`<p class="mut">${GT('pnone')}</p>`}</div>`).join('')}`},
  fin(s){return{pts:s.game.sc}}};
 
 /* =====================================================================
@@ -583,6 +612,7 @@ GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,ties:true,MK
   svg+='</svg>';
   const tr=o.map(p=>{const v=[];for(const k in E){const e=E[k];if(e.t[p])v.push(e.a==p?e.b:e.a)}return [p,v]}).filter(x=>x[1].length);
   return `<h3 class="gh3">✨ ${GT('mconst')}</h3>${svg}<p class="mut arclg">${GT('mlegend')}</p>${tr.length?`<div class="mktr">${tr.map(([p,v],i)=>`<p class="ga" ${dl(i,.4)}>${B(p)} ${GT('mbetr')} ${v.map(B).join(', ')}</p>`).join('')}</div>`:`<p class="gnote">${GT('mnobetr')}</p>`}`},
+ log(s){const g=s.game,f=g.fr;if(!f||!g.fin)return[];const[a,b]=g.fin;if(f.out==0)return[{k:'mskP',n:[a,b]}];if(f.out==2)return[{k:'mskB',n:[a,b]}];const t=f.c[a]=='V'?a:b;return[{k:'mskS',n:[t,t==a?b:a]}]},/* 📜 */
  fin(s){return{pts:s.game.sc}}};
 
 /* =====================================================================
@@ -685,6 +715,8 @@ GAMES.chn={icon:'🧭',min:4,max:8,dur:20,tags:['social'],CHI,NF:n=>n<=5?1:2,RL:
   return `<div class="chend"><p class="gbig2 ga ok">${GT(nw?'chWinN':'chWinC',{v:g.sk})}</p><p class="ga" ${dl(1)}>🏴‍☠️ ${GT('chWere')} ${g.nf.map(B).join(', ')}</p>
    ${s.order.filter(p=>!g.nf.includes(p)).map((p,i)=>`<p class="mut ga" ${dl(i+2)}>${B(p)} 🕵️ ${(g.acc[p]||[]).length?(g.acc[p]).map(x=>esc(x)+(g.nf.includes(x)?' ✅':' ❌')).join(', '):'—'}</p>`).join('')}
    <h3 class="gh3">📜 ${GT('chLog')}</h3>${g.h.map((w,i)=>`<div class="chlr ga" ${dl(i,.4)}><b>${w.ok?'⛵':'💥'} ${i+1}</b> ${R.ch(w.tr)} : ${w.route.map((p,j)=>{const a=w.all&&w.all[j]||[];return `${esc(p)} ${R.ch(a[1],a[0]!=a[1]?'x':'')}`}).join(' <i class="charr">➜</i> ')}</div>`).join('')}</div>`},
+ log(s){const g=s.game;if(!g.win||!g.nf)return[];if(g.win=='n')return[{k:g.nf.length>1?'chnW2':'chnW',n:g.nf.slice(0,2)}];/* 📜 */
+  const gd=s.order.filter(p=>!g.nf.includes(p)),A=g.acc||{},c=p=>gd.filter(x=>(A[x]||[]).includes(p)).length;return gd.length?g.nf.filter(p=>c(p)*2>=gd.length).map(p=>({k:'chnC',n:[p]})):[]},
  fin(s){return{pts:s.game.sc}}};
 
 /* =====================================================================
@@ -829,6 +861,7 @@ GAMES.mim={icon:'🐙',min:4,max:8,dur:10,tags:['social','skill'],
   return `<div class="chend"><p class="gbig2 ga ok">${GT(cw?(g.got>=g.Q?'miWinC':'miWinC2'):g.th>=g.S?'miWinS':'miWinM',{v:g.th})}</p><p class="ga" ${dl(1)}>🐙 ${GT('miWere')} ${M.map(B).join(', ')}</p>
    ${s.order.map((p,i)=>{const x=g.ss[p]||{};return `<p class="mut ga" ${dl(i+2)}>${B(p)} · ${M.includes(p)?GT('miStM',{a:x.v||0,b:x.f||0}):GT('miStC',{a:x.c||0})}</p>`}).join('')}
    <p class="mut ga" ${dl(2)}>🦪 ${g.got}/${g.Q}</p>${g.hist.length?`<h3 class="gh3">📯 ${GT('miCall')}</h3>${g.hist.map((h,i)=>`<div class="chlr ga" ${dl(i,.4)}><b>${i+1}</b> ${B(h.by)} → ${h.who?B(h.who)+(h.mim?' 🐙 ✅':' 🤿 ❌'):esc(GT('miNone'))}</div>`).join('')}`:''}</div>`},
+ log(s){const g=s.game;if(g.win=='m')return[{k:g.M.length>1?'mimW2':'mimW',n:g.M.slice(0,2)}];return g.win?(g.out||[]).map(p=>({k:'mimC',n:[p]})):[]},/* 📜 */
  fin(s){return{pts:s.game.sc}}};
 
 /* ---------- 🐙 temps réel : côté hôte ---------- */
@@ -1054,6 +1087,7 @@ GAMES.prl={icon:'⚫',min:3,max:8,dur:12,tags:['social'],tone:true,lev:prLev,
  endView(s){const g=s.game,R=this,L=typeof LANG!='undefined'?LANG:'fr';if(!g.res.length)return '';
   return `<h3 class="gh3">⚫ ${GT('prRec')}</h3>${g.res.map((r,i)=>`<div class="prend ga" ${dl(i,.3)}><span class="prbk sm" aria-hidden="true"></span><b>${esc(r.odd)}</b>
    <span class="mut">${esc(R.wd(r.q,r.sw,L))} / <b>${esc(R.wd(r.q,1-r.sw,L))}</b></span><span class="prres">${r.vo?'—':r.dive?'🤿'+(r.okD?' ✓':' ✗'):r.win?'🫥':'🔦'}</span></div>`).join('')}`},
+ log(s){const L=[];(s.game.res||[]).forEach(r=>{if(r.vo||(r.dive&&!r.okD))return;L.push({k:r.dive?'prlD':r.win?'prlH':'prlC',n:[r.odd]})});return L},/* 📜 */
  fin(s){return{pts:s.game.sc}}};
 
 /* =====================================================================
@@ -1466,6 +1500,16 @@ section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) b
 [data-theme=dark] .prrow.odd{border-color:#8a96b4;background:#0d1626}[data-theme=dark] .prw.k{background:#0d1626}[data-theme=dark] .prmy b{color:#eaf7f9}
 @media (prefers-reduced-motion:reduce){.prp,.prbk,.prc,.prw .prp.k{animation:none!important}}
 @media (max-width:420px){.prcs{flex-basis:100%;justify-content:flex-start}.prc{max-width:48%}.prmy b{font-size:21px}.prw b{font-size:18px}}
+/* 📜 Livre de bord */
+.gnod{font-size:13px;color:var(--mut);margin:0 0 10px;padding:6px 11px;border-inline-start:3px solid var(--gold);border-radius:4px 12px 12px 4px;background:color-mix(in srgb,var(--gold) 9%,transparent);line-height:1.4}
+.gnod b{font-weight:700}
+.glog{padding:10px 14px}.glog>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;user-select:none}
+.glog>summary::-webkit-details-marker{display:none}.glog>summary::after{content:'›';margin-inline-start:auto;transition:transform .25s;font-size:20px;color:var(--mut)}
+.glog[open]>summary::after{transform:rotate(90deg)}
+.glgn{font-size:11px;font-weight:700;color:var(--mut);border:1.5px solid var(--edge);border-radius:99px;padding:0 7px;line-height:17px}
+.glog ul{list-style:none;margin:8px 0 2px;padding:0;display:grid;gap:6px}.glog li{display:flex;gap:9px;align-items:baseline;font-size:13.5px;line-height:1.4}
+.glgi{flex:none;width:20px;text-align:center}
+@media (prefers-reduced-motion:reduce){.glog>summary::after{transition:none}}
 @media (max-width:420px){.grow2{flex-direction:column}.gq{font-size:19px}.gseed{font-size:26px}.gbr{grid-template-columns:minmax(0,7em) 1fr 1.6em}.gtf{width:78px}.gcamps{gap:6px}}
 @media (prefers-reduced-motion:reduce){.gw .ga,.gw .gbar,.gfloat,.gev .gbig,.grx,.arcb *,.gw.gnx>.card,.mkl{animation:none!important}.gsab i{animation-duration:0s!important;display:none}}
 `;(document.head||document.documentElement).appendChild(c)}
@@ -2739,4 +2783,15 @@ GPRL('pt',{n_prl:`A Pérola Negra`,d_prl:`Uma palavra para todos… menos uma p�
 prl1:`lingerie~pijama|encontro~entrevista de emprego|massagem~banho de espuma|paquera~amor à primeira vista|dança lenta~tango|chupão~marca de batom|lua de mel~fim de semana romântico|jacuzzi~sauna|cinta-liga~meia arrastão|ex~crush|Dia dos Namorados~pedido de casamento|piscadinha~olhar sedutor|fio dental~cueca boxer|app de namoro~encontro rápido|strip pôquer~verdade ou desafio|óleo de massagem~vela aromática|carícia~cócegas|sedutor~romântico|decote~minissaia|banho à meia-noite~banho a dois|primeiro encontro~primeiro beijo|palavras doces~carta de amor|noite de hotel~noite na barraca|salto alto~botas de couro|jantar à luz de velas~café da manhã na cama|sex appeal~carisma|striptease~dança do ventre|nadar pelado~topless|cantada~elogio|beijo de esquimó~beijo de borboleta|sutiã~espartilho|robe de seda~camisola|serenata~poema de amor|ficada de uma noite~amor de verão|fazer olhinhos~brincar de pezinho`,
 prl2:`camisinha~pílula|algemas~venda|vibrador~consolo|ménage~swing|chicote~pluma|vídeo íntimo~nude|de quatro~papai e mamãe|boquete~sexo oral nela|sex shop~casa de swing|pornô~webcam|lubrificante~chantilly|rapidinha~maratona|dominadora~submisso|sexting~sexo por telefone|látex~couro|gemido~grito|voyeur~exibicionista|amizade colorida~amante|mamilos~nádegas|sexo no escritório~sexo no carro|Kama Sutra~Cinquenta Tons de Cinza|ejaculação precoce~broxada|fantasia~fetiche|masturbação~preliminares|gozar~fingir|lap dance~pole dance|garganta profunda~69|orgia~gang bang|plug anal~bolinhas de pompoar`});
 /* /⚫ */
+/* 📜 Livre de bord : textes */
+Object.assign(GI18N.fr.ui,{lgT:`Livre de bord`,lgLast:`La dernière fois : {t}`,lg_win:`{a} a remporté {g}`,lg_win2:`{a} et {b} ont remporté {g}`,lg_prlC:`{a} s'est fait démasquer en Perle noire`,lg_prlD:`{a} a plongé 🤿 en Perle noire et trouvé le mot des autres`,lg_prlH:`{a} est passé{g.a:|e|·e} inaperçu{g.a:|e|·e} en Perle noire`,lg_chnC:`{a} s'est fait démasquer en Naufrageur`,lg_chnW:`{a} a coulé la flotte en Naufrageur`,lg_chnW2:`{a} et {b} ont coulé la flotte en Naufrageurs`,lg_mimC:`{a} s'est fait démasquer en Mimétique`,lg_mimW:`{a} a filé avec les perles en Mimétique`,lg_mimW2:`{a} et {b} ont filé avec les perles en Mimétiques`,lg_mskS:`{a} a tout volé à {b} en finale des Masques`,lg_mskP:`{a} et {b} ont partagé le trésor en finale des Masques`,lg_mskB:`{a} et {b} ont voulu tout voler en finale des Masques : perdu pour les deux`,lq_c:`se ferait démasquer le plus vite la prochaine fois`,lq_s:`bluffe le mieux sans en avoir l'air`,lq_v:`volerait tout le trésor sans trembler`,lq_t:`partagerait le trésor sans hésiter`,lq_w:`battrait {a} à la revanche`});
+Object.assign(GI18N.en.ui,{lgT:`Logbook`,lgLast:`Last time: {t}`,lg_win:`{a} won {g}`,lg_win2:`{a} and {b} won {g}`,lg_prlC:`{a} got unmasked as the Black Pearl`,lg_prlD:`{a} dived 🤿 as the Black Pearl and found the others' word`,lg_prlH:`{a} went unnoticed as the Black Pearl`,lg_chnC:`{a} got unmasked as a Wrecker`,lg_chnW:`{a} sank the fleet as a Wrecker`,lg_chnW2:`{a} and {b} sank the fleet as Wreckers`,lg_mimC:`{a} got unmasked as the Mimic`,lg_mimW:`{a} got away with the pearls as the Mimic`,lg_mimW2:`{a} and {b} got away with the pearls as Mimics`,lg_mskS:`{a} stole everything from {b} in the Masks final`,lg_mskP:`{a} and {b} shared the treasure in the Masks final`,lg_mskB:`{a} and {b} both tried to steal it all in the Masks final: both lost`,lq_c:`would get unmasked fastest next time`,lq_s:`bluffs best without showing it`,lq_v:`would steal the whole treasure without blinking`,lq_t:`would share the treasure without hesitating`,lq_w:`would beat {a} in a rematch`});
+Object.assign(GI18N.es.ui,{lgT:`Bitácora`,lgLast:`La última vez: {t}`,lg_win:`{a} ganó {g}`,lg_win2:`{a} y {b} ganaron {g}`,lg_prlC:`Descubrieron a {a}, la Perla Negra`,lg_prlD:`{a}, la Perla Negra, se zambulló 🤿 y encontró la palabra de los demás`,lg_prlH:`Nadie vio a {a}, la Perla Negra`,lg_chnC:`Descubrieron a {a}, Naufragador`,lg_chnW:`{a} hundió la flota como Naufragador`,lg_chnW2:`{a} y {b} hundieron la flota como Naufragadores`,lg_mimC:`Descubrieron a {a}, el Mimético`,lg_mimW:`{a} escapó con las perlas como Mimético`,lg_mimW2:`{a} y {b} escaparon con las perlas como Miméticos`,lg_mskS:`{a} le robó todo a {b} en la final de las Máscaras`,lg_mskP:`{a} y {b} compartieron el tesoro en la final de las Máscaras`,lg_mskB:`{a} y {b} quisieron robarlo todo en la final de las Máscaras: perdieron los dos`,lq_c:`se dejaría descubrir antes que nadie la próxima vez`,lq_s:`farolea mejor sin que se note`,lq_v:`robaría todo el tesoro sin pestañear`,lq_t:`compartiría el tesoro sin dudar`,lq_w:`le ganaría a {a} en la revancha`});
+Object.assign(GI18N.it.ui,{lgT:`Diario di bordo`,lgLast:`L'ultima volta: {t}`,lg_win:`{a} ha vinto {g}`,lg_win2:`{a} e {b} hanno vinto {g}`,lg_prlC:`Hanno smascherato {a}, la Perla Nera`,lg_prlD:`{a}, la Perla Nera, ha fatto il tuffo 🤿 e trovato la parola degli altri`,lg_prlH:`Nessuno ha notato {a}, la Perla Nera`,lg_chnC:`Hanno smascherato {a}, Naufragatore`,lg_chnW:`{a} ha affondato la flotta da Naufragatore`,lg_chnW2:`{a} e {b} hanno affondato la flotta da Naufragatori`,lg_mimC:`Hanno smascherato {a}, il Mimetico`,lg_mimW:`{a} ha portato via le perle da Mimetico`,lg_mimW2:`{a} e {b} hanno portato via le perle da Mimetici`,lg_mskS:`{a} ha rubato tutto a {b} nella finale delle Maschere`,lg_mskP:`{a} e {b} hanno condiviso il tesoro nella finale delle Maschere`,lg_mskB:`{a} e {b} hanno voluto rubare tutto nella finale delle Maschere: persi entrambi`,lq_c:`si farebbe smascherare più in fretta la prossima volta`,lq_s:`bluffa meglio senza darlo a vedere`,lq_v:`ruberebbe tutto il tesoro senza battere ciglio`,lq_t:`dividerebbe il tesoro senza esitare`,lq_w:`batterebbe {a} nella rivincita`});
+Object.assign(GI18N.de.ui,{lgT:`Logbuch`,lgLast:`Letztes Mal: {t}`,lg_win:`{a} hat {g} gewonnen`,lg_win2:`{a} und {b} haben {g} gewonnen`,lg_prlC:`{a} wurde als schwarze Perle enttarnt`,lg_prlD:`{a} ist als schwarze Perle abgetaucht 🤿 und hat das Wort der anderen gefunden`,lg_prlH:`{a} blieb als schwarze Perle unbemerkt`,lg_chnC:`{a} wurde als Strandräuber enttarnt`,lg_chnW:`{a} hat als Strandräuber die Flotte versenkt`,lg_chnW2:`{a} und {b} haben als Strandräuber die Flotte versenkt`,lg_mimC:`{a} wurde als Mimetiker enttarnt`,lg_mimW:`{a} ist als Mimetiker mit den Perlen entkommen`,lg_mimW2:`{a} und {b} sind als Mimetiker mit den Perlen entkommen`,lg_mskS:`{a} hat {b} im Finale der Masken alles gestohlen`,lg_mskP:`{a} und {b} haben im Finale der Masken den Schatz geteilt`,lg_mskB:`{a} und {b} wollten im Finale der Masken alles stehlen: beide verloren`,lq_c:`würde nächstes Mal am schnellsten enttarnt werden`,lq_s:`blufft am besten, ohne dass man es merkt`,lq_v:`würde ohne Zögern den ganzen Schatz stehlen`,lq_t:`würde den Schatz ohne Zögern teilen`,lq_w:`würde {a} in der Revanche schlagen`});
+Object.assign(GI18N.ru.ui,{lgT:`Судовой журнал`,lgLast:`В прошлый раз: {t}`,lg_win:`{a} {g.a:выиграл|выиграла|выиграл(а)} «{g}»`,lg_win2:`{a} и {b} выиграли «{g}»`,lg_prlC:`{a} {g.a:был разоблачён|была разоблачена|был(а) разоблачен(а)} в роли Чёрной жемчужины`,lg_prlD:`{a} в роли Чёрной жемчужины {g.a:нырнул|нырнула|нырнул(а)} 🤿 и {g.a:угадал|угадала|угадал(а)} слово остальных`,lg_prlH:`Никто не заметил {a} в роли Чёрной жемчужины`,lg_chnC:`{a} {g.a:был разоблачён|была разоблачена|был(а) разоблачен(а)} в роли Мародёра`,lg_chnW:`{a} в роли Мародёра {g.a:потопил|потопила|потопил(а)} флот`,lg_chnW2:`{a} и {b} в роли Мародёров потопили флот`,lg_mimC:`{a} {g.a:был разоблачён|была разоблачена|был(а) разоблачен(а)} в роли Мимика`,lg_mimW:`{a} в роли Мимика {g.a:ушёл|ушла|ушёл(ушла)} с жемчугом`,lg_mimW2:`{a} и {b} в роли Мимиков ушли с жемчугом`,lg_mskS:`{a} {g.a:забрал|забрала|забрал(а)} всё у {b} в финале «Масок»`,lg_mskP:`{a} и {b} поделили сокровище в финале «Масок»`,lg_mskB:`{a} и {b} оба хотели забрать всё в финале «Масок»: проиграли оба`,lq_c:`быстрее всех попадётся в следующий раз`,lq_s:`лучше всех блефует, не подавая виду`,lq_v:`не моргнув глазом заберёт всё сокровище`,lq_t:`не раздумывая поделится сокровищем`,lq_w:`обыграет {a} в реванше`});
+Object.assign(GI18N.zh.ui,{lgT:`航海日志`,lgLast:`上次：{t}`,lg_win:`{a} 赢得了「{g}」`,lg_win2:`{a} 和 {b} 赢得了「{g}」`,lg_prlC:`{a} 作为黑珍珠被识破了`,lg_prlD:`{a} 作为黑珍珠潜水 🤿，猜中了大家的词`,lg_prlH:`{a} 作为黑珍珠，没被任何人发现`,lg_chnC:`{a} 作为破船者被识破了`,lg_chnW:`{a} 作为破船者击沉了船队`,lg_chnW2:`{a} 和 {b} 作为破船者击沉了船队`,lg_mimC:`{a} 作为拟态者被识破了`,lg_mimW:`{a} 作为拟态者带着珍珠溜走了`,lg_mimW2:`{a} 和 {b} 作为拟态者带着珍珠溜走了`,lg_mskS:`{a} 在「面具」决赛中抢走了 {b} 的全部`,lg_mskP:`{a} 和 {b} 在「面具」决赛中平分了宝藏`,lg_mskB:`{a} 和 {b} 在「面具」决赛中都想独吞：两人都输了`,lq_c:`下次会最快被识破`,lq_s:`最会不动声色地虚张声势`,lq_v:`会眼都不眨地抢走全部宝藏`,lq_t:`会毫不犹豫地分享宝藏`,lq_w:`能在复仇赛中打败 {a}`});
+Object.assign(GI18N.he.ui,{lgT:`יומן הספינה`,lgLast:`בפעם הקודמת: {t}`,lg_win:`{g}: {a} {g.a:ניצח|ניצחה|ניצח/ה}`,lg_win2:`{g}: {a} ו-{b} ניצחו`,lg_prlC:`{a} {g.a:נחשף|נחשפה|נחשף/ה} בתור הפנינה השחורה`,lg_prlD:`{a} {g.a:צלל|צללה|צלל/ה} 🤿 בתור הפנינה השחורה {g.a:ומצא|ומצאה|ומצא/ה} את המילה של האחרים`,lg_prlH:`אף אחד לא שם לב ל-{a}, הפנינה השחורה`,lg_chnC:`{a} {g.a:נחשף|נחשפה|נחשף/ה} בתור מטביע`,lg_chnW:`{a} {g.a:הטביע|הטביעה|הטביע/ה} את הצי בתור מטביע`,lg_chnW2:`{a} ו-{b} הטביעו את הצי בתור מטביעים`,lg_mimC:`{a} {g.a:נחשף|נחשפה|נחשף/ה} בתור מחקה`,lg_mimW:`{a} {g.a:ברח|ברחה|ברח/ה} עם הפנינים בתור מחקה`,lg_mimW2:`{a} ו-{b} ברחו עם הפנינים בתור מחקים`,lg_mskS:`{a} {g.a:לקח|לקחה|לקח/ה} הכול מ-{b} בגמר של המסכות`,lg_mskP:`{a} ו-{b} חלקו את האוצר בגמר של המסכות`,lg_mskB:`{a} ו-{b} רצו לקחת הכול בגמר של המסכות: שניהם הפסידו`,lq_c:`ייחשף הכי מהר בפעם הבאה`,lq_s:`מבלף הכי טוב בלי שישימו לב`,lq_v:`ייקח את כל האוצר בלי למצמץ`,lq_t:`יחלוק את האוצר בלי להסס`,lq_w:`ינצח את {a} במשחק הגומלין`});
+Object.assign(GI18N.pt.ui,{lgT:`Diário de bordo`,lgLast:`Da última vez: {t}`,lg_win:`{a} venceu {g}`,lg_win2:`{a} e {b} venceram {g}`,lg_prlC:`Desmascararam {a}, a Pérola Negra`,lg_prlD:`{a}, a Pérola Negra, mergulhou 🤿 e achou a palavra dos outros`,lg_prlH:`Ninguém notou {a}, a Pérola Negra`,lg_chnC:`Desmascararam {a}, Naufragador`,lg_chnW:`{a} afundou a frota como Naufragador`,lg_chnW2:`{a} e {b} afundaram a frota como Naufragadores`,lg_mimC:`Desmascararam {a}, o Mimético`,lg_mimW:`{a} fugiu com as pérolas como Mimético`,lg_mimW2:`{a} e {b} fugiram com as pérolas como Miméticos`,lg_mskS:`{a} roubou tudo de {b} na final das Máscaras`,lg_mskP:`{a} e {b} dividiram o tesouro na final das Máscaras`,lg_mskB:`{a} e {b} quiseram roubar tudo na final das Máscaras: os dois perderam`,lq_c:`se deixaria desmascarar primeiro da próxima vez`,lq_s:`blefa melhor sem dar na vista`,lq_v:`roubaria o tesouro todo sem pestanejar`,lq_t:`dividiria o tesouro sem hesitar`,lq_w:`venceria {a} na revanche`});
+/* /📜 */
 })();
