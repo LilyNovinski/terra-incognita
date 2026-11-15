@@ -90,7 +90,7 @@ W.GAct=function(s,from,a){const t=a&&a.t;
   if(a.v=='again'&&on.length>=G.min&&on.length<=G.max){s.gsel=s.game.id;s.order=on;gStart(s)}else{s.phase='lobby';s.game=null;s.gres=null}
   bump();return true}
  if(t=='g'){const g=s.game;if(s.phase!='game'||!g||!s.order.includes(from))return true;if(a.k!=null&&a.k!==g.k&&!a.rx)return true;
-  let ch=false;if(a.rx&&typeof a.rx=='string'&&RX.includes(a.rx)){g.rx[from]=a.rx;ch=true}
+  let ch=false;if(a.rx&&typeof a.rx=='string'&&RX.includes(a.rx)){g.rx[from]=a.rx;(g.rxt=g.rxt||{})[from]=Date.now();ch=true}/* rxt : pour rejouer une réaction une seule fois */
   else if(a.ok&&g.rv){if(!g.done[from]){g.done[from]=1;ch=true}}
   else{/* on peut changer d'avis tant que l'étape n'est pas finie (les autres jouent encore, sablier en cours) */
    const was=g.done[from];if(was&&!g.rv)delete g.done[from];ch=!!GAMES[g.id].act(s,from,a);if(!ch&&was)g.done[from]=was}
@@ -136,7 +136,7 @@ function gEndView(s){const g=s.game,G=GAMES[g.id],R=s.gres||{pts:{}},host=meN()=
  const rows=Object.entries(R.pts).sort((a,b)=>b[1]-a[1]);let rank=0,prev=null;
  const list=R.coop?'':`<div class="gsc">${rows.map(([n,p],i)=>{if(p!==prev){rank=i;prev=p}return `<div class="grow ga ${n==meN()?'me':''}" ${dl(i,.1)}><span class="gmd">${['🥇','🥈','🥉'][rank]||rank+1}</span>${DT(n)}<span class="gnm">${NM(n)}</span><b class="gpt">${p}</b></div>`}).join('')}</div>`;
  const html=`<div class="gw g-${g.id}"><div class="ghd"><span class="gic">${G.icon}</span><b>${GT('n_'+g.id)}</b></div>
- <div class="card"><h3>${GT(R.coop?'coopT':'scores')}</h3>${list}${G.endView?G.endView(s):''}</div>
+ <div class="card"><h3>${GT(R.coop?(GI18N.fr.ui['coop_'+g.id]?'coop_'+g.id:'coopT'):'scores')}</h3>${list}${G.endView?G.endView(s):''}</div>
  ${host?`<div class="gbtns"><button class="pri wide" data-gend="again">${GT('again')}</button><button class="ghost wide" data-gend="lobby">${GT('lobby')}</button></div>`:''}</div>`;
  return{html,mine:host,hint:host?GT('hostNext'):GT('waitHostN',{n:B(s.host)}),bind(){
   $$('[data-gend]').forEach(b=>b.onclick=()=>send({t:'gx',v:b.dataset.gend}));
@@ -1091,6 +1091,100 @@ GAMES.prl={icon:'⚫',min:3,max:8,dur:12,tags:['social'],tone:true,lev:prLev,
  fin(s){return{pts:s.game.sc}}};
 
 /* =====================================================================
+   ⛈️ TEMPÊTE — fiche (coopératif, 2 à 8)
+   Niveau k : chacun reçoit k vagues secrètes (nombres 1–100, tous différents). Il faut toutes les lâcher dans l'ordre
+     croissant, à l'échelle du groupe, sans jamais dire de chiffre : pendant la partie le chat se tait (hôte : messages
+     refusés), seules les 4 réactions restent.
+   Rythme partagé = coups de houle (6 s × sablier de l'hôte ; sans sablier : quand tout le monde a choisi). À chaque coup,
+     en même temps et modifiable jusqu'à la fin du coup : 🌊 Lâcher (ma plus petite vague), ⏳ Retenir (défaut), 🌅 Vague
+     calme. Pas de premier joueur : les vagues lâchées ensemble se rangent toutes seules ; une erreur n'arrive que si une
+     vague PLUS BASSE reste en main → elle part dans l'écume (révélée), −1 ⛵ par coup fautif.
+   ⛈️ La tempête : chaque niveau a B = ⌈1,5 × vagues⌉ + 8 coups ; à 0, −1 ⛵ et les vagues restantes partent à l'écume.
+     Le compte à rebours sert aussi d'horloge commune (« je lâche quand il reste à peu près ma part du temps »).
+   🌅 Vague calme (1 au départ, +1 après les niveaux 2 et 5) : si au moins la moitié de ceux qui ont encore des vagues la
+     demande au même coup (les demandes sont visibles, les autres choix non), c'est une pause : +3 coups, et chacun montre la
+     dizaine de sa plus petite vague (« 30–39 ») tant qu'elle n'est pas lâchée. ⛵ +1 après les niveaux 3 et 6.
+   Absent : sa plus petite vague part seule quand elle est la plus basse en jeu (la partie ne bloque jamais).
+   Niveaux : 7 (2 joueurs), 6 (3), 5 (4), 4 (5), 3 (6-8). ⛵ de départ : 2 (2 joueurs), 4 (3-7), 5 (8).
+   SIM (.sim/tmp.js + tmp_grid.js, hors site, 2000-3000 parties/taille ; IA : chacun lâche sa vague quand
+     (vague − dernière posée) ≤ (coups depuis la dernière + 1) × (100 − dernière)/(coups restants), bruit lognormal
+     σ = 0,25 précis / 0,4 moyen / 0,6 flou ; vague calme au 1er coup des niveaux ≥ 3 ; avec les dizaines, on retient si
+     quelqu'un a une dizaine plus basse, on lâche si on a la seule plus basse) :
+     victoire n=2→8, moyen : 50 / 44 / 37 / 57 / 58 / 45 / 51 % ; précis : 78 / 87 / 87 / 89 / 88 / 84 / 90 % ;
+     flou : 19 / 13 / 9 / 18 / 24 / 10 / 13 % (vraie logique, .sim/tmp_run.js, 600 parties/taille : 0 fuite, 0 blocage,
+     et 100/100 parties finies avec un absent). Coopératif et simultané : aucun siège ne compte.
+     Rejetés : mêmes niveaux pour tous (5 à 8 joueurs : 24–32 vagues au dernier niveau, 1–19 % en moyen),
+     2 ⛵ partout (moyen 3–12 % dès 3 joueurs).
+   ===================================================================== */
+const TMP={BT:6,CB:3,LV:n=>n==2?7:n==3?6:n==4?5:n==5?4:3,LF:n=>n==2?2:n==8?5:4,B:c=>Math.ceil(c*1.5)+8,BON:{2:'c',3:'l',5:'c',6:'l'}};
+const tpBand=v=>{const k=Math.floor((v-1)/10);return (10*k+1)+"–"+(10*k+10)};
+GAMES.tmp={icon:'⛈️',min:2,max:8,dur:8,tags:['skill'],mute:1,TMP,
+ init(s){const g=s.game,n=s.order.length;g.n=TMP.LV(n);g.life=TMP.LF(n);g.calm=1;g.hist=[];g.ok=0;this.deal(s)},
+ deal(s){const g=s.game,k=g.r+1,d=shuf([...Array(100).keys()].map(i=>i+1));g.h={};s.order.forEach(p=>g.h[p]=d.splice(0,k).sort((a,b)=>a-b));
+  g.pl=[];g.ec=[];g.band={};g.left=g.B=TMP.B(k*s.order.length);g.ev=null;g.res=null;g.bt=0;g.since=0;g.nx=0;this.beat(s)},
+ hold(s){const g=s.game;return s.order.filter(p=>(g.h[p]||[]).length)},
+ pub(s){const g=s.game;g.cnt={};s.order.forEach(p=>g.cnt[p]=(g.h[p]||[]).length)},
+ beat(s){const g=s.game;g.ch={};gWait(g,TMP.BT,'b');g.need=this.hold(s);g.bt++;this.pub(s)},
+ act(s,from,a){const g=s.game;if(g.st!='b'||!(g.h[from]||[]).length||!['P','W','C'].includes(a.v))return;if(a.v=='C'&&g.calm<1)return;
+  g.ch[from]=a.v;g.done[from]=1;return true},
+ next(s){const g=s.game;if(g.st=='b'){this.res(s);return}
+  if(g.end){g.over=1;return}g.r++;this.deal(s)},
+ res(s){const g=s.game,H=this.hold(s),on=new Set(gOn(s)),ch=g.ch,Ho=H.filter(p=>on.has(p));g.left--;
+  const nc=Ho.filter(p=>ch[p]=='C').length;
+  if(g.calm>0&&nc&&nc>=Math.max(1,Math.ceil(Ho.length/2))){/* 🌅 pause : +3 coups, dizaines montrées, l'horloge ne bouge pas */
+   g.calm--;g.left+=TMP.CB;H.forEach(p=>g.band[p]=Math.floor((g.h[p][0]-1)/10));g.ev={t:'c',n:nc};return this.after(s)}
+  const P=Ho.filter(p=>ch[p]=='P'),low=Math.min(...H.map(p=>g.h[p][0]));
+  H.filter(p=>!on.has(p)&&g.h[p][0]==low).forEach(p=>P.push(p));/* absent : la houle emporte sa vague quand c'est son tour */
+  if(!P.length){g.since++;g.ev={t:'w'};return this.after(s)}
+  const put=P.map(p=>({v:g.h[p].shift(),p})).sort((a,b)=>a.v-b.v),mx=put[put.length-1].v,lost=[];
+  s.order.forEach(p=>{const h=g.h[p]||[];while(h.length&&h[0]<mx)lost.push({v:h.shift(),p})});
+  put.forEach(x=>g.pl.push({v:x.v,p:x.p,b:g.bt,e:lost.length?1:0}));lost.forEach(x=>g.ec.push({v:x.v,p:x.p,b:g.bt}));
+  if(lost.length){g.life--;g.nx++}
+  for(const p in g.band){const h=g.h[p]||[];if(!h.length||Math.floor((h[0]-1)/10)!=g.band[p])delete g.band[p]}
+  g.since=0;g.ev={t:lost.length?'x':'p',put,lost};this.after(s)},
+ after(s){const g=s.game,H=this.hold(s);this.pub(s);
+  if(g.life>0&&H.length&&g.left>0)return this.beat(s);
+  const storm=g.life>0&&H.length>0;if(storm)g.life--;
+  H.forEach(p=>{g.h[p].forEach(v=>g.ec.push({v,p,b:g.bt,t:1}));g.h[p]=[]});
+  const lv=g.r+1,ok=g.life>0;let bon=null;if(ok){g.ok=lv;if(lv<g.n){bon=TMP.BON[lv]||null;if(bon=='c')g.calm++;if(bon=='l')g.life++}}
+  g.res={lv,ok,storm:storm?1:0,bon};g.hist.push({lv,ok,st:storm?1:0,x:g.nx,bt:g.bt});g.end=!ok||lv>=g.n;this.pub(s);gWait(g,14,'r',1)},
+ /* secrets : chacun ne reçoit que SES vagues ; pendant un coup, on voit seulement qui demande la vague calme */
+ hide(g,n){const o={...g};o.h={[n]:(g.h[n]||[]).slice()};
+  if(g.st=='b'){o.ch={};for(const p in g.ch)if(p==n||g.ch[p]=='C')o.ch[p]=g.ch[p]}return o},
+ sea(g,nw){const P=g.pl||[],E=g.ec||[];
+  return `<div class="tpsea" aria-hidden="true"><i class="tpln"></i>${E.map(x=>`<b class="tpw ec ${nw&&x.b==nw?'nw':''}" style="inset-inline-start:${x.v-1}%"><span>${x.v}</span></b>`).join('')}
+   ${P.map(x=>`<b class="tpw ${x.e?'bad':''} ${nw&&x.b==nw?'nw':''}" style="inset-inline-start:${x.v-1}%;--c:${col(x.p)}"><span>${x.v}</span></b>`).join('')}<span class="tp0">1</span><span class="tp1">100</span></div>`},
+ /* réaction : bulle de 2,6 s, jouée une fois par envoi (les re-rendus de coup la continuent sans la relancer) */
+ rxa(g,p){const t=(g.rxt||{})[p],e=(g.rx||{})[p];if(!t||!e)return '';const M=this.rxs=this.rxs||{};if(!M[p]||M[p].t!==t)M[p]={t,at:Date.now()};
+  const age=Date.now()-M[p].at;return age<2600?`<span class="tprx" style="animation-delay:-${age}ms">${e}</span>`:''},
+ seq(g){return `<div class="tpseq">${[...(g.pl||[]).map(x=>`<b class="${x.e?'bad':''}" style="--c:${col(x.p)}">${x.v}</b>`),...(g.ec||[]).map(x=>`<b class="ec">${x.v}</b>`)].join('')}</div>`},
+ view(s){const g=s.game,m=meN(),R=this,my=(g.h||{})[m]||[],ch=g.ch||{};
+  const bar=`<div class="tpbar"><span class="tplf" title="⛵">${'⛵'.repeat(Math.max(0,g.life))}</span><span class="tpcl ${g.calm?'':'z'}" title="🌅">🌅 ${g.calm}</span><b class="tplv">${GT('tpLv',{v:g.r+1})}</b></div>`;
+  if(g.st=='r'){const r=g.res||{};
+   const msg=r.ok?(r.storm?GT('tpStorm'):GT(r.lv>=g.n?'tpWin':'tpOk',{v:r.lv})):GT('tpSunk');
+   return{html:`<div class="card c">${bar}<p class="gbig2 ga ${r.ok&&!r.storm?'ok':''}">${r.ok?(r.storm?'⛈️':'🌈'):'🌊'}</p><p class="gby2 ga" ${dl(1)}>${msg}</p>
+    ${r.bon?`<p class="gnote ga ok" ${dl(2)}>${GT(r.bon=='l'?'tpBonL':'tpBonC')}</p>`:''}${R.sea(g,0)}${R.seq(g)}</div>`,
+    bind(){if(r.ok&&!r.storm&&!RM())sparkles($('.gby2'),14)}}}
+  const H=s.order.filter(p=>g.cnt[p]),nc=Object.values(ch).filter(v=>v=='C').length,ev=g.ev||{};
+  const evt=ev.t=='p'?ev.put.map(x=>`${DT(x.p)}<b>${x.v}</b>`).join(' '):ev.t=='x'?`💥 ${GT('tpX',{v:ev.lost.map(x=>x.v).join(', ')})}`:ev.t=='c'?`🌅 ${GT('tpC')}`:ev.t=='w'?GT('tpW'):GT('tpGo');
+  const crew=s.order.map(p=>{const k=g.cnt[p]||0,bd=g.band[p];
+   return `<div class="tpm ${p==m?'me':''} ${k?'':'out'}"><span class="tpnm">${DT(p)}${p==m?esc(GT('me')):esc(p)}</span><span class="tpk">${k?'🌊'.repeat(Math.min(k,7)):'✓'}</span>
+    ${bd!=null&&k?`<span class="tpbd" dir="ltr">${tpBand(bd*10+1)}</span>`:''}${ch[p]=='C'?'<span class="tpcq">🌅</span>':''}${g.done[p]&&k?'<i class="tpok" aria-hidden="true"></i>':''}${R.rxa(g,p)}</div>`}).join('');
+  const c=ch[m]||'W',hand=my.length?`<div class="tphand">${my.map((v,i)=>`<b class="tpv ${i?'':'lo'}">${v}</b>`).join('')}</div>
+   <div class="tpbt"><button class="tpgo ${c=='P'?'sel':''}" data-tp="P" aria-pressed="${c=='P'}">🌊 ${GT('tpPut',{v:my[0]})}</button><button class="ghost ${g.done[m]&&c=='W'?'sel':''}" data-tp="W" aria-pressed="${c=='W'}">⏳ ${GT('tpHold')}</button>
+   <button class="ghost tpcb ${c=='C'?'sel':''}" data-tp="C" ${g.calm?'':'disabled'} aria-pressed="${c=='C'}">🌅 ${GT('tpCalm')}${nc?` <small>${nc}/${Math.max(1,Math.ceil(H.length/2))}</small>`:''}</button></div>`:`<p class="gnote">${GT('tpNone')}</p>`;
+  return{html:`<div class="card c tpcard">${bar}<div class="tpst"><span>⛈️ ${GT('tpLeft',{v:g.left})}</span><span class="tpsb"><i style="width:${Math.max(0,Math.min(100,100*g.left/g.B))}%"></i></span></div>
+   ${R.sea(g,g.bt-1)}<p class="tpev" aria-live="polite">${evt}</p><p class="tpsi">${GT('tpSince',{v:g.since})}</p><div class="tpcrew">${crew}</div>${hand}
+   <div class="grxb tprxb">${RX.map(e=>`<button class="ghost" data-grx="${e}" aria-label="${e}">${e}</button>`).join('')}</div><p class="tpmu">🤫 ${GT('tpMute')}</p></div>`,
+   bind(){$$('[data-tp]').forEach(b=>b.onclick=()=>gs({v:b.dataset.tp}));$$('[data-grx]').forEach(x=>x.onclick=()=>send({t:'g',rx:x.dataset.grx}))}}},
+ endView(s){const g=s.game;
+  return `<p class="gbig2 ga ${g.ok>=g.n?'ok':''}">${g.ok>=g.n?'🌈':'⛈️'} ${g.ok} / ${g.n}</p><p class="gnote ga" ${dl(1)}>${GT('tpEnd',{v:g.ok,n:g.n})}</p>
+   <div class="tpend">${(g.hist||[]).map((h,i)=>`<div class="ga" ${dl(i,.3)}><b>${GT('tpLv',{v:h.lv})}</b><span>${h.ok?(h.st?'⛈️':'✓'):'🌊'}${h.x?' · 💥×'+h.x:''}</span><span class="mut">${h.bt} 〰️</span></div>`).join('')}</div>`},
+ fin(s){const g=s.game;return{pts:g.sc,coop:{v:g.ok,max:g.n}}}};
+/* @games : jeux silencieux (Tempête) — pendant la partie, le chat se tait (hôte et envoi) ; réactions seulement */
+W.GMute=s=>!!(s&&s.phase=='game'&&s.game&&GAMES[s.game.id]&&GAMES[s.game.id].mute);
+
+/* =====================================================================
    📖 TUTORIELS ANIMÉS — une mini-démo scriptée par jeu (pièces factices qui bougent, étape par étape).
    Ouvert par le « ? » du haut (contexte : jeu en cours, ou jeu choisi au salon) et par « Les règles en images » au salon.
    Scène = 300×180 (coordonnées px), éléments .te animés en transform/opacity seulement ; mouvement réduit : état final fixe.
@@ -1185,6 +1279,16 @@ TUS.prl=[
  {k:'tu_prl5',d:6,s:()=>`<i class="tsea"></i>`+TU.e(60,150,TU.av(0))+TU.e(150,150,TU.av(1))+TU.mv(240,40,240,130,TU.av(2),.3)+TU.e(240,96,'🤿',.9,'p')+TU.e(190,60,TU.cd('🦈 ?'),1.5,'p')+TU.e(190,60,TU.cd('🦈','ok'),2.6,'p')+TU.e(250,30,TU.pt('+3'),3,'p')},
  {k:'tu_prl6',d:6,s:()=>tuP3()+TU.e(60,104,TU.cd('✍️ 🐬'),.3,'p')+TU.e(240,104,'<i class="prbk big"></i>',1.3,'p')+TU.e(60,60,TU.pt('+1'),1.8,'p')+TU.e(150,60,TU.pt('+1'),2,'p')+TU.e(240,60,TU.pt('0','no'),2.2,'p')}];
 
+/* ⛈️ tutoriel de Tempête : vagues en cartes, houle, écume */
+const tu3A=()=>[0,1,2].map(i=>TU.e(60+90*i,150,TU.av(i))).join(''),tuTk=()=>TU.e(150,40,'<i class="tutrk"></i>');
+TUS.tmp=[
+ {k:'tu_tmp1',s:()=>tu3A()+[[12,'🌊12'],[47,'🌊47'],[83,'🌊83']].map((x,i)=>TU.e(60+90*i,104,TU.cd(x[1]),.3+.3*i,'p')).join('')+TU.e(150,40,'🤫',1.4,'p big')},
+ {k:'tu_tmp2',d:6,s:()=>tu3A()+TU.e(150,36,'〰️',0,'p big')+[0,1,2].map(i=>TU.e(60+90*i,104,TU.cd(i?'⏳':'🌊',i?'':'ok'),.8+.2*i,'p')).join('')+TU.e(150,36,'〰️',2.6,'p big')+[0,1,2].map(i=>TU.e(60+90*i,70,TU.cd(i==1?'🌊':'⏳',i==1?'ok':''),3+.2*i,'p')).join('')},
+ {k:'tu_tmp3',d:6,s:()=>tu3A()+tuTk()+TU.mv(60,104,62,62,TU.cd('12','ok'),.4)+TU.mv(150,104,148,62,TU.cd('47','ok'),1.6)+TU.mv(240,104,232,62,TU.cd('83','ok'),2.8)+TU.e(150,18,'✓',3.6,'p')},
+ {k:'tu_tmp4',d:6,s:()=>tu3A()+tuTk()+TU.e(240,104,TU.cd('30'),0,'a o','--o:1.6s')+TU.mv(150,104,175,62,TU.cd('47','no'),.4)+TU.e(240,104,TU.cd('30'),1.2,'p k')+TU.mv(240,104,85,62,TU.cd('<s>30</s>'),1.7,'','--op0:0')+TU.e(150,18,'💥',1.9,'p big')+TU.e(262,24,TU.pt('−1 ⛵','no'),2.4,'p')},
+ {k:'tu_tmp5',d:6,s:()=>tu3A()+TU.e(150,56,TU.cd('⛈️ 3'),0,'a o','--o:1.1s')+TU.e(150,56,TU.cd('⛈️ 2'),1.1,'p o','--o:2.2s')+TU.e(150,56,TU.cd('⛈️ 1','no'),2.2,'p o','--o:3.3s')+TU.e(150,56,'⛈️',3.3,'p big k')+[0,1,2].map(i=>TU.e(60+90*i,104,TU.cd('🌊'),0,'a o','--o:3.5s')).join('')},
+ {k:'tu_tmp6',d:6,s:()=>tu3A()+TU.e(150,36,'🌅',.2,'p big')+[0,1,2].map(i=>TU.e(60+90*i,104,'✋',.5+.2*i,'p o','--o:1.6s')+TU.e(60+90*i,104,TU.cd(['11–20','41–50','81–90'][i],'ok'),1.7+.25*i,'p')).join('')},
+ {k:'tu_tmp7',d:6,s:()=>tu3A()+TU.e(150,40,TU.cd('🔢 ✕','no'),.2,'p')+[['😎',0],['🫧',1],['😱',2]].map(([e,i])=>TU.e(60+90*i,104,e,.8+.3*i,'p big')).join('')}];
 for(const id in TUS)if(GAMES[id])GAMES[id].tut=TUS[id];
 const GTU={id:null,i:0,t:null};
 W.GTut=function(id){const G=GAMES[id];if(!G||!G.tut||typeof document=='undefined')return false;
@@ -1510,6 +1614,38 @@ section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) b
 .glog ul{list-style:none;margin:8px 0 2px;padding:0;display:grid;gap:6px}.glog li{display:flex;gap:9px;align-items:baseline;font-size:13.5px;line-height:1.4}
 .glgi{flex:none;width:20px;text-align:center}
 @media (prefers-reduced-motion:reduce){.glog>summary::after{transition:none}}
+/* ⛈️ Tempête */
+.tpbar{display:flex;align-items:center;gap:10px;justify-content:space-between;margin-bottom:6px}
+.tplf{letter-spacing:1px;font-size:15px}.tpcl{font-size:13px;font-weight:700;padding:2px 9px;border-radius:99px;border:1.5px solid var(--edge)}.tpcl.z{opacity:.45}.tplv{font-size:13px;color:var(--mut)}
+.tpst{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700;margin:4px 0 6px}.tpst>span:first-child{flex:none;min-width:70px;text-align:start}
+.tpsb{flex:1;height:8px;border-radius:99px;background:var(--paper2);border:1px solid var(--edge);overflow:hidden}.tpsb i{display:block;height:100%;background:linear-gradient(90deg,#7b8fd8,#5ad8ae);transition:width .6s ease}
+[dir=rtl] .tpsb i{margin-inline-start:auto}
+.tpsea{position:relative;height:46px;margin:12px 12px 4px}.tpln{position:absolute;inset-inline:0;top:25px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--ink),var(--acc));opacity:.5}
+.tp0,.tp1{position:absolute;top:32px;font-size:10px;color:var(--mut)}.tp0{inset-inline-start:-6px}.tp1{inset-inline-end:-10px}
+.tpw{position:absolute;top:20px;width:13px;height:13px;margin-inline-start:-6px;border-radius:50%;background:var(--c,var(--ink));border:2px solid var(--paper);box-shadow:0 0 0 1px var(--edge)}
+.tpw span{position:absolute;bottom:15px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;color:var(--mut);opacity:0}
+.tpw.nw span{opacity:1}.tpw.ec span{bottom:auto;top:12px}.tpw.nw{animation:tpIn .6s cubic-bezier(.3,1.6,.5,1) both}.tpw.nw span{color:var(--txt);font-size:12px}
+.tpw.bad{background:var(--bad)}.tpw.ec{background:transparent;border:2px dashed var(--mut);box-shadow:none;top:21px;width:11px;height:11px}
+@keyframes tpIn{from{transform:translateY(-16px) scale(.4);opacity:0}}
+.tpev{min-height:26px;font-size:15px;margin:2px 0 0;display:flex;gap:6px 12px;justify-content:center;align-items:center;flex-wrap:wrap}.tpev b{font-size:19px}
+.tpsi{font-size:12px;color:var(--mut);margin:2px 0 10px}
+.tpcrew{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:6px;margin-bottom:12px}
+.tpm{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:3px 6px;padding:6px 9px;border:1.5px solid var(--edge);border-radius:12px;background:var(--paper2);font-size:13px;text-align:start;min-width:0}
+.tpm.me{border-color:var(--acc)}.tpm.out{opacity:.55}.tpnm{display:flex;align-items:center;gap:5px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 60px}
+.tpk{font-size:11px;letter-spacing:-2px}.tpbd{font-size:11px;font-weight:700;padding:0 6px;border-radius:99px;background:color-mix(in srgb,var(--gold) 24%,transparent)}
+.tpcq{font-size:12px}.tpok{position:absolute;top:-4px;inset-inline-end:-4px;width:10px;height:10px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 2px var(--paper)}
+.tprx{position:absolute;top:-13px;inset-inline-end:14px;font-size:18px;animation:tpRx 2.6s ease both;pointer-events:none}
+@keyframes tpRx{0%{transform:translateY(8px) scale(.5);opacity:0}15%{transform:none;opacity:1}75%{opacity:1}100%{transform:translateY(-6px);opacity:0}}
+.tphand{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:2px 0 12px}
+.tpv{min-width:46px;padding:9px 10px;border-radius:14px;border:2px solid var(--edge);background:var(--paper2);font-size:20px;text-align:center}.tpv.lo{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 14%,var(--paper2))}
+.tpbt{display:grid;grid-template-columns:1fr 1fr;gap:8px}.tpbt .tpgo{grid-column:1/-1;font-size:17px;padding:13px;background:linear-gradient(180deg,#4fb6c9,#2f8fa8);color:#fff;border:0}
+.tpbt button.sel{outline:3px solid var(--acc);outline-offset:1px}.tpbt small{font-size:11px;opacity:.8}
+.tprxb{margin-top:12px}.tpmu{font-size:11.5px;color:var(--mut);margin:6px 0 0}
+.tpend{display:grid;gap:5px;margin-top:8px}.tpend>div{display:flex;gap:10px;justify-content:space-between;padding:6px 10px;border:1.5px solid var(--edge);border-radius:10px;font-size:14px}
+.tpseq{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-top:10px}.tpseq b{font-size:13px;padding:2px 7px;border-radius:8px;border:1.5px solid var(--c,var(--edge))}.tpseq b.bad{border-color:var(--bad);color:var(--bad)}.tpseq b.ec{border:1.5px dashed var(--mut);color:var(--mut);text-decoration:line-through}
+.tutrk{display:block;width:250px;height:3px;border-radius:3px;background:linear-gradient(90deg,#2fa894,#ef8354);opacity:.6}
+@media (prefers-reduced-motion:reduce){.tpw.nw,.tprx{animation:none}.tpsb i{transition:none}}
+@media (max-width:420px){.tpcrew{grid-template-columns:1fr 1fr}.tpv{min-width:40px;font-size:18px;padding:7px 8px}}
 @media (max-width:420px){.grow2{flex-direction:column}.gq{font-size:19px}.gseed{font-size:26px}.gbr{grid-template-columns:minmax(0,7em) 1fr 1.6em}.gtf{width:78px}.gcamps{gap:6px}}
 @media (prefers-reduced-motion:reduce){.gw .ga,.gw .gbar,.gfloat,.gev .gbig,.grx,.arcb *,.gw.gnx>.card,.mkl{animation:none!important}.gsab i{animation-duration:0s!important;display:none}}
 `;(document.head||document.documentElement).appendChild(c)}
@@ -1717,7 +1853,7 @@ rad:`住在船上~住在树屋里|在水下呼吸~在天上飞|读心术~隐身�
 rad1:`雨中的初吻~日落时的初吻|按摩~双人浴|性感内衣~什么都不穿|主动撩人~被人撩|盲约~和前任约会|甜言蜜语~炙热的眼神|两人星空下过夜~两人豪华酒店过夜|长长的前戏~直奔主题|开着灯~关着灯|早上~晚上|贴身慢舞~狂野热舞|一条撩人的短信~一通午夜来电|隐藏的纹身~隐藏的穿孔|会做饭的伴侣~会按摩的伴侣|吻脖子~耳边低语`,
 rad2:`在海里做爱~在沙滩上做爱|你的性爱视频曝光~你的浏览记录曝光|3P~换妻俱乐部|手铐~蒙眼布|和前任上床~和同事上床|一年没有性~一年没有网络|一辈子安静地做爱~一辈子大声地做爱|父母读你的性幻想~你读父母的|永远在上面~永远在下面|在飞机上做爱~在电梯里做爱|再也不能高潮~每打一个喷嚏就高潮|裸照外泄~尴尬语音外泄|第一晚就上床~等三个月|和明星共度一夜~和暗恋对象共度一夜|用玩具~只用手`};
 
-GI18N.he={ui:{edit:`לשנות`,stopAsk:`לעצור את המשחק ולראות ניקוד?`,stop:`לעצור`,room:`חדר משחקים`,exp:`מסע`,expD:`המסע מאי לאי`,play:`לשחק ב{g}`,waitHost:`המארח מתחיל את המשחק`,needP:`{a} עד {b} שחקנים`,
+GI18N.he={ui:{edit:`לשנות`,stopAsk:`לעצור את המשחק ולראות ניקוד?`,stop:`לעצור`,room:`חדר משחקים`,exp:`מסע`,expD:`המסע מאי לאי`,play:`לשחק: {g}`,waitHost:`המארח מתחיל את המשחק`,needP:`{a} עד {b} שחקנים`,
 t_skill:`מיומנות`,t_chance:`מזל`,t_social:`חברתי`,send:`שליחה`,ok:`המשך`,me:`אני`,or:`או`,waitN:`מחכים ל{n}`,yourMove:`תורך!`,watch:`צפו באחרים משחקים`,ready:`{g:מוכן|מוכנה}? ממשיכים כשכולם מוכנים`,
 scores:`ניקוד`,coopT:`ניקוד חיבור`,again:`שוב`,lobby:`חזרה ללובי`,hostNext:`עוד סיבוב, או חזרה ללובי?`,waitHostN:`{n} בוחר מה הלאה`,
 n_bot:`מכתבים בבקבוק`,d_bot:`סיפורים אמיתיים ואנונימיים: מי כתב אותם?`,r_bot:`כתבו 2 או 3 דברים אמיתיים על עצמכם. הם מגיעים בעילום שם: נחשו מי כתב (+2). אף אחד לא זיהה אתכם? +3. רק חלק? +1.`,
@@ -2794,4 +2930,15 @@ Object.assign(GI18N.zh.ui,{lgT:`航海日志`,lgLast:`上次：{t}`,lg_win:`{a} 
 Object.assign(GI18N.he.ui,{lgT:`יומן הספינה`,lgLast:`בפעם הקודמת: {t}`,lg_win:`{g}: {a} {g.a:ניצח|ניצחה|ניצח/ה}`,lg_win2:`{g}: {a} ו-{b} ניצחו`,lg_prlC:`{a} {g.a:נחשף|נחשפה|נחשף/ה} בתור הפנינה השחורה`,lg_prlD:`{a} {g.a:צלל|צללה|צלל/ה} 🤿 בתור הפנינה השחורה {g.a:ומצא|ומצאה|ומצא/ה} את המילה של האחרים`,lg_prlH:`אף אחד לא שם לב ל-{a}, הפנינה השחורה`,lg_chnC:`{a} {g.a:נחשף|נחשפה|נחשף/ה} בתור מטביע`,lg_chnW:`{a} {g.a:הטביע|הטביעה|הטביע/ה} את הצי בתור מטביע`,lg_chnW2:`{a} ו-{b} הטביעו את הצי בתור מטביעים`,lg_mimC:`{a} {g.a:נחשף|נחשפה|נחשף/ה} בתור מחקה`,lg_mimW:`{a} {g.a:ברח|ברחה|ברח/ה} עם הפנינים בתור מחקה`,lg_mimW2:`{a} ו-{b} ברחו עם הפנינים בתור מחקים`,lg_mskS:`{a} {g.a:לקח|לקחה|לקח/ה} הכול מ-{b} בגמר של המסכות`,lg_mskP:`{a} ו-{b} חלקו את האוצר בגמר של המסכות`,lg_mskB:`{a} ו-{b} רצו לקחת הכול בגמר של המסכות: שניהם הפסידו`,lq_c:`ייחשף הכי מהר בפעם הבאה`,lq_s:`מבלף הכי טוב בלי שישימו לב`,lq_v:`ייקח את כל האוצר בלי למצמץ`,lq_t:`יחלוק את האוצר בלי להסס`,lq_w:`ינצח את {a} במשחק הגומלין`});
 Object.assign(GI18N.pt.ui,{lgT:`Diário de bordo`,lgLast:`Da última vez: {t}`,lg_win:`{a} venceu {g}`,lg_win2:`{a} e {b} venceram {g}`,lg_prlC:`Desmascararam {a}, a Pérola Negra`,lg_prlD:`{a}, a Pérola Negra, mergulhou 🤿 e achou a palavra dos outros`,lg_prlH:`Ninguém notou {a}, a Pérola Negra`,lg_chnC:`Desmascararam {a}, Naufragador`,lg_chnW:`{a} afundou a frota como Naufragador`,lg_chnW2:`{a} e {b} afundaram a frota como Naufragadores`,lg_mimC:`Desmascararam {a}, o Mimético`,lg_mimW:`{a} fugiu com as pérolas como Mimético`,lg_mimW2:`{a} e {b} fugiram com as pérolas como Miméticos`,lg_mskS:`{a} roubou tudo de {b} na final das Máscaras`,lg_mskP:`{a} e {b} dividiram o tesouro na final das Máscaras`,lg_mskB:`{a} e {b} quiseram roubar tudo na final das Máscaras: os dois perderam`,lq_c:`se deixaria desmascarar primeiro da próxima vez`,lq_s:`blefa melhor sem dar na vista`,lq_v:`roubaria o tesouro todo sem pestanejar`,lq_t:`dividiria o tesouro sem hesitar`,lq_w:`venceria {a} na revanche`});
 /* /📜 */
+/* ⛈️ Tempête : textes */
+Object.assign(GI18N.fr.ui,{coop_tmp:`La traversée`,n_tmp:`Tempête`,d_tmp:`En silence, lâchez vos vagues dans l'ordre avant l'orage`,r_tmp:`Coopératif. Chacun a des vagues secrètes de 1 à 100. À chaque coup de houle, tout le monde choisit en même temps : lâcher sa plus petite vague, ou retenir. Elles doivent sortir dans l'ordre croissant, sans jamais dire de chiffre. Trop tôt : −1 ⛵. De 2 à 8.`,tpLv:`Niveau {v}`,tpLeft:`dans {v}`,tpSince:`Houle sans vague : {v}`,tpPut:`Lâcher {v}`,tpHold:`Retenir`,tpCalm:`Vague calme`,tpNone:`Tes vagues sont parties. Encourage l'équipage !`,tpX:`Trop tôt ! L'écume emporte {v}`,tpC:`Vague calme : chacun montre sa dizaine`,tpW:`La mer retient son souffle…`,tpGo:`Sentez le rythme : lâchez au bon moment`,tpOk:`Niveau {v} franchi !`,tpStorm:`La tempête a frappé : −1 ⛵`,tpSunk:`Naufrage… plus de coque.`,tpWin:`Toutes les vagues sont passées : tempête domptée !`,tpBonL:`+1 ⛵ en renfort`,tpBonC:`+1 🌅 vague calme`,tpEnd:`Niveaux franchis : {v} sur {n}`,tpMute:`Pas de chiffres : le chat se tait, réactions seulement`,tu_tmp1:`Chacun reçoit en secret des vagues numérotées de 1 à 100.`,tu_tmp2:`À chaque coup de houle, tout le monde choisit en même temps : 🌊 lâcher sa plus petite vague, ou ⏳ retenir.`,tu_tmp3:`Les vagues doivent sortir dans l'ordre croissant. Lâchées au même coup, elles se rangent toutes seules.`,tu_tmp4:`Trop tôt ? Les vagues plus basses encore en main partent dans l'écume : −1 ⛵.`,tu_tmp5:`⛈️ La tempête approche à chaque coup : finissez le niveau avant elle. Le compte à rebours est votre horloge commune.`,tu_tmp6:`🌅 Vague calme : si la moitié la demande, pause. Chacun montre la dizaine de sa plus petite vague (ex. 41–50).`,tu_tmp7:`Aucun chiffre ne se dit : seulement des réactions. Écoutez le rythme du groupe.`});
+Object.assign(GI18N.en.ui,{coop_tmp:`The crossing`,n_tmp:`Storm`,d_tmp:`In silence, release your waves in order before the storm hits`,r_tmp:`Co-op. Everyone holds secret waves from 1 to 100. On each swell beat, everyone chooses at once: release your lowest wave, or hold. They must come out in ascending order, without ever saying a number. Too early: −1 ⛵. 2 to 8 players.`,tpLv:`Level {v}`,tpLeft:`in {v}`,tpSince:`Swells without a wave: {v}`,tpPut:`Release {v}`,tpHold:`Hold`,tpCalm:`Calm wave`,tpNone:`Your waves are out. Cheer the crew on!`,tpX:`Too early! The foam takes {v}`,tpC:`Calm wave: everyone shows their range`,tpW:`The sea holds its breath…`,tpGo:`Feel the rhythm: release at the right moment`,tpOk:`Level {v} cleared!`,tpStorm:`The storm struck: −1 ⛵`,tpSunk:`Shipwreck… no hulls left.`,tpWin:`Every wave is through: storm tamed!`,tpBonL:`+1 ⛵ reinforcement`,tpBonC:`+1 🌅 calm wave`,tpEnd:`Levels cleared: {v} of {n}`,tpMute:`No numbers: chat is muted, reactions only`,tu_tmp1:`Everyone secretly gets waves numbered 1 to 100.`,tu_tmp2:`On each swell beat, everyone chooses at the same time: 🌊 release your lowest wave, or ⏳ hold.`,tu_tmp3:`Waves must come out in ascending order. Released on the same beat, they sort themselves.`,tu_tmp4:`Too early? Lower waves still in hand go to the foam: −1 ⛵.`,tu_tmp5:`⛈️ The storm draws closer every beat: finish the level before it arrives. The countdown is your shared clock.`,tu_tmp6:`🌅 Calm wave: if half of you ask for it, pause. Everyone shows the range of their lowest wave (e.g. 41–50).`,tu_tmp7:`No numbers are spoken: reactions only. Listen to the group's rhythm.`});
+Object.assign(GI18N.es.ui,{coop_tmp:`La travesía`,n_tmp:`Tormenta`,d_tmp:`En silencio, soltad vuestras olas en orden antes de la tormenta`,r_tmp:`Cooperativo. Cada uno tiene olas secretas del 1 al 100. En cada golpe de mar, todos eligen a la vez: soltar su ola más baja o aguantar. Deben salir en orden creciente, sin decir nunca un número. Demasiado pronto: −1 ⛵. De 2 a 8.`,tpLv:`Nivel {v}`,tpLeft:`en {v}`,tpSince:`Golpes sin ola: {v}`,tpPut:`Soltar {v}`,tpHold:`Aguantar`,tpCalm:`Ola calma`,tpNone:`Tus olas ya salieron. ¡Anima a la tripulación!`,tpX:`¡Demasiado pronto! La espuma se lleva {v}`,tpC:`Ola calma: cada uno muestra su decena`,tpW:`El mar contiene el aliento…`,tpGo:`Sentid el ritmo: soltad en el momento justo`,tpOk:`¡Nivel {v} superado!`,tpStorm:`La tormenta golpeó: −1 ⛵`,tpSunk:`Naufragio… no quedan cascos.`,tpWin:`Todas las olas han pasado: ¡tormenta domada!`,tpBonL:`+1 ⛵ de refuerzo`,tpBonC:`+1 🌅 ola calma`,tpEnd:`Niveles superados: {v} de {n}`,tpMute:`Sin números: el chat calla, solo reacciones`,tu_tmp1:`Cada uno recibe en secreto olas numeradas del 1 al 100.`,tu_tmp2:`En cada golpe de mar, todos eligen a la vez: 🌊 soltar su ola más baja o ⏳ aguantar.`,tu_tmp3:`Las olas deben salir en orden creciente. Soltadas en el mismo golpe, se ordenan solas.`,tu_tmp4:`¿Demasiado pronto? Las olas más bajas aún en mano se van a la espuma: −1 ⛵.`,tu_tmp5:`⛈️ La tormenta se acerca a cada golpe: terminad el nivel antes. La cuenta atrás es vuestro reloj común.`,tu_tmp6:`🌅 Ola calma: si la mitad la pide, pausa. Cada uno muestra la decena de su ola más baja (p. ej. 41–50).`,tu_tmp7:`No se dice ningún número: solo reacciones. Escuchad el ritmo del grupo.`});
+Object.assign(GI18N.it.ui,{coop_tmp:`La traversata`,n_tmp:`Tempesta`,d_tmp:`In silenzio, lasciate andare le onde in ordine prima della tempesta`,r_tmp:`Cooperativo. Ognuno ha onde segrete da 1 a 100. A ogni colpo di mare, tutti scelgono insieme: lasciare la propria onda più bassa o trattenerla. Devono uscire in ordine crescente, senza mai dire un numero. Troppo presto: −1 ⛵. Da 2 a 8.`,tpLv:`Livello {v}`,tpLeft:`tra {v}`,tpSince:`Colpi senza onda: {v}`,tpPut:`Lascia {v}`,tpHold:`Trattieni`,tpCalm:`Onda calma`,tpNone:`Le tue onde sono partite. Incoraggia l'equipaggio!`,tpX:`Troppo presto! La schiuma porta via {v}`,tpC:`Onda calma: ognuno mostra la sua decina`,tpW:`Il mare trattiene il respiro…`,tpGo:`Sentite il ritmo: lasciate al momento giusto`,tpOk:`Livello {v} superato!`,tpStorm:`La tempesta ha colpito: −1 ⛵`,tpSunk:`Naufragio… niente più scafi.`,tpWin:`Tutte le onde sono passate: tempesta domata!`,tpBonL:`+1 ⛵ di rinforzo`,tpBonC:`+1 🌅 onda calma`,tpEnd:`Livelli superati: {v} su {n}`,tpMute:`Niente numeri: la chat tace, solo reazioni`,tu_tmp1:`Ognuno riceve in segreto onde numerate da 1 a 100.`,tu_tmp2:`A ogni colpo di mare, tutti scelgono insieme: 🌊 lasciare la propria onda più bassa o ⏳ trattenerla.`,tu_tmp3:`Le onde devono uscire in ordine crescente. Lasciate allo stesso colpo, si mettono in fila da sole.`,tu_tmp4:`Troppo presto? Le onde più basse ancora in mano finiscono nella schiuma: −1 ⛵.`,tu_tmp5:`⛈️ La tempesta si avvicina a ogni colpo: finite il livello prima che arrivi. Il conto alla rovescia è il vostro orologio comune.`,tu_tmp6:`🌅 Onda calma: se la metà la chiede, pausa. Ognuno mostra la decina della sua onda più bassa (es. 41–50).`,tu_tmp7:`Nessun numero si dice: solo reazioni. Ascoltate il ritmo del gruppo.`});
+Object.assign(GI18N.de.ui,{coop_tmp:`Die Überfahrt`,n_tmp:`Sturm`,d_tmp:`Lasst eure Wellen schweigend der Reihe nach los, bevor der Sturm kommt`,r_tmp:`Kooperativ. Alle haben geheime Wellen von 1 bis 100. Bei jedem Wellenschlag wählen alle gleichzeitig: die eigene niedrigste Welle loslassen oder halten. Sie müssen aufsteigend kommen, ohne dass je eine Zahl fällt. Zu früh: −1 ⛵. 2 bis 8.`,tpLv:`Level {v}`,tpLeft:`in {v}`,tpSince:`Schläge ohne Welle: {v}`,tpPut:`{v} loslassen`,tpHold:`Halten`,tpCalm:`Ruhige Welle`,tpNone:`Deine Wellen sind raus. Feuer die Crew an!`,tpX:`Zu früh! Die Gischt nimmt {v} mit`,tpC:`Ruhige Welle: alle zeigen ihren Zehnerbereich`,tpW:`Das Meer hält den Atem an…`,tpGo:`Spürt den Rhythmus: Lasst im richtigen Moment los`,tpOk:`Level {v} geschafft!`,tpStorm:`Der Sturm hat zugeschlagen: −1 ⛵`,tpSunk:`Schiffbruch… kein Rumpf mehr.`,tpWin:`Alle Wellen sind durch: Sturm gezähmt!`,tpBonL:`+1 ⛵ Verstärkung`,tpBonC:`+1 🌅 ruhige Welle`,tpEnd:`Geschaffte Level: {v} von {n}`,tpMute:`Keine Zahlen: Der Chat schweigt, nur Reaktionen`,tu_tmp1:`Alle bekommen geheim Wellen mit Zahlen von 1 bis 100.`,tu_tmp2:`Bei jedem Wellenschlag wählen alle gleichzeitig: 🌊 die niedrigste Welle loslassen oder ⏳ halten.`,tu_tmp3:`Die Wellen müssen aufsteigend kommen. Im selben Schlag losgelassen, ordnen sie sich von selbst.`,tu_tmp4:`Zu früh? Niedrigere Wellen, die noch auf der Hand sind, gehen in die Gischt: −1 ⛵.`,tu_tmp5:`⛈️ Der Sturm kommt mit jedem Schlag näher: Schafft das Level vorher. Der Countdown ist eure gemeinsame Uhr.`,tu_tmp6:`🌅 Ruhige Welle: Wenn die Hälfte sie will, Pause. Alle zeigen den Zehnerbereich ihrer niedrigsten Welle (z. B. 41–50).`,tu_tmp7:`Keine Zahl wird gesagt: nur Reaktionen. Hört auf den Rhythmus der Gruppe.`});
+Object.assign(GI18N.ru.ui,{coop_tmp:`Переход`,n_tmp:`Шторм`,d_tmp:`Молча выпускайте волны по порядку, пока не грянул шторм`,r_tmp:`Кооператив. У каждого тайные волны от 1 до 100. На каждом ударе прибоя все одновременно выбирают: выпустить свою самую низкую волну или удержать. Они должны выходить по возрастанию, и ни одного числа вслух. Слишком рано: −1 ⛵. От 2 до 8.`,tpLv:`Уровень {v}`,tpLeft:`через {v}`,tpSince:`Ударов без волны: {v}`,tpPut:`Выпустить {v}`,tpHold:`Держать`,tpCalm:`Тихая волна`,tpNone:`Твои волны ушли. Подбадривай команду!`,tpX:`Слишком рано! Пена уносит {v}`,tpC:`Тихая волна: каждый показывает свой десяток`,tpW:`Море затаило дыхание…`,tpGo:`Почувствуйте ритм: выпускайте в нужный момент`,tpOk:`Уровень {v} пройден!`,tpStorm:`Шторм ударил: −1 ⛵`,tpSunk:`Кораблекрушение… корпусов не осталось.`,tpWin:`Все волны прошли: шторм укрощён!`,tpBonL:`+1 ⛵ подкрепление`,tpBonC:`+1 🌅 тихая волна`,tpEnd:`Пройдено уровней: {v} из {n}`,tpMute:`Никаких чисел: чат молчит, только реакции`,tu_tmp1:`Каждый тайно получает волны с номерами от 1 до 100.`,tu_tmp2:`На каждом ударе прибоя все выбирают одновременно: 🌊 выпустить самую низкую волну или ⏳ удержать.`,tu_tmp3:`Волны должны выходить по возрастанию. Выпущенные на одном ударе, они сами встают по порядку.`,tu_tmp4:`Слишком рано? Более низкие волны, оставшиеся на руках, уходят в пену: −1 ⛵.`,tu_tmp5:`⛈️ С каждым ударом шторм ближе: пройдите уровень до него. Обратный отсчёт — ваши общие часы.`,tu_tmp6:`🌅 Тихая волна: если половина просит — пауза. Каждый показывает десяток своей самой низкой волны (например 41–50).`,tu_tmp7:`Числа вслух не говорят: только реакции. Слушайте ритм группы.`});
+Object.assign(GI18N.zh.ui,{coop_tmp:`穿越风暴`,n_tmp:`风暴`,d_tmp:`默默地按顺序放出海浪，赶在风暴之前`,r_tmp:`合作游戏。每人手里有 1 到 100 的秘密海浪。每一拍浪涌，所有人同时选择：放出自己最小的海浪，或按住不动。海浪必须从小到大依次出现，全程不能说出任何数字。放早了：−1 ⛵。2 到 8 人。`,tpLv:`第 {v} 关`,tpLeft:`还剩 {v} 拍`,tpSince:`无浪拍数：{v}`,tpPut:`放出 {v}`,tpHold:`按住`,tpCalm:`平静之浪`,tpNone:`你的海浪都放出去了，给大家加油吧！`,tpX:`放早了！浪花卷走了 {v}`,tpC:`平静之浪：每人亮出自己的十位区间`,tpW:`大海屏住了呼吸……`,tpGo:`感受节奏：在对的时刻放出`,tpOk:`第 {v} 关通过！`,tpStorm:`风暴来袭：−1 ⛵`,tpSunk:`沉船了……没有船体了。`,tpWin:`所有海浪都已通过：风暴被驯服了！`,tpBonL:`+1 ⛵ 增援`,tpBonC:`+1 🌅 平静之浪`,tpEnd:`通过关卡：{v} / {n}`,tpMute:`不能说数字：聊天已关闭，只能用表情`,tu_tmp1:`每人秘密拿到编号 1 到 100 的海浪。`,tu_tmp2:`每一拍浪涌，所有人同时选择：🌊 放出最小的海浪，或 ⏳ 按住。`,tu_tmp3:`海浪必须从小到大出现。同一拍放出的海浪会自动排好序。`,tu_tmp4:`放早了？手里更小的海浪会被卷进浪花：−1 ⛵。`,tu_tmp5:`⛈️ 每一拍风暴都更近一步：在它到来前完成本关。倒计时就是你们共同的时钟。`,tu_tmp6:`🌅 平静之浪：一半人请求就暂停，每人亮出自己最小海浪所在的十位区间（如 41–50）。`,tu_tmp7:`不能说任何数字：只能用表情。听听大家的节奏。`});
+Object.assign(GI18N.he.ui,{coop_tmp:`המעבר`,n_tmp:`סערה`,d_tmp:`בשקט, שחררו את הגלים לפי הסדר לפני שהסערה מגיעה`,r_tmp:`שיתופי. לכל אחד גלים סודיים מ-1 עד 100. בכל הכאת גל כולם בוחרים בו-זמנית: לשחרר את הגל הנמוך ביותר שלהם או להחזיק. הגלים חייבים לצאת בסדר עולה, בלי לומר אף מספר. מוקדם מדי: −1 ⛵. 2 עד 8.`,tpLv:`שלב {v}`,tpLeft:`בעוד {v}`,tpSince:`הכאות בלי גל: {v}`,tpPut:`לשחרר {v}`,tpHold:`להחזיק`,tpCalm:`גל שקט`,tpNone:`הגלים שלך יצאו. עודדו את הצוות!`,tpX:`מוקדם מדי! הקצף לוקח את {v}`,tpC:`גל שקט: כל אחד מראה את הטווח שלו`,tpW:`הים עוצר את נשימתו…`,tpGo:`הרגישו את הקצב: שחררו ברגע הנכון`,tpOk:`שלב {v} עבר!`,tpStorm:`הסערה היכתה: −1 ⛵`,tpSunk:`טביעה… לא נשארו ספינות.`,tpWin:`כל הגלים עברו: הסערה אולפה!`,tpBonL:`+1 ⛵ תגבורת`,tpBonC:`+1 🌅 גל שקט`,tpEnd:`שלבים שעברו: {v} מתוך {n}`,tpMute:`בלי מספרים: הצ'אט שותק, רק תגובות`,tu_tmp1:`כל אחד מקבל בסוד גלים ממוספרים מ-1 עד 100.`,tu_tmp2:`בכל הכאת גל כולם בוחרים יחד: 🌊 לשחרר את הגל הנמוך ביותר או ⏳ להחזיק.`,tu_tmp3:`הגלים חייבים לצאת בסדר עולה. גלים ששוחררו באותה הכאה מסתדרים לבד.`,tu_tmp4:`מוקדם מדי? גלים נמוכים יותר שעוד ביד הולכים לקצף: −1 ⛵.`,tu_tmp5:`⛈️ הסערה מתקרבת בכל הכאה: סיימו את השלב לפניה. הספירה לאחור היא השעון המשותף שלכם.`,tu_tmp6:`🌅 גל שקט: אם חצי מבקשים, הפסקה. כל אחד מראה את הטווח של הגל הנמוך ביותר שלו (למשל 41–50).`,tu_tmp7:`לא אומרים מספרים: רק תגובות. הקשיבו לקצב של הקבוצה.`});
+Object.assign(GI18N.pt.ui,{coop_tmp:`A travessia`,n_tmp:`Tempestade`,d_tmp:`Em silêncio, soltem suas ondas em ordem antes da tempestade`,r_tmp:`Cooperativo. Cada um tem ondas secretas de 1 a 100. A cada batida do mar, todos escolhem ao mesmo tempo: soltar sua onda mais baixa ou segurar. Elas devem sair em ordem crescente, sem nunca dizer um número. Cedo demais: −1 ⛵. De 2 a 8.`,tpLv:`Nível {v}`,tpLeft:`em {v}`,tpSince:`Batidas sem onda: {v}`,tpPut:`Soltar {v}`,tpHold:`Segurar`,tpCalm:`Onda calma`,tpNone:`Suas ondas já saíram. Anime a tripulação!`,tpX:`Cedo demais! A espuma leva {v}`,tpC:`Onda calma: cada um mostra sua dezena`,tpW:`O mar prende a respiração…`,tpGo:`Sintam o ritmo: soltem na hora certa`,tpOk:`Nível {v} superado!`,tpStorm:`A tempestade atingiu: −1 ⛵`,tpSunk:`Naufrágio… sem cascos.`,tpWin:`Todas as ondas passaram: tempestade domada!`,tpBonL:`+1 ⛵ de reforço`,tpBonC:`+1 🌅 onda calma`,tpEnd:`Níveis superados: {v} de {n}`,tpMute:`Sem números: o chat se cala, só reações`,tu_tmp1:`Cada um recebe em segredo ondas numeradas de 1 a 100.`,tu_tmp2:`A cada batida do mar, todos escolhem ao mesmo tempo: 🌊 soltar a onda mais baixa ou ⏳ segurar.`,tu_tmp3:`As ondas devem sair em ordem crescente. Soltas na mesma batida, elas se ordenam sozinhas.`,tu_tmp4:`Cedo demais? Ondas mais baixas ainda na mão vão para a espuma: −1 ⛵.`,tu_tmp5:`⛈️ A tempestade se aproxima a cada batida: terminem o nível antes dela. A contagem regressiva é o relógio comum de vocês.`,tu_tmp6:`🌅 Onda calma: se metade pedir, pausa. Cada um mostra a dezena da sua onda mais baixa (ex. 41–50).`,tu_tmp7:`Nenhum número é dito: só reações. Escutem o ritmo do grupo.`});
+/* /⛈️ */
 })();

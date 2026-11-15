@@ -52,7 +52,7 @@
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="i18n.js?v=20261115j"></script>
 <script src="decks.js?v=5"></script>
-<script src="games.js?v=13"></script><!-- @games -->
+<script src="games.js?v=14"></script><!-- @games -->
 <style>
 :root{--sea1:#bdeef0;--sea2:#69c9d3;--deep:#0e5866;--deep2:#0a4652;--paper:#fffaf0;--paper2:#fbf0d9;--edge:#ead6ae;--edge2:#d8bd88;--txt:#3b2a1b;--mut:#8a7660;--acc:#ff8a3d;--acc-d:#d9661f;--acc2:#ffb15c;--ink:#1d8e6c;--sur:#d9661f;--ear:#5869b5;--bad:#d64b3c;--gold:#f2b84b}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -2083,7 +2083,7 @@ function cleanGif(u){try{u=String(u||'').trim();if(!u)return '';const x=new URL(
 /* lien de page Giphy → fichier */
 function normGif(u){const m=String(u||'').trim().match(/^https?:\/\/(?:www\.)?giphy\.com\/(?:gifs|stickers)\/(?:[\w-]*-)?(\w+)\/?$/i);return m?`https://media.giphy.com/media/${m[1]}/giphy.gif`:String(u||'').trim()}
 /* côté hôte : impose l'auteur, limite le débit, nettoie */
-function chatIn(from,m){if(!m||typeof m!='object'||!st)return;const now=Date.now(),r=chatRate[from]=(chatRate[from]||[]).filter(t=>now-t<10000);
+function chatIn(from,m){if(!m||typeof m!='object'||!st)return;if(window.GMute&&GMute(st))return;/* @games : jeu silencieux */const now=Date.now(),r=chatRate[from]=(chatRate[from]||[]).filter(t=>now-t<10000);
  const txt=chTidy(m.txt).slice(0,300),gif=cleanGif(m.gif);if(!txt&&!gif)return;if(r.length>=5)return false;r.push(now);
  const msg={id:String(m.id||'').replace(/\W/g,'').slice(0,24)||rid(),from,txt,gif,ts:now};chatAdd(msg);broadcast({t:'chat',m:msg})}
 /* « en train d'écrire » : des bulles d'air montent, à la couleur de la personne (dans le chat, et depuis le bouton 💬 fermé) */
@@ -2097,7 +2097,7 @@ function typDraw(){const w=$('#chat');if(!w)return;const now=Date.now(),L=Object
  const c=col(L[0]),k=JSON.stringify(L);w.style.setProperty('--tc',c);tab.classList.add('typ');
  if(b._k!==k){b._k=k;b.innerHTML=`<span class="bb">${L.slice(0,3).map((n,i)=>`<i style="--c:${col(n)};animation-delay:${i*.45}s"></i><i style="--c:${col(n)};animation-delay:${i*.45+.9}s"></i>`).join('')}</span><span>${T(L.length>1?'chTypN':'chTyp1',{n:L.map(n=>`<b style="color:${col(n)}">${esc(n)}</b>`).join(', ')})}</span>`}
  b.classList.add('on')}
-function chatSend(txt,gif){const m={id:rid(),txt:chTidy(txt).slice(0,300),gif:cleanGif(gif)};if(!m.txt&&!m.gif)return false;
+function chatSend(txt,gif){if(window.GMute&&GMute(st)){toast(GT('tpMute'));return false}/* @games : jeu silencieux */const m={id:rid(),txt:chTidy(txt).slice(0,300),gif:cleanGif(gif)};if(!m.txt&&!m.gif)return false;
  if(isHost){if(chatIn(me.name,m)===false){toast(T('chSlow'));return false}}else if(hostConn&&hostConn.open)hostConn.send({t:'chat',m});else return false;return true}
 function chatOk(m){return m&&typeof m=='object'&&typeof m.id=='string'&&typeof m.from=='string'&&(m.txt||m.gif)}
 function chatAdd(m){if(!chatOk(m)||chatLog.some(x=>x.id==m.id))return;if(CHT[m.from]){delete CHT[m.from];typDraw()}const prev=chatLog[chatLog.length-1];chatLog.push(m);if(chatLog.length>60)chatLog.shift();
