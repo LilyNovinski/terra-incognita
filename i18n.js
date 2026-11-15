@@ -786,6 +786,10 @@ he:{ownBtn:"להציע שאלה",ownT:"שאלה לקבוצה",ownD:"היא תו�
 pt:{ownBtn:"Sugerir uma pergunta",ownT:"Uma pergunta para o grupo",ownD:"Ela vai aparecer de vez em quando nas próximas partidas, com o seu nome. O tom segue o ajuste da partida.",ownPh:"Sua pergunta…",ownSend:"Adicionar",ownClose:"Fechar",ownOk:"Pergunta adicionada ✓",ownFrom:"✍🏻 Pergunta de {n}"}};
 for(const l in EXT_OWN)if(I18N[l])Object.assign(I18N[l].ui,EXT_OWN[l]);
 
+/* @i18n-typ */
+const EXT_TYP={fr:{chTyp1:"{n} écrit…",chTypN:"{n} écrivent…"},en:{chTyp1:"{n} is writing…",chTypN:"{n} are writing…"},es:{chTyp1:"{n} está escribiendo…",chTypN:"{n} están escribiendo…"},it:{chTyp1:"{n} sta scrivendo…",chTypN:"{n} stanno scrivendo…"},de:{chTyp1:"{n} schreibt…",chTypN:"{n} schreiben…"},ru:{chTyp1:"{n} пишет…",chTypN:"{n} пишут…"},zh:{chTyp1:"{n} 正在输入…",chTypN:"{n} 正在输入…"},he:{chTyp1:"{n} כותב/ת…",chTypN:"{n} כותבים…"},pt:{chTyp1:"{n} está escrevendo…",chTypN:"{n} estão escrevendo…"}};
+for(const l in EXT_TYP)if(I18N[l])Object.assign(I18N[l].ui,EXT_TYP[l]);
+
 /* @i18n-polish */
 const EXT_POL={fr:{timerD:"Le sablier laisse le temps de réfléchir et d'écrire, puis avance tout seul quand on regarde les réponses"},
 en:{timerD:"The hourglass leaves plenty of time to think and write, then moves on by itself while you look at the answers"},
