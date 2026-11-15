@@ -85,7 +85,7 @@ const pick=(names,cur,attr,ex)=>`<div class="gpk">${names.filter(n=>n!=ex).map((
 const norm=w=>String(w||'').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,'').replace(/^(.{4,})[sx]$/,'$1');
 const hideOwn=(o,n)=>{const r={};for(const k in o||{})r[k]=k==n?o[k]:null;return r};
 
-W.GView=function(){const s=st,g=s.game;if(!g||!GAMES[g.id])return{html:''};
+W.GView=function(){const s=isHost?GHide(meN(),st):st,g=s.game;if(!g||!GAMES[g.id])return{html:''};/* l'hôte voit la même chose que les autres */
  if(s.v!==GV.v){GV.v=s.v;GV.t=Date.now()}
  if(s.phase=='gend')return gEndView(s);
  const G=GAMES[g.id],v=G.view(s)||{},two=s.order.length==2;
@@ -95,7 +95,7 @@ W.GView=function(){const s=st,g=s.game;if(!g||!GAMES[g.id])return{html:''};
  ${g.dl?`<div class="gsab" aria-hidden="true"><i style="animation-duration:${g.sec}s;animation-delay:-${Math.max(0,g.sec-rem).toFixed(2)}s"></i></div>`:''}
  ${g.k<=1?`<p class="grule">${GT(rk)}</p>`:''}`;
  const h={...gHint(s),...v};const ob=v.bind;
- return{...h,html:`<div class="gw g-${g.id}">${head}${v.html}</div>`,bind(){
+ return{...h,html:`<div class="gw g-${g.id}${g.k>1?' gnx':''}">${head}${v.html}</div>`,bind(){
   $('#gok')&&($('#gok').onclick=()=>gs({ok:1}));$('#gstop')&&($('#gstop').onclick=()=>ask(GT('stopAsk'),GT('stop')).then(v=>v&&send({t:'gx',v:'stop'})));
   if(GV.fx!==g.id+g.k){GV.fx=g.id+g.k;if(g.rv)try{SFX.reveal()}catch(e){}}
   ob&&ob()}}};
@@ -335,6 +335,107 @@ GAMES.pec={bag:PBAG,icon:'🦪',min:2,max:8,dur:7,tags:['chance'],
    bind(){$$('[data-gd]').forEach(x=>x.onclick=()=>gs({v:x.dataset.gd}));$$('[data-grx]').forEach(x=>x.onclick=()=>send({t:'g',rx:x.dataset.grx}))}}},
  fin(s){const p={};for(const n in s.game.cof)if(n=='~'||s.order.includes(n))p[n]=s.game.cof[n];return{pts:p}}};
 
+/* =====================================================================
+   🏝️ ARCHIPEL — fiche (stratégie pure, zéro hasard)
+   Mer en hexagones, rayon 3 (37 cases ; rayon 2 / 19 cases à 2-3 joueurs). Perles par case, du centre au bord : 3, 2, 2, 1
+     (rayon 2 : 3, 2, 1). Rien n'est tiré au sort et aucun siège n'existe : l'ordre des joueurs n'intervient jamais.
+   Mise en place (60 s, simultanée, secrète) : chacun tape une case du bord = son port (on peut partager un port) et une case
+     de l'anneau juste en dessous = un récif (infranchissable). Le plateau est construit par les joueurs.
+   Boucle : ordres secrets (40 s) → résolution simultanée, animée au début de l'étape suivante. Récolte tous les 4 tours.
+   UN ordre = UNE case tapée (≤ 7 choix, icône sur chaque case) : case voisine → ⛵ naviguer (on peut entrer partout sauf
+     récif) ; sa propre case vide → 🏝️ bâtir ; îlot adverse sous soi → 🌊 le couler, sauf s'il est protégé (bateau de son·sa
+     propriétaire dessus ou à côté) ; son îlot (ou îlot protégé) → 🛡️ rester. Couler demande donc 2 tours visibles (y aller,
+     puis couler) : la victime peut revenir à côté, ou viser la même case (annulation).
+   Conflits : deux ordres (quels qu'ils soient) sur la même case s'annulent tous les deux.
+   Tous les 4 tours : récolte (chaque îlot rapporte ses perles), puis la marée engloutit l'anneau extérieur (îlots et récifs
+     compris ; les bateaux glissent vers la case intérieure libre la plus proche, départage par géométrie, jamais par siège).
+     12 tours (8 à 2-3 joueurs), ≈ 12 min. Rattrapage par la position : le centre vaut plus et dure plus, mais tout le monde y
+     converge. Pas d'élimination : un bateau n'est jamais détruit. Égalité : places partagées.
+   SIM (node .sim/arc.js, 2000 parties/taille, IA prudente / agressive / imitatrice / hasard, mêmes bases, poids différents) :
+     victoires par siège n=2 49/51 · n=4 25.3/24.1/24.5/26.1 · n=8 12.0–13.3 (attendu 12.5) ; parties « miroir » idem.
+     Duels à 2 : prudente-agressive 50/50, prudente-imitatrice 53/47, agressive-imitatrice 55/45, hasard ≤ 1 %.
+     Tables mixtes (victoire relative à 1/n) : prudente ≈150 %, agressive ≈125 %, imitatrice ≈115 %, hasard <10 % :
+     pas de style dominant, et jouer au hasard perd (le skill compte). Versions rejetées : couler depuis une case voisine
+     (l'agressive gagnait 80 % des duels), garde « dessus seulement » (garder = perdre son tour).
+   ===================================================================== */
+const AX=(()=>{const L=[];for(let q=-3;q<=3;q++)for(let r=-3;r<=3;r++){const k=Math.max(Math.abs(q),Math.abs(r),Math.abs(q+r));if(k<=3)L.push([q,r,k])}
+ const an=([q,r])=>{const a=Math.atan2(r*Math.sqrt(3)/2,q+r/2);return a<0?a+2*Math.PI:a};return L.sort((a,b)=>a[2]-b[2]||an(a)-an(b))})();
+const AXI={};AX.forEach(([q,r],i)=>AXI[q+','+r]=i);
+const AN=AX.map(([q,r])=>[[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]].map(([a,b])=>AXI[(q+a)+','+(r+b)]).filter(x=>x!=null).sort((a,b)=>a-b));
+const AVAL={2:[3,2,1],3:[3,2,2,1]},arcV=(g,c)=>AVAL[g.R][AX[c][2]];
+const arcGd=(g,c)=>{const o=g.isl[c],b=o!=null?g.bt[o]:null;return b!=null&&(b===c||AN[c].includes(b))};
+/* cibles légales de p : [[case, type]] — m naviguer, b bâtir, r couler, g rester */
+function arcT(g,p){const b=g.bt[p];if(b==null)return[];const own=g.isl[b],out=[[b,own==null?'b':own==p||arcGd(g,b)?'g':'r']];
+ AN[b].forEach(c=>{if(AX[c][2]<=g.lv&&!g.rf.includes(c))out.push([c,'m'])});return out}
+function arcNear(g,b){const seen=new Set([b]);let fr=[b];
+ while(fr.length){const nx=[];fr.forEach(c=>AN[c].forEach(d=>{if(!seen.has(d)){seen.add(d);nx.push(d)}}));
+  const ok=nx.filter(c=>AX[c][2]<=g.lv&&!g.rf.includes(c));if(ok.length){ok.sort((a,c)=>(g.isl[a]!=null)-(g.isl[c]!=null)||a-c);return ok[0]}fr=nx}return 0}
+GAMES.arc={icon:'🏝️',min:2,max:8,dur:12,tags:['skill'],T:arcT,V:arcV,gd:arcGd,AX,AN,
+ init(s){const g=s.game;g.R=s.order.length<=3?2:3;g.lv=g.R;g.N=4*g.R;g.n=0;g.bt={};g.isl={};g.rf=[];g.o={};g.pp={};g.pf={};g.ev=null;g.hv=[];g.ss={};
+  s.order.forEach(p=>g.ss[p]={b:0,r:0});gWait(g,60,'s')},
+ act(s,from,a){const g=s.game,c=+a.c;if(a.c==null||!(c>=0&&c<AX.length))return;
+  if(g.st=='s'){const k=AX[c][2];if(k==g.R)g.pp[from]=c;else if(k==g.R-1)g.pf[from]=c;else return;
+   if(g.pp[from]!=null&&g.pf[from]!=null)g.done[from]=1;return true}
+  if(g.st=='o'){if(!arcT(g,from).some(t=>t[0]==c))return;g.o[from]=c;g.done[from]=1;return true}},
+ next(s){const g=s.game;
+  if(g.st=='s'){const edge=AX.map((x,i)=>i).filter(i=>AX[i][2]==g.R);
+   s.order.forEach(p=>{g.bt[p]=g.pp[p]!=null?g.pp[p]:edge[Math.floor(Math.random()*edge.length)]});
+   g.rf=[...new Set(Object.values(g.pf).filter(c=>c!=null))];g.ev={set:1,rf:[...g.rf]};g.n=g.N;g.r=0;g.o={};gWait(g,40,'o');return}
+  if(g.st=='o'){this.res(s);g.o={};g.r++;if(g.r%4==0){this.harvest(s);gWait(g,20,'h',1);return}gWait(g,40,'o');return}
+  if(g.st=='h'){if(g.r>=g.n){g.over=1;return}this.tide(g);gWait(g,40,'o')}},
+ res(s){const g=s.game,ord={},cnt={},ev={mv:{},bd:[],rd:[],cx:[],o:{}};
+  s.order.forEach(p=>{const c=g.o[p];if(c==null)return;const t=arcT(g,p).find(x=>x[0]==c);if(!t)return;ord[p]=t;cnt[c]=(cnt[c]||0)+1});
+  for(const p in ord){const [c,k]=ord[p];ev.o[p]=[c,k];if(cnt[c]>1){if(!ev.cx.includes(c))ev.cx.push(c);continue}
+   if(k=='m')ev.mv[p]=[g.bt[p],c];else if(k=='b')ev.bd.push([c,p]);else if(k=='r')ev.rd.push([c,p,g.isl[c]])}
+  for(const p in ev.mv)g.bt[p]=ev.mv[p][1];
+  ev.bd.forEach(([c,p])=>{g.isl[c]=p;g.ss[p]&&g.ss[p].b++});ev.rd.forEach(([c,p])=>{delete g.isl[c];g.ss[p]&&g.ss[p].r++});g.ev=ev},
+ harvest(s){const g=s.game,gain={};s.order.forEach(p=>gain[p]=0);for(const c in g.isl){const p=g.isl[c];if(gain[p]!=null)gain[p]+=arcV(g,+c)}
+  for(const p in gain)g.sc[p]+=gain[p];g.hv.push(gain)},
+ tide(g){const k=g.lv;g.lv--;const sunk=[];for(const c in g.isl)if(AX[c][2]>g.lv){sunk.push([+c,g.isl[c]]);delete g.isl[c]}
+  g.rf=g.rf.filter(c=>AX[c][2]<=g.lv);const mv={};
+  for(const p in g.bt){const b=g.bt[p];if(AX[b][2]<=g.lv)continue;const c=arcNear(g,b);mv[p]=[b,c];g.bt[p]=c}
+  g.ev={mv,bd:[],rd:[],cx:[],o:{},tide:k,sunk}},
+ hide(g,n){return g.st=='o'?{...g,o:hideOwn(g.o,n)}:g.st=='s'?{...g,pp:hideOwn(g.pp,n),pf:hideOwn(g.pf,n)}:g},
+ svg(s,tg,mine){mine=mine||{};const g=s.game,S=10,R=g.R,ev=g.ev||{},m=meN(),r3=Math.sqrt(3);
+  const X=c=>S*r3*(AX[c][0]+AX[c][1]/2),Y=c=>S*1.5*AX[c][1],f=v=>+v.toFixed(2);
+  const hx=(c,k)=>{const x=X(c),y=Y(c);return [0,1,2,3,4,5].map(i=>{const a=Math.PI/180*(60*i-30);return f(x+S*k*Math.cos(a))+','+f(y+S*k*Math.sin(a))}).join(' ')};
+  const cells=AX.map((x,i)=>i).filter(i=>AX[i][2]<=R),W=f(S*r3*(R+.5)+1.5),H=f(S*(1.5*R+1)+1.5);
+  const lbl=(c,t,cl,dy)=>`<text class="${cl}" x="${f(X(c))}" y="${f(Y(c)+(dy||0))}">${t}</text>`;
+  let o=`<svg class="arcb" viewBox="${-W} ${-H} ${2*W} ${2*H}" role="img" aria-label="${esc(GT('n_arc'))}">`;
+  cells.forEach(c=>{const k=AX[c][2],dead=k>g.lv,sk=ev.tide&&k==ev.tide;o+=`<polygon class="h r${R-k}${dead?' dead':''}" points="${hx(c,.96)}"/>`;
+   if(sk)o+=`<polygon class="h r${R-k} sink" points="${hx(c,.96)}"/>`;
+   if(!dead&&g.isl[c]==null&&!g.rf.includes(c))o+=lbl(c,arcV(g,c),'v')});
+  const rock=(c,cl)=>{const x=X(c),y=Y(c);return `<g class="rk ${cl||''}"><circle cx="${f(x-2.4)}" cy="${f(y+1.2)}" r="3.1"/><circle cx="${f(x+2.2)}" cy="${f(y+1.6)}" r="2.5"/><circle cx="${f(x+.2)}" cy="${f(y-1.8)}" r="2.9"/></g>`};
+  g.rf.forEach(c=>o+=rock(c,ev.set?'pop':''));
+  const isl=(c,p,cl)=>`<g class="${cl}"><polygon class="isl" style="fill:${col(p)}" points="${hx(c,.68)}"/>${lbl(c,arcV(g,c),'iv')}</g>`;
+  for(const c in g.isl)o+=isl(+c,g.isl[c],'il'+((ev.bd||[]).some(x=>x[0]==c)?' pop':''));
+  (ev.rd||[]).forEach(([c,p,v])=>o+=isl(c,v,'gone'));(ev.sunk||[]).forEach(([c,p])=>o+=isl(c,p,'gone'));
+  (ev.cx||[]).forEach(c=>o+=lbl(c,'✕','cx',-5));
+  if(mine.pp!=null)o+=`<circle class="bt0" cx="${f(X(mine.pp))}" cy="${f(Y(mine.pp))}" r="3.4" style="fill:${col(m)}"/>`;
+  if(mine.pf!=null)o+=rock(mine.pf,'mf');
+  const at={};s.order.forEach(p=>{const b=g.bt[p];if(b!=null)(at[b]=at[b]||[]).push(p)});
+  for(const b in at){const L=at[b],n=L.length;L.forEach((p,i)=>{const a=n>1?2*Math.PI*i/n-Math.PI/2:0,rr=n>1?(n>4?4.4:3.6):0,x=X(+b)+rr*Math.cos(a),y=Y(+b)+rr*Math.sin(a);
+   const mv=(ev.mv||{})[p],d=mv?` style="--dx:${f(X(mv[0])-X(mv[1]))}px;--dy:${f(Y(mv[0])-Y(mv[1]))}px"`:'';
+   o+=`<g class="bt${mv?' mv':''}${p==m?' me':''}"${d}><circle cx="${f(x)}" cy="${f(y)}" r="${n>4?2.5:3}" style="fill:${col(p)}"/><text x="${f(x)}" y="${f(y)}">${esc(([...p][0]||'').toUpperCase())}</text></g>`})}
+  const gl={m:'⛵',b:'🏝️',r:'🌊',g:'🛡️',p:'⚓',f:'🪨'};
+  (tg||[]).forEach(([c,k])=>{const on=mine.c===c||(k=='p'&&mine.pp===c)||(k=='f'&&mine.pf===c);
+   o+=`<polygon class="tg${on?' on':''}" points="${hx(c,.96)}" data-ac="${c}" role="button" aria-label="${esc(GT('k_'+k))}"/>`+(k=='p'||k=='f'?'':lbl(c,gl[k],'gl'+(on?' on':''),5.2))});
+  return o+'</svg>'},
+ view(s){const g=s.game,m=meN(),play=s.order.includes(m);
+  const nx={};for(const c in g.isl)nx[g.isl[c]]=(nx[g.isl[c]]||0)+arcV(g,+c);
+  const bind=()=>$$('[data-ac]').forEach(x=>x.addEventListener('click',()=>gs({c:+x.dataset.ac})));
+  if(g.st=='s'){const tg=play?AX.map((x,i)=>i).filter(i=>AX[i][2]==g.R||AX[i][2]==g.R-1).map(i=>[i,AX[i][2]==g.R?'p':'f']):[];
+   return{html:`<div class="card c"><p class="arcst">${GT('asetup')}</p>${this.svg(s,tg,{pp:g.pp[m],pf:g.pf[m]})}<p class="arclg mut">⚓ ${GT('k_p')} · 🪨 ${GT('k_f')}</p></div>`,bind}}
+  if(g.st=='h'){const h=g.hv[g.hv.length-1]||{},last=g.r>=g.n;
+   return{html:`<div class="card c"><p class="arcst"><b>🦪 ${GT(last?'afinal':'aharv')}</b></p><div class="arcsc">${s.order.map((p,i)=>`<span class="gchip ga ${p==m?'me':''}" ${dl(i,.2)}>${DT(p)}${esc(p)} <b>+${h[p]||0}</b></span>`).join('')}</div>${this.svg(s)}
+    ${last?'':`<p class="gnote ga" ${dl(3,.3)}>🌊 ${GT('atidec')}</p>`}</div>`,bind(){if((h[m]||0)>0&&!RM())sparkles($('.arcsc .me'),10)}}}
+  const left=4-g.r%4,fin=g.r>=g.n-4,tg=play?arcT(g,m):[],c=g.o[m],k=c!=null&&(tg.find(t=>t[0]==c)||[])[1],ev=g.ev||{};
+  const chips=`<div class="arcsc">${s.order.map(p=>`<span class="gchip ${p==m?'me':''}">${DT(p)}${esc(p)} <b>${g.sc[p]||0}</b>🦪${nx[p]?`<i class="mut">+${nx[p]}</i>`:''}</span>`).join('')}</div>`;
+  return{html:`<div class="card c">${chips}<p class="arcst">${left==1?GT(fin?'afin1':'atide1'):GT(fin?'afin':'atide',{k:left})}${ev.tide?` · <b>${GT('asunk')}</b>`:(ev.cx||[]).length?` · <b class="arccx">✕ ${GT('acx')}</b>`:''}</p>
+   ${this.svg(s,tg,{c})}<p class="arcmy">${!play?'':k?`${GT('amine')} : <b>${GT('k_'+k)}</b>`:GT('apick')}</p><p class="arclg mut">${['m','b','r','g'].map(x=>GT('k_'+x)).join(' · ')}</p></div>`,bind}},
+ endView(s){const g=s.game;return `<div class="arcsc">${s.order.map((p,i)=>`<span class="gchip ga" ${dl(i,.3)}>${DT(p)}${esc(p)} · 🏝️ ${(g.ss[p]||{}).b||0} · 🌊 ${(g.ss[p]||{}).r||0}</span>`).join('')}</div><p class="mut arclg">🏝️ ${GT('abuilt')} · 🌊 ${GT('araid')}</p>`},
+ fin(s){return{pts:s.game.sc}}};
+
 /* ---------- styles (injectés) ---------- */
 if(typeof document!='undefined'){const c=document.createElement('style');c.id='games-css';c.textContent=`
 .gw{--gease:cubic-bezier(.22,1,.36,1)}
@@ -439,8 +540,38 @@ if(typeof document!='undefined'){const c=document.createElement('style');c.id='g
 [data-theme=dark] .gtf{background:#123d33;border-color:#2c7a62}[data-theme=dark] .gtf.f{background:#43291a;border-color:#7a4a2a;color:var(--sur)}
 [data-theme=dark] .gtags i{background:#12403f;color:#8fd6dc}[data-theme=dark] .gtags i.gtg-chance{background:#45321a;color:#ffc27a}[data-theme=dark] .gtags i.gtg-skill{background:#262f5a;color:#b7c1ff}
 [data-theme=dark] .gpl{color:#3b2a1b}
+/* entre deux étapes : l'en-tête et la carte restent, seul le contenu se renouvelle (plus d'écran vide pendant le fondu) */
+section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) both}.still .gw.gnx>.card{animation:none}
+@keyframes gstep{from{opacity:.55}}
+/* 🏝️ Archipel */
+.arcsc{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:0 0 8px}.arcsc .gchip b{font-size:14px}.arcsc .gchip i{font-style:normal;font-size:12px}
+.arcst{font:700 14px Nunito;color:var(--mut);margin:0 0 4px;text-align:center}.arcst b{color:var(--deep)}.arcst .arccx{color:var(--bad)}
+.arcmy{font:700 15px Nunito;margin:6px 0 0;text-align:center;min-height:1.4em}.arclg{font-size:12px;text-align:center;margin:4px 0 0}
+.arcb{display:block;width:100%;max-width:500px;margin:2px auto 0;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;overflow:visible}
+.arcb .h{stroke:var(--paper);stroke-width:.9;stroke-linejoin:round}
+.arcb .r0{fill:#3f9fb2}.arcb .r1{fill:#62b7c5}.arcb .r2{fill:#8fcfd7}.arcb .r3{fill:#b9e4e8}
+.arcb .dead{fill:var(--edge);opacity:.28}
+.arcb .sink{opacity:0;animation:arcsink 1.2s ease both}@keyframes arcsink{from{opacity:1}}
+.arcb text{text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.arcb .v{font:800 4.2px Nunito,sans-serif;fill:#fff;opacity:.75}
+.arcb .isl{stroke:#fff;stroke-width:1;stroke-linejoin:round}
+.arcb .iv{font:900 4.6px Nunito,sans-serif;fill:#fff;paint-order:stroke;stroke:#0005;stroke-width:.6}
+.arcb .rk circle{fill:#56656c;stroke:#2f3b40;stroke-width:.5}.arcb .mf{opacity:.85}
+.arcb .bt circle{stroke:#fff;stroke-width:1}.arcb .bt text{font:900 3.4px Nunito,sans-serif;fill:#fff}
+.arcb .bt.me circle{stroke:var(--txt);stroke-width:1.1}.arcb .bt0{stroke:#fff;stroke-width:1;opacity:.95}
+.arcb .tg{fill:transparent;stroke:var(--acc);stroke-width:1;stroke-dasharray:2.2 1.6;cursor:pointer;transition:fill .15s}
+.arcb .tg:hover{fill:#ff8a3d22}.arcb .tg.on{fill:#ff8a3d40;stroke-dasharray:none;stroke-width:1.5}
+.arcb .gl{font-size:4.6px;opacity:.8}.arcb .gl.on{opacity:1}
+.arcb .cx{font:900 5px Nunito,sans-serif;fill:var(--bad);opacity:.9;transform-box:fill-box;transform-origin:center;animation:arcpop .4s var(--gease) .5s both}
+.arcb .mv{animation:arcmv .75s var(--gease) both}@keyframes arcmv{from{transform:translate(var(--dx),var(--dy))}}
+.arcb .pop{transform-box:fill-box;transform-origin:center;animation:arcpop .45s var(--gease) .45s both}@keyframes arcpop{from{transform:scale(.3);opacity:0}}
+.arcb .gone{opacity:0;transform-box:fill-box;transform-origin:center;animation:arcgone 1s ease .35s both}@keyframes arcgone{from{opacity:1;transform:none}to{opacity:0;transform:scale(.5)}}
+.still .arcb *{animation:none!important}
+[data-theme=dark] .arcb .r0{fill:#2a7f97}[data-theme=dark] .arcb .r1{fill:#21627a}[data-theme=dark] .arcb .r2{fill:#1b4e66}[data-theme=dark] .arcb .r3{fill:#163f55}
+[data-theme=dark] .arcb .v{fill:#bfe6ee;opacity:.7}[data-theme=dark] .arcb .isl{stroke:#e9f6f8}[data-theme=dark] .arcb .rk circle{fill:#8d9ea6;stroke:#53646b}
+[data-theme=dark] .arcb .tg.on{fill:#ff8a3d55}
 @media (max-width:420px){.grow2{flex-direction:column}.gq{font-size:19px}.gseed{font-size:26px}.gbr{grid-template-columns:minmax(0,7em) 1fr 1.6em}.gtf{width:78px}.gcamps{gap:6px}}
-@media (prefers-reduced-motion:reduce){.gw .ga,.gw .gbar,.gfloat,.gev .gbig,.grx{animation:none!important}.gsab i{animation-duration:0s!important;display:none}}
+@media (prefers-reduced-motion:reduce){.gw .ga,.gw .gbar,.gfloat,.gev .gbig,.grx,.arcb *,.gw.gnx>.card{animation:none!important}.gsab i{animation-duration:0s!important;display:none}}
 `;(document.head||document.documentElement).appendChild(c)}
 
 /* =====================================================================
@@ -701,4 +832,72 @@ vag2:`orgasmo|algemas|camisinha|vídeo íntimo|striptease|ménage|bunda|nudismo|
 rad:`Morar num barco~Morar numa casa na árvore|Respirar debaixo d'água~Voar|Ler mentes~Ficar invisível|Sempre calor demais~Sempre frio demais|Uma ilha deserta com um bom livro~Uma cidade lotada com seus amigos|Conhecer o seu futuro~Rever o seu passado|Falar todas as línguas~Falar com os animais|Nunca mais música~Nunca mais filmes|Uma festa surpresa~Um jantar tranquilo|A fama~Uma fortuna secreta|Viajar sem ninguém~Viajar em dez|O mar~A montanha|O nascer do sol~O pôr do sol|Nunca conseguir mentir~Nunca mais ouvir uma mentira|Um golfinho de estimação~Um papagaio que fala|Sempre dizer o que pensa~Guardar tudo para si|Reviver o seu melhor dia~Viver um dia desconhecido|Doce~Salgado|Uma tempestade em alto-mar~Um mês de calmaria|Explorar o fundo do mar~Explorar o espaço|Um superpoder inútil~Nenhum poder|Escrever um livro~Compor uma canção|Dormir sob as estrelas~Dormir num palácio|Um ano sem celular~Um ano sem café|Ficar no leme~Cuidar da cozinha do navio|Uma vida de pirata~Uma vida de sereia|Saber cozinhar tudo~Saber consertar tudo|Chegar sempre cedo~Chegar sempre tarde|Um ano de férias~Um ano de salário dobrado|Se teletransportar~Parar o tempo|Achar um tesouro~Descobrir uma ilha desconhecida|Rir o tempo todo~Nunca chorar|Uma palafita~Um farol isolado|Cantar na frente de todos~Dançar na frente de todos|Mil amigos~Três amigos para a vida|Um verão eterno~Um inverno eterno|Ler todos os livros do mundo~Ver todos os filmes do mundo|Nadar com tubarões~Andar numa corda bamba sobre o mar|Voltar aos 10 anos~Pular para os 80 anos|Uma noite de jogos~Uma noite de karaokê`,
 rad1:`Um primeiro beijo na chuva~Um primeiro beijo no pôr do sol|Uma massagem~Um banho a dois|Lingerie~Nada mesmo|Paquerar~Ser paquerado|Um encontro às cegas~Um encontro com o ex|Palavras doces~Olhares ardentes|Uma noite sob as estrelas a dois~Uma noite num hotel de luxo a dois|Preliminares longas~Direto ao ponto|Luz acesa~Luz apagada|De manhã~À noite|Uma dança lenta bem colada~Uma dança alucinada|Uma mensagem picante~Uma ligação à meia-noite|Uma tatuagem escondida~Um piercing escondido|Parceiro que cozinha~Parceiro que faz massagem|Um beijo no pescoço~Um sussurro no ouvido`,
 rad2:`Sexo no mar~Sexo na praia|Seu vídeo íntimo vazado~Seu histórico da internet vazado|Um ménage~Um clube de swing|Algemas~Uma venda nos olhos|Transar com o ex~Transar com alguém do trabalho|Um ano sem sexo~Um ano sem internet|Sexo silencioso para sempre~Sexo barulhento para sempre|Seus pais leem suas fantasias~Você lê as dos seus pais|Sempre por cima~Sempre por baixo|Sexo num avião~Sexo num elevador|Nunca mais gozar~Gozar a cada espirro|Um nude vazado~Um áudio constrangedor vazado|Transar na primeira noite~Esperar três meses|Uma noite com uma celebridade~Uma noite com seu crush secreto|Brinquedos~Só as mãos`};
+
+/* =====================================================================
+   TEXTES — vague 2 (Archipel…) : ajoutés aux tables ui de chaque langue
+   ===================================================================== */
+const GADD=(l,o)=>Object.assign(GI18N[l].ui,o);
+GADD('fr',{n_arc:`Archipel`,d_arc:`Ordres secrets et simultanés : bâtis tes îlots avant la marée`,
+r_arc:`Chaque tour, en secret : tape une case voisine pour naviguer, ou ta case pour y bâtir un îlot — ou pour couler l'îlot adverse où tu es, sauf si son bateau est dessus ou à côté. Deux ordres sur la même case s'annulent. Tous les 4 tours, chaque îlot rapporte ses perles (plus au centre), puis la marée engloutit le bord.`,
+r_arc2:`Chaque tour, en secret : tape une case voisine pour naviguer, ou ta case pour y bâtir un îlot — ou pour couler l'îlot adverse où tu es, sauf si son bateau est dessus ou à côté. Deux ordres sur la même case s'annulent. Tous les 4 tours, chaque îlot rapporte ses perles (plus au centre), puis la marée engloutit le bord. À deux : petite mer, 8 tours.`,
+asetup:`Tape une case du bord pour ton port ⚓, puis une case de l'anneau intérieur pour ton récif 🪨. Tout le monde choisit en même temps.`,
+k_m:`⛵ Naviguer`,k_b:`🏝️ Bâtir ici`,k_r:`🌊 Couler cet îlot`,k_g:`🛡️ Rester`,k_p:`ton port`,k_f:`ton récif`,
+atide:`Récolte dans {k} tours`,atide1:`Récolte à la fin de ce tour`,afin:`Dernière récolte dans {k} tours`,afin1:`Dernier tour : dernière récolte`,asunk:`la marée a englouti le bord`,acx:`ordres annulés (même case)`,
+amine:`Ton ordre`,apick:`Tape une case entourée`,aharv:`Récolte`,afinal:`Dernière récolte`,atidec:`La marée monte : le bord va être englouti.`,abuilt:`îlots bâtis`,araid:`îlots coulés`});
+GADD('en',{n_arc:`Archipelago`,d_arc:`Secret simultaneous orders: build your islets before the tide`,
+r_arc:`Each turn, in secret: tap a neighbouring hex to sail, or your own hex to build an islet there — or to sink the rival islet you're on, unless its boat is on it or next to it. Two orders on the same hex cancel out. Every 4 turns each islet yields its pearls (more in the centre), then the tide swallows the edge.`,
+r_arc2:`Each turn, in secret: tap a neighbouring hex to sail, or your own hex to build an islet there — or to sink the rival islet you're on, unless its boat is on it or next to it. Two orders on the same hex cancel out. Every 4 turns each islet yields its pearls (more in the centre), then the tide swallows the edge. For two: a smaller sea, 8 turns.`,
+asetup:`Tap an edge hex for your harbour ⚓, then a hex of the inner ring for your reef 🪨. Everyone chooses at the same time.`,
+k_m:`⛵ Sail`,k_b:`🏝️ Build here`,k_r:`🌊 Sink this islet`,k_g:`🛡️ Stay`,k_p:`your harbour`,k_f:`your reef`,
+atide:`Harvest in {k} turns`,atide1:`Harvest at the end of this turn`,afin:`Last harvest in {k} turns`,afin1:`Last turn: final harvest`,asunk:`the tide swallowed the edge`,acx:`orders cancelled (same hex)`,
+amine:`Your order`,apick:`Tap an outlined hex`,aharv:`Harvest`,afinal:`Final harvest`,atidec:`The tide is rising: the edge will be swallowed.`,abuilt:`islets built`,araid:`islets sunk`});
+GADD('es',{n_arc:`Archipiélago`,d_arc:`Órdenes secretas y simultáneas: construye tus islotes antes de la marea`,
+r_arc:`Cada turno, en secreto: toca una casilla vecina para navegar, o la tuya para construir un islote — o para hundir el islote rival donde estás, salvo si su barco está encima o al lado. Dos órdenes sobre la misma casilla se anulan. Cada 4 turnos, cada islote da sus perlas (más en el centro) y luego la marea se traga el borde.`,
+r_arc2:`Cada turno, en secreto: toca una casilla vecina para navegar, o la tuya para construir un islote — o para hundir el islote rival donde estás, salvo si su barco está encima o al lado. Dos órdenes sobre la misma casilla se anulan. Cada 4 turnos, cada islote da sus perlas (más en el centro) y luego la marea se traga el borde. A dos: mar más pequeño, 8 turnos.`,
+asetup:`Toca una casilla del borde para tu puerto ⚓ y luego una del anillo interior para tu arrecife 🪨. Todos eligen a la vez.`,
+k_m:`⛵ Navegar`,k_b:`🏝️ Construir aquí`,k_r:`🌊 Hundir este islote`,k_g:`🛡️ Quedarse`,k_p:`tu puerto`,k_f:`tu arrecife`,
+atide:`Cosecha en {k} turnos`,atide1:`Cosecha al final de este turno`,afin:`Última cosecha en {k} turnos`,afin1:`Último turno: cosecha final`,asunk:`la marea se tragó el borde`,acx:`órdenes anuladas (misma casilla)`,
+amine:`Tu orden`,apick:`Toca una casilla marcada`,aharv:`Cosecha`,afinal:`Cosecha final`,atidec:`Sube la marea: el borde va a desaparecer.`,abuilt:`islotes construidos`,araid:`islotes hundidos`});
+GADD('it',{n_arc:`Arcipelago`,d_arc:`Ordini segreti e simultanei: costruisci i tuoi isolotti prima della marea`,
+r_arc:`A ogni turno, in segreto: tocca una casella vicina per navigare, o la tua per costruirci un isolotto — o per affondare l'isolotto avversario su cui sei, a meno che la sua barca sia sopra o accanto. Due ordini sulla stessa casella si annullano. Ogni 4 turni ogni isolotto rende le sue perle (di più al centro), poi la marea inghiotte il bordo.`,
+r_arc2:`A ogni turno, in segreto: tocca una casella vicina per navigare, o la tua per costruirci un isolotto — o per affondare l'isolotto avversario su cui sei, a meno che la sua barca sia sopra o accanto. Due ordini sulla stessa casella si annullano. Ogni 4 turni ogni isolotto rende le sue perle (di più al centro), poi la marea inghiotte il bordo. In due: mare più piccolo, 8 turni.`,
+asetup:`Tocca una casella del bordo per il tuo porto ⚓, poi una dell'anello interno per il tuo scoglio 🪨. Tutti scelgono insieme.`,
+k_m:`⛵ Naviga`,k_b:`🏝️ Costruisci qui`,k_r:`🌊 Affonda l'isolotto`,k_g:`🛡️ Resta`,k_p:`il tuo porto`,k_f:`il tuo scoglio`,
+atide:`Raccolto tra {k} turni`,atide1:`Raccolto alla fine di questo turno`,afin:`Ultimo raccolto tra {k} turni`,afin1:`Ultimo turno: raccolto finale`,asunk:`la marea ha inghiottito il bordo`,acx:`ordini annullati (stessa casella)`,
+amine:`Il tuo ordine`,apick:`Tocca una casella evidenziata`,aharv:`Raccolto`,afinal:`Raccolto finale`,atidec:`La marea sale: il bordo verrà inghiottito.`,abuilt:`isolotti costruiti`,araid:`isolotti affondati`});
+GADD('de',{n_arc:`Archipel`,d_arc:`Geheime, gleichzeitige Befehle: bau deine Inseln vor der Flut`,
+r_arc:`Jede Runde geheim: tippe ein Nachbarfeld, um zu segeln, oder dein eigenes Feld, um dort eine Insel zu bauen — oder um die fremde Insel zu versenken, auf der du stehst, außer ihr Boot ist darauf oder daneben. Zwei Befehle auf dasselbe Feld heben sich auf. Alle 4 Runden bringt jede Insel ihre Perlen (mehr in der Mitte), dann verschluckt die Flut den Rand.`,
+r_arc2:`Jede Runde geheim: tippe ein Nachbarfeld, um zu segeln, oder dein eigenes Feld, um dort eine Insel zu bauen — oder um die fremde Insel zu versenken, auf der du stehst, außer ihr Boot ist darauf oder daneben. Zwei Befehle auf dasselbe Feld heben sich auf. Alle 4 Runden bringt jede Insel ihre Perlen (mehr in der Mitte), dann verschluckt die Flut den Rand. Zu zweit: kleineres Meer, 8 Runden.`,
+asetup:`Tippe ein Randfeld für deinen Hafen ⚓, dann ein Feld des inneren Rings für dein Riff 🪨. Alle wählen gleichzeitig.`,
+k_m:`⛵ Segeln`,k_b:`🏝️ Hier bauen`,k_r:`🌊 Insel versenken`,k_g:`🛡️ Bleiben`,k_p:`dein Hafen`,k_f:`dein Riff`,
+atide:`Ernte in {k} Runden`,atide1:`Ernte am Ende dieser Runde`,afin:`Letzte Ernte in {k} Runden`,afin1:`Letzte Runde: Schlussernte`,asunk:`die Flut hat den Rand verschluckt`,acx:`Befehle aufgehoben (gleiches Feld)`,
+amine:`Dein Befehl`,apick:`Tippe ein markiertes Feld`,aharv:`Ernte`,afinal:`Schlussernte`,atidec:`Die Flut steigt: der Rand wird verschluckt.`,abuilt:`Inseln gebaut`,araid:`Inseln versenkt`});
+GADD('ru',{n_arc:`Архипелаг`,d_arc:`Тайные одновременные приказы: строй острова до прилива`,
+r_arc:`Каждый ход тайно: нажми соседнюю клетку, чтобы плыть, или свою — чтобы построить там остров или потопить чужой остров, на котором стоишь, если его лодка не на нём и не рядом. Два приказа на одну клетку отменяют друг друга. Каждые 4 хода каждый остров приносит жемчуг (в центре больше), затем прилив поглощает край.`,
+r_arc2:`Каждый ход тайно: нажми соседнюю клетку, чтобы плыть, или свою — чтобы построить там остров или потопить чужой остров, на котором стоишь, если его лодка не на нём и не рядом. Два приказа на одну клетку отменяют друг друга. Каждые 4 хода каждый остров приносит жемчуг (в центре больше), затем прилив поглощает край. Вдвоём: море меньше, 8 ходов.`,
+asetup:`Нажми клетку на краю для своей гавани ⚓, затем клетку внутреннего кольца для рифа 🪨. Все выбирают одновременно.`,
+k_m:`⛵ Плыть`,k_b:`🏝️ Строить здесь`,k_r:`🌊 Потопить остров`,k_g:`🛡️ Остаться`,k_p:`твоя гавань`,k_f:`твой риф`,
+atide:`Сбор через {k} хода`,atide1:`Сбор в конце этого хода`,afin:`Последний сбор через {k} хода`,afin1:`Последний ход: финальный сбор`,asunk:`прилив поглотил край`,acx:`приказы отменены (одна клетка)`,
+amine:`Твой приказ`,apick:`Нажми выделенную клетку`,aharv:`Сбор жемчуга`,afinal:`Финальный сбор`,atidec:`Прилив поднимается: край уйдёт под воду.`,abuilt:`построено островов`,araid:`потоплено островов`});
+GADD('zh',{n_arc:`群岛`,d_arc:`秘密同时下令：在潮水前建起你的小岛`,
+r_arc:`每回合秘密行动：点相邻格航行，或点自己所在格建造小岛——或击沉你所在的对手小岛（除非它的船在岛上或旁边）。两个指令落在同一格会互相抵消。每4回合，每座小岛产出珍珠（越靠中心越多），然后潮水吞没最外圈。`,
+r_arc2:`每回合秘密行动：点相邻格航行，或点自己所在格建造小岛——或击沉你所在的对手小岛（除非它的船在岛上或旁边）。两个指令落在同一格会互相抵消。每4回合，每座小岛产出珍珠（越靠中心越多），然后潮水吞没最外圈。两人时：海域更小，共8回合。`,
+asetup:`点一个边缘格作为你的港口 ⚓，再点内圈的一格放置你的礁石 🪨。所有人同时选择。`,
+k_m:`⛵ 航行`,k_b:`🏝️ 在此建造`,k_r:`🌊 击沉此岛`,k_g:`🛡️ 停留`,k_p:`你的港口`,k_f:`你的礁石`,
+atide:`{k} 回合后收获`,atide1:`本回合结束时收获`,afin:`{k} 回合后最后收获`,afin1:`最后一回合：最终收获`,asunk:`潮水吞没了外圈`,acx:`指令被抵消（同一格）`,
+amine:`你的指令`,apick:`点一个高亮的格子`,aharv:`收获`,afinal:`最终收获`,atidec:`潮水上涨：最外圈将被吞没。`,abuilt:`建造的小岛`,araid:`击沉的小岛`});
+GADD('he',{n_arc:`ארכיפלג`,d_arc:`פקודות סודיות ובו־זמניות: בנו איים לפני הגאות`,
+r_arc:`בכל תור, בסוד: הקישו על משבצת שכנה כדי להפליג, או על המשבצת שלכם כדי לבנות בה אי — או כדי להטביע את האי היריב שאתם עליו, אלא אם הסירה שלו עליו או לידו. שתי פקודות על אותה משבצת מבטלות זו את זו. כל 4 תורות כל אי מניב פנינים (יותר במרכז), ואז הגאות בולעת את השוליים.`,
+r_arc2:`בכל תור, בסוד: הקישו על משבצת שכנה כדי להפליג, או על המשבצת שלכם כדי לבנות בה אי — או כדי להטביע את האי היריב שאתם עליו, אלא אם הסירה שלו עליו או לידו. שתי פקודות על אותה משבצת מבטלות זו את זו. כל 4 תורות כל אי מניב פנינים (יותר במרכז), ואז הגאות בולעת את השוליים. בשניים: ים קטן יותר, 8 תורות.`,
+asetup:`הקישו על משבצת בשוליים לנמל שלכם ⚓, ואז על משבצת בטבעת הפנימית לשונית שלכם 🪨. כולם בוחרים בו־זמנית.`,
+k_m:`⛵ להפליג`,k_b:`🏝️ לבנות כאן`,k_r:`🌊 להטביע את האי`,k_g:`🛡️ להישאר`,k_p:`הנמל שלך`,k_f:`השונית שלך`,
+atide:`קציר בעוד {k} תורות`,atide1:`קציר בסוף התור הזה`,afin:`קציר אחרון בעוד {k} תורות`,afin1:`תור אחרון: קציר אחרון`,asunk:`הגאות בלעה את השוליים`,acx:`פקודות בוטלו (אותה משבצת)`,
+amine:`הפקודה שלך`,apick:`הקישו על משבצת מסומנת`,aharv:`קציר`,afinal:`קציר אחרון`,atidec:`הגאות עולה: השוליים ייבלעו.`,abuilt:`איים שנבנו`,araid:`איים שהוטבעו`});
+GADD('pt',{n_arc:`Arquipélago`,d_arc:`Ordens secretas e simultâneas: construa suas ilhotas antes da maré`,
+r_arc:`A cada turno, em segredo: toque numa casa vizinha para navegar, ou na sua para construir uma ilhota — ou para afundar a ilhota rival onde você está, a menos que o barco dela esteja em cima ou ao lado. Duas ordens na mesma casa se anulam. A cada 4 turnos, cada ilhota rende suas pérolas (mais no centro), e a maré engole a borda.`,
+r_arc2:`A cada turno, em segredo: toque numa casa vizinha para navegar, ou na sua para construir uma ilhota — ou para afundar a ilhota rival onde você está, a menos que o barco dela esteja em cima ou ao lado. Duas ordens na mesma casa se anulam. A cada 4 turnos, cada ilhota rende suas pérolas (mais no centro), e a maré engole a borda. A dois: mar menor, 8 turnos.`,
+asetup:`Toque numa casa da borda para o seu porto ⚓, depois numa casa do anel interno para o seu recife 🪨. Todos escolhem ao mesmo tempo.`,
+k_m:`⛵ Navegar`,k_b:`🏝️ Construir aqui`,k_r:`🌊 Afundar a ilhota`,k_g:`🛡️ Ficar`,k_p:`seu porto`,k_f:`seu recife`,
+atide:`Colheita em {k} turnos`,atide1:`Colheita no fim deste turno`,afin:`Última colheita em {k} turnos`,afin1:`Último turno: colheita final`,asunk:`a maré engoliu a borda`,acx:`ordens anuladas (mesma casa)`,
+amine:`Sua ordem`,apick:`Toque numa casa destacada`,aharv:`Colheita`,afinal:`Colheita final`,atidec:`A maré sobe: a borda vai ser engolida.`,abuilt:`ilhotas construídas`,araid:`ilhotas afundadas`});
 })();
