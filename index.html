@@ -954,6 +954,19 @@ html[data-theme=dark]{color-scheme:dark}
 
 
 
+/* @css-game4 */
+.g4bet{display:flex;align-items:center;gap:6px;margin-top:12px;flex-wrap:wrap}.g4bet .mut{font-size:13px;flex:1;min-width:0}
+.g4bet button{flex:none;width:44px;height:40px;padding:0;font-size:20px;border-radius:12px;opacity:.55;filter:grayscale(.6)}
+.g4bet button.sel{opacity:1;filter:none;outline:2px solid #ff8a3d;outline-offset:1px}
+.g4tag{font-size:15px}.g4tag.win{filter:drop-shadow(0 0 6px #ffd76a)}
+.g4miss{margin-top:8px;font-size:14px;text-align:center}
+.g4f1{font-size:13px;opacity:.75;margin:-4px 0 6px}
+.pin.g4gold path[filter]{stroke:#ffc93c;stroke-width:6}
+.g4ph{text-align:start}.g4pht{font-weight:800;display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.g4pi{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid color-mix(in srgb,currentColor 12%,transparent);opacity:0;animation:g4in .6s ease-out forwards}
+.g4pi b{overflow-wrap:anywhere}.g4pe{font-size:26px;flex:none}
+@keyframes g4in{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.g4pi{animation:none;opacity:1}}
 /* @css-game3 */
 /* fin en étapes */
 .g3steps{display:flex;flex-direction:column;align-items:center;gap:6px;margin:4px 0 -6px}
@@ -1457,7 +1470,7 @@ function pinsFor(list,r){
   else{const [cx,cy,rx,ry]=HOT[r],a=-2.4+i*0.8;x=cx+Math.cos(a)*rx*.62;y=cy+Math.sin(a)*ry*.58}
   const nm=lmName(l),c=PINC[l.kind],lab=l.kind=='sur'&&nm&&L.length<=4?short(nm):'',full=KN(l.kind)+(nm?' · '+nm:'');
   const fs=18*Z,w=[...lab].reduce((s,ch)=>s+(/[\u2e80-\u9fff]/.test(ch)?fs:fs*.56),0)+18*Z;
-  return `<g class="pin k-${l.kind}" data-t="${esc(full)}" role="img" aria-label="${esc(full)}" style="animation-delay:${i*.06}s" opacity="${isOld(l)?.5:1}"><g transform="translate(${x.toFixed(0)} ${(y+14).toFixed(0)}) scale(${Z})"><g class="pm">
+  return `<g class="pin k-${l.kind}${l.gold?' g4gold':''}" data-t="${esc(full)}" role="img" aria-label="${esc(full)}" style="animation-delay:${i*.06}s" opacity="${isOld(l)?.5:1}"><g transform="translate(${x.toFixed(0)} ${(y+14).toFixed(0)}) scale(${Z})"><g class="pm">
    <ellipse cx="0" cy="1" rx="9" ry="3.5" fill="#0a4652" opacity=".28"/>
    <path d="M0,0 C-5,-9 -19,-17 -19,-31 A19,19 0 1 1 19,-31 C19,-17 5,-9 0,0Z" fill="${c}" stroke="#fff" stroke-width="4" stroke-linejoin="round" filter="url(#ps)"/>
    <circle cx="-6" cy="-38" r="5" fill="#fff" opacity=".25"/><g transform="translate(0 -31)">${GLY[l.kind]}</g></g>
@@ -2151,7 +2164,7 @@ function land(mode){const c=st.cur,now=Date.now(),gs=others(c.terr);c.kind=mode;
  else if(mode=='ear')gs.forEach(n=>mapOf(n,c.terr,1).push(c.q.custom?{r:c.r,kind:'ear',name:c.q.q,kw:c.kw||'',date:now}:{r:c.r,kind:'ear',ref:{id:c.q.id},kw:c.kw||'',date:now}));
  else{const rb=gByName(c);for(const n in rb.res)if(P(n))mapOf(n,c.terr,1).push(rb.res[n]?{r:c.r,kind:'ink',...inkMark({...c,guesses:rb.g},n),kw:c.kw||'',date:now}:{r:c.r,kind:'sur',name:c.placeName,kw:c.kw||'',date:now})}
  if(!c.q.custom){st.used[c.terr]=st.used[c.terr]||[];if(!st.used[c.terr].includes(c.q.id))st.used[c.terr].push(c.q.id)}
- gHist(c);g3Land(c);st.phase='landed'}
+ gHist(c);g3Land(c);g4Land(c);st.phase='landed'}
 function loadBestSave(){const k=saveKey(st.order);const cands=[LS.get(k,null)];for(const n in clientSaves)cands.push(clientSaves[n][k]);
  const best=cands.filter(x=>x&&x.maps).sort((a,b)=>b.updatedAt-a.updatedAt)[0];
  /* game2 : chaque partie repart de cartes vierges ; les anciennes restent dans le carnet (log), les questions déjà vues sont évitées */
@@ -2226,11 +2239,11 @@ function gK(c,v,terr){if(myPend.cid!==c.id)myPend={cid:c.id,k:gSlot()};if(terr)m
 function gGuess(c,from,a){const S=gSec(c);let v=a.v;if(typeof v=='string')v=tidy(v).slice(0,140);if(!gValid(c,v))return;
  let k=typeof a.k=='string'&&/^[0-9a-f]{12}$/.test(a.k)&&(!S.kn[a.k]||S.kn[a.k]==from)?a.k:gSlot();
  if(S.k[from]&&S.k[from]!==k)delete S.kn[S.k[from]];
- S.g[from]=v;S.k[from]=k;S.kn[k]=from;c.sent=c.sent||[];if(!c.sent.includes(from))c.sent.push(from);checkAll()}
+ S.g[from]=v;S.k[from]=k;S.kn[k]=from;g4Bet(S,from,a);c.sent=c.sent||[];if(!c.sent.includes(from))c.sent.push(from);checkAll()}
 function gReveal(c,res,S){S.res=res;c.answer=S.ans??null;c.guesses={};c.result={};
  /* game2 : une fois le verdict rendu, l'anonymat tombe : les noms apparaissent à la révélation */
  for(const n of shuf(Object.keys(res))){c.guesses[n]=S.g[n];c.result[n]=res[n]}
- c.anonR=false;c.unveil=!!st.anon;delete c.cards;st.phase='reveal'}
+ c.anonR=false;c.unveil=!!st.anon;delete c.cards;g4Reveal(c,S);st.phase='reveal'}
 function gJudge(c,a){const S=gSec(c),v=a.v||{},gs=others(c.terr),res={},cards=c.cards||[],used=new Set();
  cards.forEach(cd=>{const n=S.kn[cd.k]||cd.n;if(n&&gs.includes(n))used.add(n)});
  const free=gs.filter(x=>!used.has(x));// secret perdu (changement d'hôte) : on répartit sans rien révéler
@@ -2634,12 +2647,12 @@ function vQuestion(){const c=st.cur,terr=c.terr==me.name,key=c.id+':'+me.name;
   if(terr)return {mine:false,hint:T('imagHint'),html:qHead(c)+`<div class="card c"><p class="serif" style="font-size:20px">${T('imagT')}</p><p class="mut" style="margin-top:6px">${T('prepReal')}</p>${progress(c)}</div>${doorBtn}`,bind:bindDoor};
   if(done)return {mine:false,hint:T('predSent'),html:qHead(c)+`<div class="card"><p class="mut">${T('yourPred')}</p><p class="q">${QQ(esc(myPend.cid==c.id&&myPend.g!=null?myPend.g:drafts[key]||''))}</p>${progress(c)}</div>`};
   return {mine:true,hint:T('writeHint',{n:B(c.terr)}),
-   html:qHead(c)+`<div class="card"><label style="margin-top:0">${T('imagine')}</label><textarea data-d="${esc(key)}" maxlength="140" placeholder="${esc(T('predPh'))}"></textarea><p class="err"></p><button class="pri wide" id="ok">${T('send')}</button>${progress(c)}</div>`,
-   bind(){$('#ok').onclick=()=>{const v=(drafts[key]||'').trim();if(!v)return err(T('writeSth'));send({t:'guess',v,k:gK(c,tidy(v).slice(0,140))})}}}}
+   html:qHead(c)+`<div class="card"><label style="margin-top:0">${T('imagine')}</label><textarea data-d="${esc(key)}" maxlength="140" placeholder="${esc(T('predPh'))}"></textarea>${g4BetBar(key)}<p class="err"></p><button class="pri wide" id="ok">${T('send')}</button>${progress(c)}</div>`,
+   bind(){$('#ok').onclick=()=>{const v=(drafts[key]||'').trim();if(!v)return err(T('writeSth'));send({t:'guess',v,b:g4B(key),k:gK(c,tidy(v).slice(0,140))})};g4BindBet(key)}}}
  if(done)return {mine:false,hint:T('sentHint'),html:qHead(c)+`<div class="card c"><p class="serif" style="font-size:20px">${T(terr?'secretKept':'sealed')} ✓</p>${progress(c)}</div>${doorBtn}`,bind:bindDoor};
  return {mine:true,hint:terr?T('secretHint'):T('guessHint',{n:B(c.terr)}),
-  html:qHead(c)+`<div class="card"><p class="mut">${terr?T('yourSecret'):T('whatThink',{n:esc(c.terr)})}</p>${choiceInput(c,key)}<p class="err"></p><button class="pri wide" id="ok">${T(terr?'validate':'seal')}</button>${progress(c)}</div>${doorBtn}`,
-  bind(){bindChoice(c,key);$('#ok').onclick=()=>{const v=drafts[key];if(v==null)return err(T('chooseAns'));send({t:terr?'answer':'guess',v,k:gK(c,v,terr)})};bindDoor()}}}
+  html:qHead(c)+`<div class="card"><p class="mut">${terr?T('yourSecret'):T('whatThink',{n:esc(c.terr)})}</p>${choiceInput(c,key)}${terr?'':g4BetBar(key)}<p class="err"></p><button class="pri wide" id="ok">${T(terr?'validate':'seal')}</button>${progress(c)}</div>${doorBtn}`,
+  bind(){bindChoice(c,key);$('#ok').onclick=()=>{const v=drafts[key];if(v==null)return err(T('chooseAns'));send({t:terr?'answer':'guess',v,b:g4B(key),k:gK(c,v,terr)})};g4BindBet(key);bindDoor()}}}
 
 /* ---------- Jugement (questions libres) ---------- */
 function vJudge(){const c=st.cur,terr=c.terr==me.name,key=c.id+':judge';
@@ -2665,8 +2678,8 @@ function vReveal(){const c=st.cur,dv=driver(c),can=me.name==dv,q=LQ(c.q,c.terr);
  return {mine:can,hint:can?T('contHint'):T('nextBy',{n:B(dv)}),
   hintBtn:can?`<button class="pri" id="go2" style="padding:8px 14px">${T('cont')}</button>`:'',
   html:qHead(c)+`<div class="card">${c.type!='libre'?`<p class="mut c">${T('answered',{n:esc(c.terr)})}</p><div class="big-ans flip"><div>${show(c.answer)}</div></div>`:''}
-  <div class="flip">${Object.entries(c.result).map(([n,ok],i)=>`<div class="guess ${ok?'ok':'no'}" style="animation-delay:${.25+i*.25}s">${gWho(c,n)}${show(c.guesses[n])}</div><span class="verdict" style="color:${ok?'var(--ink)':'var(--sur)'}">${T(ok?'spotOn':'surprise')}</span></div>`).join('')}</div>
-  <p class="mut c" style="margin-top:10px">${anyWrong?T('surpLine',{n:esc(c.terr)}):T('allRight')}</p>${c.unveil?`<p class="gnote c">🎭 ${T('g2Unveil')}</p>`:''}${g3RevealExtra(c)}${g2HeartBtn(c)}${reactBar()}</div>`,
+  <div class="flip">${Object.entries(c.result).map(([n,ok],i)=>`<div class="guess ${ok?'ok':'no'}" style="animation-delay:${.25+i*.25}s">${gWho(c,n)}${show(c.guesses[n])}${g4Tag(c,n)}</div><span class="verdict" style="color:${ok?'var(--ink)':'var(--sur)'}">${T(ok?'spotOn':'surprise')}</span></div>`).join('')}</div>
+  <p class="mut c" style="margin-top:10px">${anyWrong?T('surpLine',{n:esc(c.terr)}):T('allRight')}</p>${c.unveil?`<p class="gnote c">🎭 ${T('g2Unveil')}</p>`:''}${g4Miss(c)}${g3RevealExtra(c)}${g2HeartBtn(c)}${reactBar()}</div>`,
   bind(){$('#go2')&&($('#go2').onclick=()=>send({t:'toName'}))}}}
 
 /* ---------- Nommer ---------- */
@@ -2697,14 +2710,14 @@ function vEnd(){const mine=st.flags[me.name],os=others(me.name);if(!os.includes(
  return {mine:!mine,hint:mine?T('waitFlags',{list:waiting.map(esc).join(', ')}):T('endHint'),
   html:`${g3Steps('end')}<div class="banner"><p class="serif">${T('exchange')}</p><p class="mut" style="margin-top:6px">${T(mine?'exchangeD':'g3EndD')}</p></div>
   ${mine?`<div class="card c"><p class="serif" style="font-size:20px">${T('flagsDone')}</p></div>`:
-  `<div class="card"><h3>${T('plant')}</h3>
+  `<div class="card"><h3>${T('plant')}</h3><p class="g4f1">${T('g4FlagOpt')}</p>
   ${os.map(n=>`<div class="g3pp"><p class="g3pph">${DOT(n)} <b>${esc(n)}</b></p>${g3Mine(n)}<label>${T('g3FlagL',{n:esc(n)})}</label><textarea data-d="flag:${esc(n)}" maxlength="240" style="min-height:64px" placeholder="${esc(T('plantD'))}"></textarea><p class="g2lock">${T(st.anon?'g2LockA':'g2Lock',{n:NS(n)})}</p></div>`).join('')}
   <p class="err"></p><button class="pri wide" id="ok">${T('plantBtn')}</button></div>`}
   <h3 class="gh c">${T('g3MyIsl')}</h3>
   <div class="tabs" style="justify-content:center">${os.map(n=>`<button data-et="${esc(n)}" class="${o==n?'sel':''}">${DOT(n)}${T('seenBy',{n:esc(n)})}</button>`).join('')}</div>
   <div class="card g2end"><div class="map">${svgMap(o,me.name)}</div><div style="margin-top:10px">${lmList(mapOf(o,me.name))}</div></div>`,
   bind(){$$('[data-et]').forEach(b=>b.onclick=()=>{ui.endTab=b.dataset.et;render()});
-   $('#ok')&&($('#ok').onclick=()=>{const v={};for(const n of os){const x=(drafts['flag:'+n]||'').trim();if(!x)return err(T('flagEach'));v[n]=x.slice(0,240)}send({t:'flags',v})})}}}
+   $('#ok')&&($('#ok').onclick=()=>{const v={};for(const n of os){const x=(drafts['flag:'+n]||'').trim();if(x)v[n]=x.slice(0,240)}if(!Object.keys(v).length)return err(T('g4Flag1'));send({t:'flags',v})})}}}
 
 /* ---------- Carnet ---------- */
 function constellation(){const n=st.order.length,W=400,H=n>2?260:150,cx=200,cy=H/2,rad=n>2?95:120;
@@ -2789,7 +2802,7 @@ function gSaveTxt(e){const txt=gRecapText(e);
 function gBindRecap(id,e,re){$$('[data-rt]').forEach(b=>b.onclick=()=>{ui[id+'Tab']=b.dataset.rt;re()});$('#gsave')&&($('#gsave').onclick=()=>gSaveTxt(e))}
 function vRecap(){const e=st.log.at(-1)||{players:st.order,hist:st.hist||[],flags:{}},host=me.name==st.host;
  return {mine:host,hint:host?T('recapHint'):T('recapWait',{n:B(st.host)}),hintBtn:host?`<button class="pri" id="go2" style="padding:8px 14px">${T('toLog')}</button>`:'',
-  html:`${g3Steps('recap')}<div class="banner"><p class="serif">${T('recapT')}</p><p class="mut" style="margin-top:6px">${T('recapD')}</p></div>${gRecapBody(e,'rc')}<button class="wide" id="gsave">💾 ${T('saveTxt')}</button>`,
+  html:`${g3Steps('recap')}<div class="banner"><p class="serif">${T('recapT')}</p><p class="mut" style="margin-top:6px">${T('recapD')}</p></div>${g4Phare(e)}${gRecapBody(e,'rc')}<button class="wide" id="gsave">💾 ${T('saveTxt')}</button>`,
   bind(){gBindRecap('rc',e,render);$('#go2')&&($('#go2').onclick=()=>send({t:'recapDone'}))}}}
 function gReview(i){const e=st&&st.log[i];if(!e)return;
  $('#modal').innerHTML=`<div class="modal"><div class="card grev"><p class="serif c" style="font-size:21px">${T('recapT')}</p>${gRecapBody(e,'rv')}${g2OldMap(e)}<div class="row"><button class="ghost" id="rvx">${T('cont')}</button><button id="gsave">💾 ${T('saveTxt')}</button></div></div></div>`;
@@ -2800,6 +2813,36 @@ function vPfiche(){const L=st.L||st.length,sub=st.order[Math.floor((st.turn-1)/L
   <div class="card grc">${H.length?`<ul class="gfacts">${H.map(h=>`<li>${regionBadge(h.r,26)}<div><span class="mut">${esc(gQ(h))}</span><br>${esc(h.placeName?'✨ '+h.placeName:gA(h)||'·')}</div></li>`).join('')}</ul>`:`<p class="mut c">${T('pfEmpty')}</p>`}${reactBar()}</div>`,
   bind(){$('#go2')&&($('#go2').onclick=()=>send({t:'pfDone'}))}}}
 
+/* === game4 : mise de conviction 🤔/🙂/🔥, encre dorée, fin « Phare » === */
+const G4E=['🤔','🙂','🔥'];
+const g4B=key=>{const b=drafts[key+':b'];return b==null?1:b};
+const g4BetBar=key=>{const b=g4B(key);return `<div class="g4bet" role="radiogroup" aria-label="${esc(T('g4BetT'))}"><span class="mut">${T('g4BetT')}</span>${G4E.map((e,i)=>`<button type="button" role="radio" aria-checked="${b==i}" data-g4b="${i}" class="${b==i?'sel':''}" data-tip="${esc(T('g4B'+i))}" aria-label="${esc(T('g4B'+i))}">${e}</button>`).join('')}</div>`};
+function g4BindBet(key){$$('[data-g4b]').forEach(x=>x.onclick=()=>{drafts[key+':b']=+x.dataset.g4b;$$('[data-g4b]').forEach(y=>{const on=y==x;y.classList.toggle('sel',on);y.setAttribute('aria-checked',on)})})}
+/* hôte : la mise reste dans le secret (SEC), comme la réponse */
+function g4Bet(S,from,a){S.b=S.b||{};if([0,1,2].includes(a.b))S.b[from]=a.b;else if(S.b[from]==null)S.b[from]=1}
+function g4Reveal(c,S){c.bet={};for(const n in c.result)if(S.b&&S.b[n]!=null)c.bet[n]=S.b[n]}
+function g4Land(c){const h=st.hist&&st.hist.at(-1),b=c.bet||{};if(!h||!(c.kind=='ink'||c.kind=='named'))return;
+ h.fi=(h.ok||[]).filter(n=>b[n]==2);h.fx=(h.ko||[]).filter(n=>b[n]==2);
+ for(const n of h.fi){const l=mapOf(n,c.terr).at(-1);if(l&&l.r==c.r&&l.kind=='ink')l.gold=1}}
+const g4Tag=(c,n)=>{const b=(c.bet||{})[n];return b==null||b==1?'':` <span class="g4tag${b==2&&c.result[n]?' win':''}">${G4E[b]}</span>`};
+function g4Miss(c){const x=Object.keys(c.bet||{}).filter(n=>c.bet[n]==2&&!c.result[n]);if(!x.length)return '';
+ return `<p class="g4miss">🔥 ${T('g4Miss',{n:x.map(B).join(', '),o:B(c.terr)})}</p>`}
+/* effet doré local, une fois par révélation */
+let G4FX=null,G4PA={};
+function g4After(){const c=st.cur;if(st.phase!='reveal'||!c||G4FX===c.id)return;G4FX=c.id;
+ const w=Object.keys(c.bet||{}).filter(n=>c.bet[n]==2&&c.result[n]);if(!w.length)return;
+ setTimeout(()=>{fxGold(w[0],'🔥');fxBanner(T('g4Gold',{n:w.join(', ')}),true)},900)}
+/* fin « Phare » : trois distinctions calculées sur l'historique */
+function g4Phare(e){const H=(e.hist||[]).filter(h=>h.kind!='door'),ppl=e.players||[];if(!H.length)return '';const out=[];
+ const top=f=>{let b=null,m=0;for(const n of ppl){const v=f(n);if(v>m){m=v;b=n}}return b?[b,m]:null};
+ const mm=H.filter(h=>h.mm!=null);
+ if(ppl.length==2&&mm.length)out.push(['🪞',T('g4Mir'),Math.round(100*mm.filter(h=>h.mm).length/mm.length)+' %']);
+ else{const r=top(n=>H.reduce((a,h)=>a+((h.ok||[]).includes(n)?1:0),0));if(r)out.push(['🔭',T('g4Read'),B(r[0])+` <span class="mut">· ${r[1]} ✓</span>`])}
+ const s=top(n=>H.filter(h=>h.terr==n).reduce((a,h)=>a+gN(h.ko),0));if(s)out.push(['🌋',T('g4Surp'),B(s[0])+` <span class="mut">· ${s[1]} ✨</span>`]);
+ const lk=H.filter(h=>gN(h.lk)).sort((a,b)=>gN(b.lk)-gN(a.lk))[0];
+ if(lk)out.push(['❤️',T('g4Love'),`${esc(lk.placeName||gA(lk)||gQ(lk))} <span class="mut">· ${esc(lk.terr)} · ❤️ ${gN(lk.lk)}</span>`]);
+ if(!out.length)return '';const g=e.gid||e.date,el=(Date.now()-(G4PA[g]=G4PA[g]||Date.now()))/1000;
+ return `<div class="card g4ph"><p class="g4pht">${LIGHT} ${T('g4Phare')}</p>${out.map(([i,t,v],k)=>`<div class="g4pi" style="animation-delay:${(.3+k*.9-el).toFixed(2)}s"><span class="g4pe" aria-hidden="true">${i}</span><div><span class="mut">${t}</span><br><b>${v}</b></div></div>`).join('')}</div>`}
 /* === game3 : notes de voyage, événements, « ça a changé ? », duo (complicité, qui de nous), fin en 3 étapes ===
    - Notes : juste après chaque atterrissage, chaque personne (sauf l'île explorée) écrit en une ligne ce qu'elle retient. La note est épinglée sur sa carte
      (lmList), scellée pour la personne concernée jusqu'au bilan, où elle reçoit le recueil ; chacun retrouve SES notes, rangées par personne.
@@ -2841,7 +2884,7 @@ function g3Act(from,a){const s=st;
 /* sablier : quand tout le monde a noté (et voté), l'atterrissage se termine vite */
 function g3Hurry(){const s=st,c=s.cur;if(s.phase!='landed'||!c||!s.dl)return;const h=g3H(c.id);if(h&&g3Done(h)&&g3WoDone(c))s.dl=Math.min(s.dl,Date.now()+4000)}
 /* complicité (duo) : ne fait que monter */
-function g3Cx(H){let p=0;for(const h of H||[]){if(h.kind=='door')continue;let x=gN(h.ok)*2+(h.kind=='named'?1:0)+(h.kind=='ear'?2:0)+gN(h.lk)+Object.values(h.nt||{}).filter(Boolean).length+(h.mm?3:0);
+function g3Cx(H){let p=0;for(const h of H||[]){if(h.kind=='door')continue;let x=gN(h.ok)*2+(h.kind=='named'?1:0)+(h.kind=='ear'?2:0)+gN(h.lk)+Object.values(h.nt||{}).filter(Boolean).length+(h.mm?3:0)+gN(h.fi)*2;
   const w=h.wo&&h.wo.v&&Object.values(h.wo.v);if(w&&w.length==2&&w[0]==w[1])x+=2;if(h.ev=='rainbow')x*=2;p+=x}return p}
 function g3Lv(p){let i=0;while(i<G3LV.length-1&&p>=G3LV[i+1])i++;const N=T('cxL').split('|'),a=G3LV[i],b=G3LV[i+1];return {i,name:N[i]||'',f:b?(p-a)/(b-a):1}}
 /* ---- vues ---- */
@@ -2932,7 +2975,7 @@ function g3CxBar(){let el=$('#g3cx');const tb=$('#tb'),show=tb&&st.order&&st.ord
  if(p>G3CX.v){const f=document.createElement('span');f.className='g3plus';f.textContent='+'+(p-G3CX.v);el.appendChild(f);setTimeout(()=>f.remove(),1700);el.classList.remove('up');void el.offsetWidth;el.classList.add('up');
   if(L.i>G3CX.l){setTimeout(()=>{toast('🔗 '+T('cxUp',{l:L.name}));confetti(36);tone([[523,0],[659,.1],[784,.2],[1046,.3,.6]])},500)}}
  G3CX.v=p;G3CX.l=L.i}
-function g3After(){const c=st.cur,ph=st.phase,prev=G3P;G3P=ph=='landed'&&c?c.id:null;
+function g3After(){g4After();const c=st.cur,ph=st.phase,prev=G3P;G3P=ph=='landed'&&c?c.id:null;
  $$('[data-g3a]').forEach(e=>{const k=e.dataset.g3a;if(G3AN.has(k))e.classList.add('g3q');else G3AN.add(k)});
  /* une note commencée mais pas épinglée part toute seule quand on quitte l'atterrissage */
  if(prev&&prev!==G3P){const k='note:'+prev,v=(drafts[k]||'').trim(),h=g3H(prev);
