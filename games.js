@@ -586,6 +586,106 @@ GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,ties:true,MK
  fin(s){return{pts:s.game.sc}}};
 
 /* =====================================================================
+   🧭 LA CHAÎNE DES PHARES — fiche (rôles cachés, 4-8 joueurs, sans élimination ni nuit)
+   Rôles secrets : 1 Naufrageur (4-5 joueurs) ou 2 (6-8, ils se connaissent) ; les autres sont gardiens de phare.
+   Vague : un capitaine (tour à tour, départ tiré au sort) reçoit le bon chenal parmi 4 (🐚⭐🌙🐋). Il le transmet EN
+     PRIVÉ à qui il veut, qui le relaie à son tour (2 relais à 4-7 joueurs, 3 à 8) ; le dernier guide le navire.
+     Chaque relais choisit le chenal qu'il transmet : un Naufrageur peut le changer… ou pas, pour rester crédible.
+     35 s par relais (sans choix : il transmet ce qu'il a reçu, à quelqu'un au hasard).
+   Public : la route (qui a relayé, dans quel ordre), le bon chenal et celui pris par le navire (arrivé ou coulé).
+     Privé : ce que chacun a reçu/transmis. On débat dans le chat (affirmations invérifiables).
+   ⛓️ Entre deux vagues, vote (45 s) : la majorité absolue des joueurs en ligne met un suspect aux fers (ou l'en libère
+     en votant « personne ») ; il joue toujours, mais ce qu'il reçoit et transmet devient public.
+   Fin : 6 vagues (4-5 joueurs) ou 7 (6-8), ou dès que l'issue est jouée. Les Naufrageurs gagnent à 2 navires coulés (4-5 joueurs) ou 3 (6-8).
+     Puis accusation secrète (60 s, autant de noms que de Naufrageurs). Points : équipage gagnant +4 chacun,
+     Naufrageurs gagnants +6 chacun, et chaque gardien +2 par Naufrageur bien accusé.
+   SIM (.sim/chn.js, hors site, 1500 parties/cas ; gardiens « prudents » = inférence bayésienne sur leurs propres relais et
+     ceux du joueur aux fers, évitent les suspects, votent et accusent les plus probables ; « hasard » ; Naufrageurs agressif /
+     malin (ne brouille pas après un complice, se calme s'il est trop suspect) / timide (1 fois sur 2)) : sièges ±6 % (bruit).
+     Victoire des Naufrageurs n=4→8, contre gardiens prudents : malin 37/30/56/38/47 %, agressif 39/35/74/43/39 %,
+     timide 32/23/34/23/30 % ; moitié prudents moitié hasard : 75/52/77/61/80 % ; tout hasard : 83–94 %.
+     Gardiens prudents : 63–92 % d'accusations justes. Rejetés : 3 coulés à 4-5 joueurs (0–10 %), 3 relais à 6-7 (82 % / 66 %).
+   ===================================================================== */
+const CHI=['🐚','⭐','🌙','🐋'];
+GAMES.chn={icon:'🧭',min:4,max:8,dur:20,tags:['social'],CHI,NF:n=>n<=5?1:2,RL:n=>n<=7?2:3,WV:n=>n<=5?6:7,TH:n=>n<=5?2:3,CW:4,NW:6,AC:2,
+ init(s){const g=s.game,o=s.order;g.nf=shuf(o).slice(0,this.NF(o.length));g.K=g.nf.length;g.n=this.WV(o.length);g.th=this.TH(o.length);
+  g.r=0;g.sk=0;g.ok=0;g.irn=null;g.h=[];g.pv={};o.forEach(p=>g.pv[p]=[]);g.c0=Math.floor(Math.random()*o.length);g.lv=null;this.wave(s)},
+ wave(s){const g=s.game,o=s.order,on=gOn(s);let cap=o[(g.c0+g.r)%o.length];
+  for(let i=0;i<o.length&&!on.includes(cap);i++)cap=o[(g.c0+g.r+i)%o.length];
+  g.route=[cap];g.tr=Math.floor(Math.random()*4);g.rc={[cap]:g.tr};g.ps={};g.hold=cap;g.nx=null;this.turn(s)},
+ elig(s){const g=s.game;return gOn(s).filter(p=>!g.route.includes(p))},
+ pilot(s){return s.game.route.length>=this.RL(s.order.length)+1||!this.elig(s).length},
+ turn(s){const g=s.game;gWait(g,35,'p');g.need=[g.hold]},
+ act(s,from,a){const g=s.game;
+  if(g.st=='p'&&from==g.hold&&[0,1,2,3].includes(a.c)){const pl=this.pilot(s);if(!pl&&!this.elig(s).includes(a.to))return;g.ps[from]=a.c;g.nx=pl?null:a.to;g.done[from]=1;return true}
+  if(g.st=='v'&&(a.v===''||(s.order.includes(a.v)&&a.v!=from))){g.vt[from]=a.v;g.done[from]=1;return true}
+  if(g.st=='a'&&Array.isArray(a.v)){g.acc[from]=[...new Set(a.v)].filter(p=>s.order.includes(p)&&p!=from).slice(0,g.K);g.done[from]=1;return true}},
+ next(s){const g=s.game;
+  if(g.st=='p'){const h=g.hold;if(g.ps[h]==null)g.ps[h]=g.rc[h];
+   if(!this.pilot(s)){const E=this.elig(s);if(!E.includes(g.nx))g.nx=E[Math.floor(Math.random()*E.length)];
+    const nx=g.nx;g.route.push(nx);g.rc[nx]=g.ps[h];g.hold=nx;g.nx=null;return this.turn(s)}
+   return this.land(s)}
+  if(g.st=='v'){this.irons(s);g.r++;return this.wave(s)}
+  if(g.st=='a'){this.score(s);g.over=1}},
+ land(s){const g=s.game,f=g.ps[g.hold],ok=f===g.tr,ir=g.irn&&g.route.includes(g.irn)?g.irn:null;
+  if(ok)g.ok++;else g.sk++;
+  g.h.push({route:[...g.route],tr:g.tr,f,ok,ir,ip:ir?[g.rc[ir],g.ps[ir]]:null,all:g.route.map(p=>[g.rc[p],g.ps[p]])});
+  g.route.forEach(p=>g.pv[p].push([g.r,g.rc[p],g.ps[p]]));g.hold=null;
+  const left=g.n-g.r-1;if(g.sk>=g.th||g.sk+left<g.th||left<=0){g.acc={};g.n=g.r+1;gWait(g,60,'a')}else{g.vt={};gWait(g,45,'v')}},
+ /* majorité absolue des joueurs en ligne : fers à ce joueur (ou libération si « personne ») ; sinon rien ne change */
+ irons(s){const g=s.game,c={},need=Math.floor(gOn(s).length/2)+1;for(const p in g.vt){const v=g.vt[p]??'';c[v]=(c[v]||0)+1}
+  const top=Object.entries(c).sort((a,b)=>b[1]-a[1])[0];if(top&&top[1]>=need)g.irn=top[0]||null;g.lv={c,irn:g.irn}},
+ score(s){const g=s.game,nw=g.sk>=g.th;g.win=nw?'n':'c';g.ac={};
+  s.order.forEach(p=>{let v=0;if(g.nf.includes(p)){if(nw)v=this.NW}else{const a=(g.acc[p]||[]).filter(x=>g.nf.includes(x)).length;g.ac[p]=a;v=(nw?0:this.CW)+this.AC*a}g.sc[p]+=v})},
+ hide(g,n,s){const o={...g},vis=p=>p==n||p==g.irn;o.nf=g.nf.includes(n)?g.nf:null;delete o.tr;
+  o.rc={};o.ps={};for(const p in g.rc)if(vis(p))o.rc[p]=g.rc[p];for(const p in g.ps)if(vis(p))o.ps[p]=g.ps[p];
+  if(n!=g.hold)delete o.nx;o.h=g.h.map(w=>({...w,all:null}));o.pv={[n]:g.pv[n]};
+  if(g.vt)o.vt=hideOwn(g.vt,n);if(g.acc)o.acc=hideOwn(g.acc,n);delete o.ac;delete o.win;return o},
+ ch(i,cl){return i==null?'<span class="chc q">?</span>':`<span class="chc ${cl||''}">${CHI[i]}</span>`},
+ /* route : capitaine 🧭 puis gardiens 🗼 ; kn(p,i) = [reçu, transmis] connus de moi (moi, ou le joueur aux fers) */
+ chain(route,hold,kn){const R=this,m=meN();return `<div class="chrt">${route.map((p,i)=>{const k=kn(p,i);
+  return `${i?'<i class="charr" aria-hidden="true">➜</i>':''}<span class="chn ga ${p==hold?'on':''} ${p==m?'me':''}" ${dl(i)}>${DT(p)}<b>${p==m?esc(GT('me')):esc(p)}</b>${k?`<span class="chk">${R.ch(k[0])}<i>›</i>${R.ch(k[1],k[1]!=null&&k[0]!=k[1]?'x':'')}</span>`:''}</span>`}).join('')}</div>`},
+ log(g,m){const R=this,mine={};((g.pv||{})[m]||[]).forEach(([w,a,b])=>mine[w]=[a,b]);
+  return g.h.length?`<details class="chlog"><summary>📜 ${GT('chLog')} (${g.h.length})</summary>${g.h.map((w,i)=>`<div class="chlr"><b>${w.ok?'⛵':'💥'} ${i+1}</b> ${w.route.map((p,j)=>esc(p)+(mine[i]&&p==m?` ${R.ch(mine[i][0])}›${R.ch(mine[i][1])}`:w.ir==p&&w.ip?` ⛓️${R.ch(w.ip[0])}›${R.ch(w.ip[1],w.ip[0]!=w.ip[1]?'x':'')}`:'')).join(' <i class="charr">➜</i> ')}</div>`).join('')}</details>`:''},
+ view(s){const g=s.game,m=meN(),R=GAMES.chn,N=!!(g.nf&&g.nf.includes(m));
+  const hd=`<div class="chhd"><span class="chrole ga ${N?'n':''}">${N?'🏴‍☠️ '+GT('chN'):'🗼 '+GT('chC')}${N&&g.nf.length>1?' · '+g.nf.filter(p=>p!=m).map(B).join(', '):''}</span>
+   <span class="chsk ga" ${dl(1)} title="${esc(GT('chSkT',{v:g.th}))}">💥 ${g.sk}/${g.th} · ⛵ ${g.ok}</span>${g.irn?`<span class="chir ga" ${dl(2)}>⛓️ ${B(g.irn)}</span>`:''}</div>`;
+  const kn=(rc,ps)=>p=>p in rc||p in ps?[rc[p],ps[p]]:null;
+  if(g.st=='p'){const me=m==g.hold,cap=g.route[0]==m;
+   if(!me)return{html:`<div class="card c">${hd}${R.chain(g.route,g.hold,kn(g.rc,g.ps))}<p class="gnote ga" ${dl(2)}>${GT(g.route.length==1?'chWaitC':'chWait',{n:B(g.hold)})}</p>${g.lv&&g.route.length==1?R.lvote(g):''}${R.log(g,m)}</div>`};
+   const pl=R.pilot(s),E=pl?[]:R.elig(s),rc=g.rc[m],K='ch'+g.k;if(R.sk!==K){R.sk=K;R.sc=rc;R.st=null}
+   const ready=R.sc!=null&&(pl||E.includes(R.st));
+   return{html:`<div class="card c">${hd}${R.chain(g.route,g.hold,kn(g.rc,g.ps))}<p class="gq2 ga">${GT(cap?'chCap':'chGot')} ${R.ch(rc,'big')}</p>
+    ${N?`<p class="chtip ga" ${dl(1)}>🏴‍☠️ ${GT('chNtip')}</p>`:''}<p class="gsub">${GT(pl?'chPilot':'chPass')}</p>
+    <div class="gpk chpk">${CHI.map((x,i)=>`<button class="ga chb ${R.sc==i?'sel':''}" ${dl(i,.2)} data-chc="${i}" aria-pressed="${R.sc==i}">${x}</button>`).join('')}</div>
+    ${pl?'':`<p class="gsub">${GT('chTo')}</p>${pick(E,R.st,'data-cht',m)}`}<button class="pri wide" id="gsend" ${ready?'':'disabled'}>${GT(pl?'chSail':'send')}</button></div>`,
+    bind(){$$('[data-chc]').forEach(b=>b.onclick=()=>{R.sc=+b.dataset.chc;render()});$$('[data-cht]').forEach(b=>b.onclick=()=>{R.st=b.dataset.cht;render()});
+     $('#gsend').onclick=()=>{if(R.sc==null)return;gs(pl?{c:R.sc}:{c:R.sc,to:R.st})}}}}
+  const w=g.h[g.h.length-1]||{route:[]},mine=((g.pv||{})[m]||[]).find(x=>x[0]==g.h.length-1),
+   wk=p=>p==m&&mine?[mine[1],mine[2]]:p==w.ir&&w.ip?w.ip:null;
+  const res=`<div class="chres ${w.ok?'ok':'ko'}"><div class="chsea" aria-hidden="true"><span class="chship ${w.ok?'ok':'ko'}">⛵</span>${w.ok?'':'<span class="chboom">💥</span>'}</div>
+   <p class="gbig2 ga ${w.ok?'ok':''}" ${dl(1,.6)}>${GT(w.ok?'chOk':'chKo')}</p><p class="mut ga" ${dl(2,.6)}>${GT('chTr')} ${R.ch(w.tr)} · ${GT('chF')} ${R.ch(w.f,w.ok?'':'x')}</p></div>`;
+  const body=`${hd}${res}${R.chain(w.route,null,wk)}`;
+  if(g.st=='v'){const v=g.vt[m];
+   return{html:`<div class="card c">${body}<p class="gq2">⛓️ ${GT('chVote')}</p><p class="gsub">${GT('chVoteD')}</p>${pick(s.order,v,'data-chv',m)}
+    <button class="ghost wide chno ${v===''?'sel':''}" data-chv="">${GT(g.irn?'chFree':'chNone')}</button>${R.log(g,m)}</div>`,
+    bind(){$$('[data-chv]').forEach(b=>b.onclick=()=>gs({v:b.dataset.chv}));if(!w.ok&&!RM())try{$('.chres').classList.add('shk')}catch(e){}}}}
+  const K='ca'+g.k;if(R.ak!==K){R.ak=K;R.ac=[...(g.acc[m]||[])]}
+  const sent=g.acc[m]!=null&&g.done[m];
+  return{html:`<div class="card c">${body}<p class="gq2">🕵️ ${GT('chAcc',{v:g.K})}</p><p class="gsub">${GT(N?'chAccN':'chAccD')}</p>
+   <div class="gpk">${s.order.filter(p=>p!=m).map((p,i)=>`<button class="ga ${R.ac.includes(p)?'sel':''}" ${dl(i)} data-cha="${esc(p)}" aria-pressed="${R.ac.includes(p)}">${DT(p)}<span>${esc(p)}</span></button>`).join('')}</div>
+   <button class="pri wide" id="gsend">${GT(sent?'chAccOk':'send')}</button>${R.log(g,m)}</div>`,
+   bind(){$$('[data-cha]').forEach(b=>b.onclick=()=>{const p=b.dataset.cha;R.ac=R.ac.includes(p)?R.ac.filter(x=>x!=p):[...R.ac,p].slice(-g.K);render()});
+    $('#gsend').onclick=()=>gs({v:R.ac})}}},
+ lvote(g){const e=Object.entries(g.lv.c||{}).sort((a,b)=>b[1]-a[1]);if(!e.length)return '';
+  return `<p class="mut chlv ga" ${dl(3)}>🗳️ ${e.map(([p,v])=>`${p?B(p):esc(GT('chNoneS'))} ×${v}`).join(' · ')}</p>`},
+ endView(s){const g=s.game,R=this,nw=g.win=='n';
+  return `<div class="chend"><p class="gbig2 ga ok">${GT(nw?'chWinN':'chWinC',{v:g.sk})}</p><p class="ga" ${dl(1)}>🏴‍☠️ ${GT('chWere')} ${g.nf.map(B).join(', ')}</p>
+   ${s.order.filter(p=>!g.nf.includes(p)).map((p,i)=>`<p class="mut ga" ${dl(i+2)}>${B(p)} 🕵️ ${(g.acc[p]||[]).length?(g.acc[p]).map(x=>esc(x)+(g.nf.includes(x)?' ✅':' ❌')).join(', '):'—'}</p>`).join('')}
+   <h3 class="gh3">📜 ${GT('chLog')}</h3>${g.h.map((w,i)=>`<div class="chlr ga" ${dl(i,.4)}><b>${w.ok?'⛵':'💥'} ${i+1}</b> ${R.ch(w.tr)} : ${w.route.map((p,j)=>{const a=w.all&&w.all[j]||[];return `${esc(p)} ${R.ch(a[1],a[0]!=a[1]?'x':'')}`}).join(' <i class="charr">➜</i> ')}</div>`).join('')}</div>`},
+ fin(s){return{pts:s.game.sc}}};
+
+/* =====================================================================
    📖 TUTORIELS ANIMÉS — une mini-démo scriptée par jeu (pièces factices qui bougent, étape par étape).
    Ouvert par le « ? » du haut (contexte : jeu en cours, ou jeu choisi au salon) et par « Les règles en images » au salon.
    Scène = 300×180 (coordonnées px), éléments .te animés en transform/opacity seulement ; mouvement réduit : état final fixe.
@@ -654,6 +754,14 @@ const TUS={
   {k:'tu_msk5',s:()=>TU.e(80,80,'🐙',0,'a big')+TU.e(112,62,'🦈')+TU.e(220,80,'🎭',0,'a big')+TU.e(80,130,TU.cd('🔒'),.2,'p')+TU.e(220,130,TU.cd('🔒'),.4,'p')+TU.e(80,40,TU.pt('+2'),1,'p')+TU.e(220,40,TU.pt('+2'),1.1,'p')+TU.e(258,62,'✓',1.7,'p')},
   {k:'tu_msk6',d:7,s:()=>TU.e(70,140,TU.av(0))+TU.e(230,140,TU.av(1))+TU.e(150,40,TU.cd('16','ok'),0,'p')+
    [['🤝','🤝','+8','+8',.3,1.9],['🗡️','🤝','+16','0',2.1,3.7],['🗡️','🗡️','−8','−8',3.9,0]].map(([a,b,x,y,d,o])=>{const O=o?'p o':'p';return TU.e(70,100,TU.cd(a),d,O,'--o:'+o+'s')+TU.e(230,100,TU.cd(b),d+.1,O,'--o:'+o+'s')+TU.e(70,72,TU.pt(x,x[0]=='−'?'no':''),d+.6,O,'--o:'+o+'s')+TU.e(230,72,TU.pt(y,y[0]=='−'||y=='0'?'no':''),d+.7,O,'--o:'+o+'s')}).join('')}]};
+/* 🧭 tutoriel de La Chaîne des Phares */
+TUS.chn=[
+ {k:'tu_chn1',s:()=>[0,1,2].map(i=>TU.e(60+90*i,145,TU.av(i))).join('')+TU.e(60,40,'🧭',0,'p big')+TU.e(60,98,TU.cd('⭐','ok'),.4,'p o','--o:1.6s')+TU.mv(60,98,150,98,TU.cd('⭐'),1.5,'','--op0:0')},
+ {k:'tu_chn2',d:6,s:()=>[0,1,2].map(i=>TU.e(60+90*i,145,TU.av(i))).join('')+TU.e(150,98,TU.cd('⭐'),0,'a o','--o:1.2s')+TU.mv(150,98,240,98,TU.cd('🌙','no'),1.2,'','--op0:0')+TU.e(240,52,'🏴‍☠️ ❓',2.2,'p')},
+ {k:'tu_chn3',d:6,s:()=>`<i class="tsea"></i>`+TU.e(150,46,'⛵',.2,'p big o','--o:1.8s')+TU.e(150,46,'💥',1.8,'p big')+TU.e(150,96,TU.cd('⭐ ≠ 🌙','no'),1,'p')+TU.e(150,150,TU.cd(TU.n().slice(0,3).map(esc).join(' <i class="charr">➜</i> ')),2.4,'p')},
+ {k:'tu_chn4',d:6,s:()=>[0,1,2,3].map(i=>TU.e(45+70*i,150,TU.av(i))).join('')+[0,1,3].map((i,j)=>TU.e(45+70*i,108,'✋',.3+.25*j,'p')).join('')+TU.e(185,104,'⛓️',1.6,'p big')+TU.e(185,56,TU.cd('🌙 › 🌙'),2.4,'p')},
+ {k:'tu_chn5',d:6,s:()=>[0,1,2,3].map(i=>TU.e(45+70*i,150,TU.av(i))).join('')+TU.e(45,108,'🕵️',.3,'p')+TU.e(115,108,'🕵️',.5,'p')+TU.e(255,108,'🏴‍☠️',1.5,'p big')+TU.e(45,66,TU.pt('+2'),2.1,'p')+TU.e(115,66,TU.pt('+2'),2.2,'p')+TU.e(185,66,TU.pt('+2'),2.3,'p')}];
+
 for(const id in TUS)if(GAMES[id])GAMES[id].tut=TUS[id];
 const GTU={id:null,i:0,t:null};
 W.GTut=function(id){const G=GAMES[id];if(!G||!G.tut||typeof document=='undefined')return false;
@@ -874,6 +982,34 @@ section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) b
 [data-theme=dark] .gtu .tus{background:#0b1c2d;box-shadow:inset 0 0 0 2px #26475f}[data-theme=dark] .tcd{background:#16324a;box-shadow:0 0 0 1.5px #2c5574,0 3px 0 #06121f}[data-theme=dark] .tub polygon{fill:#2d6a8a55;stroke:#2c5574}[data-theme=dark] .tub .c0{fill:#2d6a8aaa}
 .gtutb{margin-top:10px}
 @media (prefers-reduced-motion:reduce){.te,.te>span,.tub .tdead{animation:none!important}.te.o{display:none}.te.m{transform:none}}
+
+/* 🧭 La Chaîne des Phares */
+.chhd{display:flex;flex-wrap:wrap;gap:6px 8px;justify-content:center;margin:0 0 12px;font:700 14px Nunito}
+.chrole,.chsk,.chir{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:99px;background:var(--paper2);border:2px solid var(--edge);white-space:nowrap}
+.chrole.n{border-color:var(--bad)}.chir{border-style:dashed}
+.chrt{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 4px;margin:6px 0 12px}
+.chn{position:relative;display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:14px;background:var(--paper2);border:2px solid var(--edge);font:700 14px Nunito;max-width:100%}
+.chn b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:9em}.chn.me{border-color:var(--acc2)}
+.chn.on::after{content:'';position:absolute;inset:-5px;border-radius:18px;border:2px solid var(--acc);animation:chPulse 1.4s ease-in-out infinite;pointer-events:none}
+@keyframes chPulse{0%,100%{opacity:.25;transform:scale(.97)}50%{opacity:1;transform:scale(1.03)}}
+.charr{font-style:normal;color:var(--mut);font-size:13px}[dir=rtl] .charr{display:inline-block;transform:scaleX(-1)}
+.chk{display:inline-flex;align-items:center;gap:2px}.chk i{font-style:normal;color:var(--mut)}
+.chc{display:inline-block;line-height:1;font-size:18px;padding:2px 3px;border-radius:8px}.chc.big{font-size:30px;vertical-align:middle}
+.chc.x{background:color-mix(in srgb,var(--bad) 22%,transparent);box-shadow:inset 0 0 0 2px var(--bad)}.chc.q{font:800 14px Nunito;color:var(--mut)}
+.chtip{font:700 14px Nunito;color:var(--bad);margin:0 0 8px}
+.chpk{margin:8px 0 10px}.gw .chpk>button.chb{flex:1 1 20%;font-size:28px;padding:10px 4px}
+.chres{margin:4px 0 6px}.chsea{position:relative;height:56px;overflow:hidden;border-radius:16px;background:linear-gradient(180deg,transparent 58%,rgba(64,160,205,.35) 58%,rgba(40,110,160,.45))}
+.chship{position:absolute;left:50%;top:6px;font-size:38px;line-height:1;margin-left:-19px}
+.chship.ok{animation:chSail 1.1s var(--gease,ease) both}.chship.ko{animation:chSink 1.3s ease-in .2s both}
+@keyframes chSail{from{transform:translateX(-120px);opacity:0}to{transform:none;opacity:1}}
+@keyframes chSink{0%{transform:none;opacity:1}100%{transform:translateY(30px) rotate(28deg);opacity:.35}}
+.chboom{position:absolute;left:50%;top:4px;margin-left:-20px;font-size:34px;line-height:1;animation:chBoom .45s var(--gease,ease) 1.1s both}@keyframes chBoom{from{transform:scale(.2);opacity:0}}
+.chres.shk .chsea{animation:chShk .5s ease 1s both}@keyframes chShk{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.chno{margin-top:10px}.chlv{font-size:13px;margin-top:6px}
+.chlog{margin-top:14px;text-align:start;font-size:13px}.chlog summary{cursor:pointer;font:700 14px Nunito;color:var(--mut)}
+.chlr{padding:5px 0;border-top:1px dashed var(--edge);overflow-wrap:anywhere;line-height:1.7}.chlr .chc{font-size:15px}
+.chend{text-align:start}.chend .gbig2{text-align:center}
+@media (prefers-reduced-motion:reduce){.chn.on::after,.chship,.chres.shk .chsea,.chboom{animation:none!important}.chship.ko{transform:translateY(30px) rotate(28deg);opacity:.35}}
 
 @media (max-width:420px){.grow2{flex-direction:column}.gq{font-size:19px}.gseed{font-size:26px}.gbr{grid-template-columns:minmax(0,7em) 1fr 1.6em}.gtf{width:78px}.gcamps{gap:6px}}
 @media (prefers-reduced-motion:reduce){.gw .ga,.gw .gbar,.gfloat,.gev .gbig,.grx,.arcb *,.gw.gnx>.card,.mkl{animation:none!important}.gsab i{animation-duration:0s!important;display:none}}
@@ -1863,4 +1999,96 @@ msk2:`Confesse sua fantasia mais marítima|Descreva sua posição favorita sem d
 bot:`Um lugar inusitado onde você dormiu|Um medo de infância|Um objeto que você guarda desde sempre|Seu pior emprego|Uma comida que você odeia|Um encontro com uma celebridade|Uma travessura de infância|Um talento escondido|Uma viagem que deu errado|Um apelido que você tinha|Uma vez que você se perdeu|Uma mentira que acabou mal|Seu primeiro show|Um recorde pessoal|Um bicho de estimação que você teve|Algo que você nunca fez|Um sonho recorrente|Um mico na escola|Um presente inesquecível|Uma mania estranha|Seu pior corte de cabelo|Uma vez que você foi muito corajoso|Uma risada na hora errada|Um lugar que você sonha conhecer|Um esporte que você praticou|Uma coleção que você tinha|Um filme que te fez chorar|Um acidente ridículo|Algo que você faz melhor que todo mundo|Seu primeiro emprego|Um objeto perdido de que você sente falta|Um encontro por acaso|Uma receita de família|Uma fobia|Uma decisão que mudou tudo|Uma noite em claro memorável|Uma briga absurda|Um prato que você sabe cozinhar|Uma fantasia que você vestiu|Uma aposta perdida|Sua lembrança mais antiga|Um momento de glória|Um idioma que você fala um pouco|Uma música que te lembra alguém|Uma vez que você colou ou trapaceou|Um encontro com um animal selvagem|Um lugar onde você morou|Um professor que te marcou|Um erro de tradução|Algo que você ainda coleciona`,
 bot1:`Seu primeiro beijo|Um encontro que deu errado|Uma paixonite improvável|Uma declaração de amor fracassada|Uma mensagem enviada para a pessoa errada|Um encontro perfeito|Uma cantada que funcionou|Um amor de verão|Um elogio que te fez corar|Um ciúme ridículo|Um amor à primeira vista|Um término original|Um encontro de aplicativo|Uma dança lenta inesquecível|Um beijo roubado|Um ex surpreendente|Uma carta de amor|Uma noite sob as estrelas|Conhecer os pais|Uma paquera desajeitada`,
 bot2:`Um lugar maluco onde você transou|Uma primeira vez memorável|Uma fantasia realizada|Um fiasco na cama|Uma noite casual|Um brinquedo erótico que você testou|Uma vez que te pegaram no flagra|Um nude que você mandou|Um striptease|Uma noite muito agitada|Um sexting que deu errado|Uma experiência que você não repetiria|Um parceiro inesperado|Uma posição que deu errado|Um lugar público ousado|Uma compra no sex shop|Uma festa que saiu do controle|Um sonho erótico|Uma fantasia inconfessável|Uma noite com um desconhecido`});
+/* 🧭 La Chaîne des Phares : textes */
+const GCH=(l,o)=>Object.assign(GI18N[l].ui,o);
+GCH('fr',{n_chn:`La Chaîne des Phares`,d_chn:`Passez le bon chenal… sans savoir qui le brouille`,
+r_chn:`Chaque vague, un capitaine reçoit en secret le bon chenal (🐚 ⭐ 🌙 🐋) et le transmet en privé au gardien de son choix, qui le relaie à son tour : le dernier guide le navire. Parmi vous se cache 1 Naufrageur (2 dès 6 joueurs) qui peut changer le chenal : à 2 navires coulés (3 dès 6 joueurs), les Naufrageurs gagnent. Entre les vagues, débattez dans le chat et votez pour mettre un suspect aux fers (ce qu'il reçoit et transmet devient public) ; à la fin, chacun accuse en secret : +2 par Naufrageur démasqué.`,
+chN:`Naufrageur`,chC:`Gardien de phare`,chSkT:`Les Naufrageurs gagnent à {v} navires coulés`,chWaitC:`{n} est capitaine : la passe part…`,chWait:`{n} relaie la passe…`,
+chCap:`Le bon chenal :`,chGot:`On t'a transmis :`,chNtip:`Tu peux changer le chenal… ou le garder pour rester crédible.`,chPass:`Quel chenal transmets-tu ?`,chPilot:`Tu guides le navire : quel chenal ?`,chTo:`À qui ?`,chSail:`Lever l'ancre`,
+chOk:`Le navire est arrivé !`,chKo:`Le navire a coulé !`,chTr:`bon chenal`,chF:`chenal pris`,chVote:`Mettre quelqu'un aux fers ?`,chVoteD:`Il faut la majorité. Ses relais deviendront publics.`,chFree:`Personne (libérer)`,chNone:`Personne`,chNoneS:`personne`,
+chAcc:`Qui sont les Naufrageurs ? (jusqu'à {v})`,chAccD:`+2 par Naufrageur démasqué.`,chAccN:`Accuse aussi quelqu'un : personne ne doit deviner ton rôle.`,chAccOk:`Envoyé ✓`,chLog:`Journal de bord`,
+chWinN:`Les Naufrageurs l'emportent : {v} navires coulés !`,chWinC:`L'équipage l'emporte : la flotte est sauve !`,chWere:`Les Naufrageurs étaient :`,
+tu_chn1:`{a} est capitaine : il reçoit le bon chenal ⭐ et le passe en secret à {b}.`,tu_chn2:`{b} le relaie à {c}… mais un Naufrageur caché peut changer le chenal.`,
+tu_chn3:`Le dernier relais guide le navire : mauvais chenal, il coule. Tous voient la route, personne ne voit ce que les autres ont passé.`,tu_chn4:`Débattez, puis votez : le suspect est mis aux fers ⛓️ et ce qu'il passe devient public.`,
+tu_chn5:`À la fin, accusez en secret : +2 par Naufrageur démasqué. Mais assez de navires coulés, et ce sont eux qui gagnent.`});
+GCH('en',{n_chn:`The Lighthouse Chain`,d_chn:`Pass on the right channel… without knowing who scrambles it`,
+r_chn:`Each wave, a captain secretly gets the right channel (🐚 ⭐ 🌙 🐋) and privately passes it to a keeper of their choice, who relays it in turn: the last one steers the ship. Hidden among you is 1 Wrecker (2 from 6 players) who can change the channel: at 2 sunk ships (3 from 6 players), the Wreckers win. Between waves, debate in the chat and vote to put a suspect in irons (what they receive and pass becomes public); at the end, everyone accuses in secret: +2 per Wrecker unmasked.`,
+chN:`Wrecker`,chC:`Lighthouse keeper`,chSkT:`The Wreckers win at {v} sunk ships`,chWaitC:`{n} is captain: the channel sets off…`,chWait:`{n} is relaying the channel…`,
+chCap:`The right channel:`,chGot:`You were passed:`,chNtip:`You can change the channel… or keep it to stay believable.`,chPass:`Which channel do you pass on?`,chPilot:`You steer the ship: which channel?`,chTo:`To whom?`,chSail:`Weigh anchor`,
+chOk:`The ship made it!`,chKo:`The ship sank!`,chTr:`right channel`,chF:`channel taken`,chVote:`Put someone in irons?`,chVoteD:`It takes a majority. Their relays will become public.`,chFree:`Nobody (release)`,chNone:`Nobody`,chNoneS:`nobody`,
+chAcc:`Who are the Wreckers? (up to {v})`,chAccD:`+2 per Wrecker unmasked.`,chAccN:`Accuse someone too: nobody should guess your role.`,chAccOk:`Sent ✓`,chLog:`Logbook`,
+chWinN:`The Wreckers win: {v} ships sunk!`,chWinC:`The crew wins: the fleet is safe!`,chWere:`The Wreckers were:`,
+tu_chn1:`{a} is captain: they get the right channel ⭐ and secretly pass it to {b}.`,tu_chn2:`{b} relays it to {c}… but a hidden Wrecker can change the channel.`,
+tu_chn3:`The last relay steers the ship: wrong channel, it sinks. Everyone sees the route, nobody sees what the others passed.`,tu_chn4:`Debate, then vote: the suspect is put in irons ⛓️ and what they pass becomes public.`,
+tu_chn5:`At the end, accuse in secret: +2 per Wrecker unmasked. But enough sunk ships, and they win.`});
+GCH('es',{n_chn:`La Cadena de Faros`,d_chn:`Pasad el canal correcto… sin saber quién lo enreda`,
+r_chn:`Cada ola, un capitán recibe en secreto el canal correcto (🐚 ⭐ 🌙 🐋) y lo pasa en privado al farero que elija, que lo releva a su vez: el último guía el barco. Entre vosotros se esconde 1 Naufragador (2 desde 6 jugadores) que puede cambiar el canal: con 2 barcos hundidos (3 desde 6 jugadores), ganan los Naufragadores. Entre olas, debatid en el chat y votad para encadenar a un sospechoso (lo que recibe y pasa se vuelve público); al final, cada uno acusa en secreto: +2 por Naufragador desenmascarado.`,
+chN:`Naufragador`,chC:`Farero`,chSkT:`Los Naufragadores ganan con {v} barcos hundidos`,chWaitC:`{n} es capitán: el canal sale…`,chWait:`{n} releva el canal…`,
+chCap:`El canal correcto:`,chGot:`Te han pasado:`,chNtip:`Puedes cambiar el canal… o mantenerlo para seguir siendo creíble.`,chPass:`¿Qué canal pasas?`,chPilot:`Guías el barco: ¿qué canal?`,chTo:`¿A quién?`,chSail:`Levar anclas`,
+chOk:`¡El barco ha llegado!`,chKo:`¡El barco se ha hundido!`,chTr:`canal correcto`,chF:`canal tomado`,chVote:`¿Encadenar a alguien?`,chVoteD:`Hace falta mayoría. Sus relevos serán públicos.`,chFree:`Nadie (liberar)`,chNone:`Nadie`,chNoneS:`nadie`,
+chAcc:`¿Quiénes son los Naufragadores? (hasta {v})`,chAccD:`+2 por Naufragador desenmascarado.`,chAccN:`Acusa también a alguien: nadie debe adivinar tu rol.`,chAccOk:`Enviado ✓`,chLog:`Cuaderno de bitácora`,
+chWinN:`Ganan los Naufragadores: ¡{v} barcos hundidos!`,chWinC:`Gana la tripulación: ¡la flota está a salvo!`,chWere:`Los Naufragadores eran:`,
+tu_chn1:`{a} es capitán: recibe el canal correcto ⭐ y se lo pasa en secreto a {b}.`,tu_chn2:`{b} se lo pasa a {c}… pero un Naufragador oculto puede cambiar el canal.`,
+tu_chn3:`El último relevo guía el barco: canal equivocado, se hunde. Todos ven la ruta, nadie ve lo que pasaron los demás.`,tu_chn4:`Debatid y votad: el sospechoso queda encadenado ⛓️ y lo que pasa se vuelve público.`,
+tu_chn5:`Al final, acusad en secreto: +2 por Naufragador desenmascarado. Pero con bastantes barcos hundidos, ganan ellos.`});
+GCH('it',{n_chn:`La Catena dei Fari`,d_chn:`Passate il canale giusto… senza sapere chi lo confonde`,
+r_chn:`A ogni ondata, un capitano riceve in segreto il canale giusto (🐚 ⭐ 🌙 🐋) e lo passa in privato al guardiano che vuole, che lo inoltra a sua volta: l'ultimo guida la nave. Tra voi si nasconde 1 Naufragatore (2 da 6 giocatori) che può cambiare il canale: con 2 navi affondate (3 da 6 giocatori), vincono i Naufragatori. Tra un'ondata e l'altra, discutete in chat e votate per mettere ai ferri un sospettato (ciò che riceve e passa diventa pubblico); alla fine ognuno accusa in segreto: +2 per Naufragatore smascherato.`,
+chN:`Naufragatore`,chC:`Guardiano del faro`,chSkT:`I Naufragatori vincono con {v} navi affondate`,chWaitC:`{n} è capitano: il canale parte…`,chWait:`{n} inoltra il canale…`,
+chCap:`Il canale giusto:`,chGot:`Ti hanno passato:`,chNtip:`Puoi cambiare il canale… o tenerlo per restare credibile.`,chPass:`Che canale passi?`,chPilot:`Guidi la nave: quale canale?`,chTo:`A chi?`,chSail:`Salpare`,
+chOk:`La nave è arrivata!`,chKo:`La nave è affondata!`,chTr:`canale giusto`,chF:`canale preso`,chVote:`Mettere qualcuno ai ferri?`,chVoteD:`Serve la maggioranza. I suoi passaggi diventeranno pubblici.`,chFree:`Nessuno (liberare)`,chNone:`Nessuno`,chNoneS:`nessuno`,
+chAcc:`Chi sono i Naufragatori? (fino a {v})`,chAccD:`+2 per Naufragatore smascherato.`,chAccN:`Accusa anche tu qualcuno: nessuno deve indovinare il tuo ruolo.`,chAccOk:`Inviato ✓`,chLog:`Diario di bordo`,
+chWinN:`Vincono i Naufragatori: {v} navi affondate!`,chWinC:`Vince l'equipaggio: la flotta è salva!`,chWere:`I Naufragatori erano:`,
+tu_chn1:`{a} è capitano: riceve il canale giusto ⭐ e lo passa in segreto a {b}.`,tu_chn2:`{b} lo inoltra a {c}… ma un Naufragatore nascosto può cambiare il canale.`,
+tu_chn3:`L'ultimo passaggio guida la nave: canale sbagliato, affonda. Tutti vedono la rotta, nessuno vede cosa hanno passato gli altri.`,tu_chn4:`Discutete, poi votate: il sospettato finisce ai ferri ⛓️ e ciò che passa diventa pubblico.`,
+tu_chn5:`Alla fine accusate in segreto: +2 per Naufragatore smascherato. Ma con abbastanza navi affondate, vincono loro.`});
+GCH('de',{n_chn:`Die Leuchtturmkette`,d_chn:`Gebt die richtige Fahrrinne weiter… ohne zu wissen, wer sie verfälscht`,
+r_chn:`In jeder Welle erhält ein Kapitän geheim die richtige Fahrrinne (🐚 ⭐ 🌙 🐋) und gibt sie privat an einen Wärter seiner Wahl weiter, der sie wiederum weiterreicht: der Letzte steuert das Schiff. Unter euch versteckt sich 1 Strandräuber (2 ab 6 Leuten), der die Rinne ändern kann: bei 2 gesunkenen Schiffen (3 ab 6 Leuten) gewinnen die Strandräuber. Zwischen den Wellen diskutiert im Chat und stimmt ab, wen ihr in Ketten legt (was er erhält und weitergibt, wird öffentlich); am Ende klagt jeder geheim an: +2 pro entlarvtem Strandräuber.`,
+chN:`Strandräuber`,chC:`Leuchtturmwärter`,chSkT:`Die Strandräuber gewinnen bei {v} gesunkenen Schiffen`,chWaitC:`{n} ist Kapitän: die Rinne geht los…`,chWait:`{n} gibt die Rinne weiter…`,
+chCap:`Die richtige Rinne:`,chGot:`Du hast erhalten:`,chNtip:`Du kannst die Rinne ändern… oder sie behalten, um glaubwürdig zu bleiben.`,chPass:`Welche Rinne gibst du weiter?`,chPilot:`Du steuerst das Schiff: welche Rinne?`,chTo:`An wen?`,chSail:`Anker lichten`,
+chOk:`Das Schiff ist angekommen!`,chKo:`Das Schiff ist gesunken!`,chTr:`richtige Rinne`,chF:`genommene Rinne`,chVote:`Jemanden in Ketten legen?`,chVoteD:`Es braucht eine Mehrheit. Seine Weitergaben werden öffentlich.`,chFree:`Niemand (freilassen)`,chNone:`Niemand`,chNoneS:`niemand`,
+chAcc:`Wer sind die Strandräuber? (bis zu {v})`,chAccD:`+2 pro entlarvtem Strandräuber.`,chAccN:`Klag auch jemanden an: niemand soll deine Rolle erraten.`,chAccOk:`Gesendet ✓`,chLog:`Logbuch`,
+chWinN:`Die Strandräuber gewinnen: {v} Schiffe gesunken!`,chWinC:`Die Mannschaft gewinnt: die Flotte ist gerettet!`,chWere:`Die Strandräuber waren:`,
+tu_chn1:`{a} ist Kapitän: er erhält die richtige Rinne ⭐ und gibt sie geheim an {b} weiter.`,tu_chn2:`{b} gibt sie an {c} weiter… aber ein versteckter Strandräuber kann die Rinne ändern.`,
+tu_chn3:`Der Letzte steuert das Schiff: falsche Rinne, es sinkt. Alle sehen die Route, niemand sieht, was die anderen weitergegeben haben.`,tu_chn4:`Diskutiert, dann stimmt ab: der Verdächtige kommt in Ketten ⛓️ und was er weitergibt, wird öffentlich.`,
+tu_chn5:`Am Ende klagt ihr geheim an: +2 pro entlarvtem Strandräuber. Aber sinken genug Schiffe, gewinnen sie.`});
+GCH('ru',{n_chn:`Цепь маяков`,d_chn:`Передайте верный фарватер… не зная, кто его путает`,
+r_chn:`Каждую волну капитан тайно получает верный фарватер (🐚 ⭐ 🌙 🐋) и лично передаёт его выбранному смотрителю, а тот — дальше: последний ведёт корабль. Среди вас прячется 1 Мародёр (2 — от 6 игроков), который может подменить фарватер: при 2 затонувших кораблях (3 — от 6 игроков) Мародёры побеждают. Между волнами спорьте в чате и голосуйте, кого заковать в кандалы (всё, что он получает и передаёт, становится публичным); в конце каждый тайно обвиняет: +2 за каждого разоблачённого Мародёра.`,
+chN:`Мародёр`,chC:`Смотритель маяка`,chSkT:`Мародёры побеждают при {v} затонувших кораблях`,chWaitC:`{n} — капитан: фарватер отправляется…`,chWait:`{n} передаёт фарватер…`,
+chCap:`Верный фарватер:`,chGot:`Тебе передали:`,chNtip:`Можно подменить фарватер… или оставить, чтобы не вызвать подозрений.`,chPass:`Какой фарватер передаёшь?`,chPilot:`Ты ведёшь корабль: какой фарватер?`,chTo:`Кому?`,chSail:`Поднять якорь`,
+chOk:`Корабль дошёл!`,chKo:`Корабль затонул!`,chTr:`верный фарватер`,chF:`выбранный фарватер`,chVote:`Заковать кого-нибудь?`,chVoteD:`Нужно большинство. Его передачи станут публичными.`,chFree:`Никого (освободить)`,chNone:`Никого`,chNoneS:`никого`,
+chAcc:`Кто Мародёры? (до {v})`,chAccD:`+2 за каждого разоблачённого Мародёра.`,chAccN:`Тоже обвини кого-нибудь: никто не должен угадать твою роль.`,chAccOk:`Отправлено ✓`,chLog:`Судовой журнал`,
+chWinN:`Побеждают Мародёры: затонуло кораблей — {v}!`,chWinC:`Побеждает команда: флот спасён!`,chWere:`Мародёрами были:`,
+tu_chn1:`{a} — капитан: получает верный фарватер ⭐ и тайно передаёт его {b}.`,tu_chn2:`{b} передаёт его {c}… но скрытый Мародёр может подменить фарватер.`,
+tu_chn3:`Последний ведёт корабль: неверный фарватер — и он тонет. Маршрут видят все, а что передали другие — никто.`,tu_chn4:`Спорьте и голосуйте: подозреваемого заковывают ⛓️, и всё, что он передаёт, становится публичным.`,
+tu_chn5:`В конце обвиняйте тайно: +2 за каждого разоблачённого Мародёра. Но если кораблей затонет достаточно, побеждают они.`});
+GCH('zh',{n_chn:`灯塔之链`,d_chn:`传出正确的航道……却不知道是谁在捣乱`,
+r_chn:`每一波，船长秘密得知正确航道（🐚 ⭐ 🌙 🐋），私下传给自己选的守塔人，再由他继续传下去：最后一人为船掌舵。你们之中藏着1名破船者（6人起为2名），他可以改动航道：沉船达到2艘（6人起为3艘），破船者获胜。每波之间在聊天里讨论，并投票给嫌疑人戴上镣铐（他收到和传出的内容都会公开）；最后每人秘密指认：每揪出一名破船者+2。`,
+chN:`破船者`,chC:`守塔人`,chSkT:`沉船达到{v}艘时破船者获胜`,chWaitC:`{n}是船长：航道出发了……`,chWait:`{n}正在传递航道……`,
+chCap:`正确航道：`,chGot:`你收到的是：`,chNtip:`你可以改动航道……也可以照传以保持可信。`,chPass:`你要传出哪条航道？`,chPilot:`你来掌舵：走哪条航道？`,chTo:`传给谁？`,chSail:`起锚`,
+chOk:`船到港了！`,chKo:`船沉了！`,chTr:`正确航道`,chF:`实际航道`,chVote:`要给谁戴上镣铐吗？`,chVoteD:`需要过半数。他的传递将会公开。`,chFree:`不选（释放）`,chNone:`不选`,chNoneS:`不选`,
+chAcc:`谁是破船者？（最多{v}人）`,chAccD:`每揪出一名破船者+2。`,chAccN:`你也指认一个人吧：别让人猜出你的身份。`,chAccOk:`已发送 ✓`,chLog:`航海日志`,
+chWinN:`破船者获胜：沉了{v}艘船！`,chWinC:`船员获胜：船队平安！`,chWere:`破船者是：`,
+tu_chn1:`{a}是船长：他得知正确航道⭐，并秘密传给{b}。`,tu_chn2:`{b}再传给{c}……但隐藏的破船者可以改动航道。`,
+tu_chn3:`最后一人掌舵：航道错了，船就沉。大家都看得到路线，却看不到别人传了什么。`,tu_chn4:`讨论后投票：嫌疑人被戴上镣铐⛓️，他传出的内容会公开。`,
+tu_chn5:`最后秘密指认：每揪出一名破船者+2。但沉船够多的话，就是他们赢。`});
+GCH('he',{n_chn:`שרשרת המגדלורים`,d_chn:`העבירו את הנתיב הנכון… בלי לדעת מי משבש אותו`,
+r_chn:`בכל גל, רב החובל מקבל בסוד את הנתיב הנכון (🐚 ⭐ 🌙 🐋) ומעביר אותו בפרטי לשומר שהוא בוחר, וזה מעביר הלאה: האחרון מנווט את הספינה. ביניכם מסתתר מטביע 1 (2 החל מ־6 שחקנים) שיכול לשנות את הנתיב: ב־2 ספינות טבועות (3 החל מ־6 שחקנים) המטביעים מנצחים. בין הגלים התווכחו בצ׳אט והצביעו מי נכבל באזיקים (מה שהוא מקבל ומעביר נהיה גלוי); בסוף כל אחד מאשים בסוד: ‎+2 על כל מטביע שנחשף.`,
+chN:`מטביע`,chC:`שומר מגדלור`,chSkT:`המטביעים מנצחים ב־{v} ספינות טבועות`,chWaitC:`{n} רב החובל: הנתיב יוצא לדרך…`,chWait:`{n} מעביר את הנתיב…`,
+chCap:`הנתיב הנכון:`,chGot:`העבירו לך:`,chNtip:`אפשר לשנות את הנתיב… או להשאיר אותו כדי להישאר אמין.`,chPass:`איזה נתיב להעביר?`,chPilot:`אתה מנווט את הספינה: איזה נתיב?`,chTo:`למי?`,chSail:`להרים עוגן`,
+chOk:`הספינה הגיעה!`,chKo:`הספינה טבעה!`,chTr:`נתיב נכון`,chF:`נתיב שנבחר`,chVote:`לכבול מישהו?`,chVoteD:`צריך רוב. ההעברות שלו ייחשפו.`,chFree:`אף אחד (לשחרר)`,chNone:`אף אחד`,chNoneS:`אף אחד`,
+chAcc:`מי המטביעים? (עד {v})`,chAccD:`‎+2 על כל מטביע שנחשף.`,chAccN:`האשימו גם מישהו: אסור שינחשו את התפקיד שלכם.`,chAccOk:`נשלח ✓`,chLog:`יומן הספינה`,
+chWinN:`המטביעים ניצחו: {v} ספינות טבעו!`,chWinC:`הצוות ניצח: הצי ניצל!`,chWere:`המטביעים היו:`,
+tu_chn1:`{a} רב החובל: הוא מקבל את הנתיב הנכון ⭐ ומעביר אותו בסוד ל{b}.`,tu_chn2:`{b} מעביר אותו ל{c}… אבל מטביע נסתר יכול לשנות את הנתיב.`,
+tu_chn3:`האחרון מנווט את הספינה: נתיב שגוי, והיא טובעת. כולם רואים את המסלול, אף אחד לא רואה מה האחרים העבירו.`,tu_chn4:`התווכחו ואז הצביעו: החשוד נכבל ⛓️ ומה שהוא מעביר נהיה גלוי.`,
+tu_chn5:`בסוף האשימו בסוד: ‎+2 על כל מטביע שנחשף. אבל אם טבעו מספיק ספינות, הם מנצחים.`});
+GCH('pt',{n_chn:`A Corrente de Faróis`,d_chn:`Passem o canal certo… sem saber quem o embaralha`,
+r_chn:`A cada onda, um capitão recebe em segredo o canal certo (🐚 ⭐ 🌙 🐋) e o passa no privado para o faroleiro que quiser, que o repassa por sua vez: o último guia o navio. Entre vocês se esconde 1 Naufragador (2 a partir de 6 jogadores) que pode mudar o canal: com 2 navios afundados (3 a partir de 6 jogadores), os Naufragadores vencem. Entre as ondas, debatam no chat e votem para acorrentar um suspeito (o que ele recebe e passa fica público); no fim, cada um acusa em segredo: +2 por Naufragador desmascarado.`,
+chN:`Naufragador`,chC:`Faroleiro`,chSkT:`Os Naufragadores vencem com {v} navios afundados`,chWaitC:`{n} é capitão: o canal está saindo…`,chWait:`{n} está repassando o canal…`,
+chCap:`O canal certo:`,chGot:`Passaram para você:`,chNtip:`Você pode mudar o canal… ou mantê-lo para continuar confiável.`,chPass:`Que canal você passa?`,chPilot:`Você guia o navio: qual canal?`,chTo:`Para quem?`,chSail:`Levantar âncora`,
+chOk:`O navio chegou!`,chKo:`O navio afundou!`,chTr:`canal certo`,chF:`canal tomado`,chVote:`Acorrentar alguém?`,chVoteD:`É preciso maioria. Os repasses dele ficarão públicos.`,chFree:`Ninguém (soltar)`,chNone:`Ninguém`,chNoneS:`ninguém`,
+chAcc:`Quem são os Naufragadores? (até {v})`,chAccD:`+2 por Naufragador desmascarado.`,chAccN:`Acuse alguém também: ninguém deve adivinhar seu papel.`,chAccOk:`Enviado ✓`,chLog:`Diário de bordo`,
+chWinN:`Os Naufragadores vencem: {v} navios afundados!`,chWinC:`A tripulação vence: a frota está salva!`,chWere:`Os Naufragadores eram:`,
+tu_chn1:`{a} é capitão: recebe o canal certo ⭐ e o passa em segredo para {b}.`,tu_chn2:`{b} repassa para {c}… mas um Naufragador escondido pode mudar o canal.`,
+tu_chn3:`O último repasse guia o navio: canal errado, ele afunda. Todos veem a rota, ninguém vê o que os outros passaram.`,tu_chn4:`Debatam e votem: o suspeito é acorrentado ⛓️ e o que ele passa fica público.`,
+tu_chn5:`No fim, acusem em segredo: +2 por Naufragador desmascarado. Mas com navios afundados suficientes, eles vencem.`});
 })();
