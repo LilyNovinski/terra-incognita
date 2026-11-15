@@ -2032,6 +2032,11 @@ setInterval(()=>{
    /* quelqu'un a pris la suite : on redevient client */
    isHost=false;conns={};dropBeacon();peer=null;try{hp.destroy()}catch(x){}st.epoch=e-1;migrate(null,e)})}},3000);
 window.addEventListener('pagehide',()=>{if(isHost&&st)handoff()});
+/* donner l'hôte : on passe l'état complet à la personne choisie, puis on redevient joueur·se comme les autres */
+function giveHost(n){if(!isHost||!st||n==me.name)return;const p=P(n);if(!p||!p.online||!isLinked(n)){toast(T('giveHostNo'));return}
+ const s=JSON.parse(JSON.stringify(st));
+ for(const id in conns){const c=conns[id];if(c.open)try{c.send({t:'handoff',to:n,st:c.pname==n?s:viewFor(c.pname,s)})}catch(e){}}
+ st=viewFor(me.name,s);const old=peer;setTimeout(()=>{isHost=false;conns={};peer=null;try{old&&old.destroy()}catch(e){}migrate(n)},600)}
 /* retour sur l'onglet (téléphone) : on ne se croit pas abandonné ; si le lien est tombé, on rejoint l'hôte actuel au lieu de prendre sa place */
 document.addEventListener('visibilitychange',()=>{if(document.hidden||!st||isHost)return;lastSeen=Date.now();
  if(!migrating&&(!hostConn||!hostConn.open))migrate()});
@@ -2468,10 +2473,11 @@ function g2Waiting(host){g2Wait=true;if(st)return;
  $('#g2cx').onclick=()=>{g2Wait=false;leave()}}
 /* hôte : menu de la pastille (exclure / bannir) */
 function g2KickMenu(btn,n){$('#g2km')&&$('#g2km').remove();const m=document.createElement('div');m.id='g2km';m.className='g2km';
- m.innerHTML=`<button data-k="0"><b>🚪 ${T('kick')}</b><span>${T('g2KickD')}</span></button><button data-k="1"><b>⛔ ${T('g2Ban')}</b><span>${T('g2BanD')}</span></button>`;
+ m.innerHTML=`<button data-k="h"><b><i class="hostico" aria-hidden="true">${LIGHT}</i> ${T('giveHost')}</b><span>${T('giveHostD')}</span></button><button data-k="0"><b>🚪 ${T('kick')}</b><span>${T('g2KickD')}</span></button><button data-k="1"><b>⛔ ${T('g2Ban')}</b><span>${T('g2BanD')}</span></button>`;
  document.body.appendChild(m);const r=btn.getBoundingClientRect(),w=m.offsetWidth;m.style.top=(r.bottom+8)+'px';m.style.left=Math.max(8,Math.min(innerWidth-w-8,r.left+r.width/2-w/2))+'px';
  const off=e=>{if(!m.contains(e.target)){m.remove();document.removeEventListener('pointerdown',off,true)}};setTimeout(()=>document.addEventListener('pointerdown',off,true));
  m.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const ban=b.dataset.k=='1';m.remove();document.removeEventListener('pointerdown',off,true);
+  if(b.dataset.k=='h'){ask(T('giveHostAsk',{n:B(n)}),T('giveHost')).then(v=>v&&giveHost(n));return}
   ask(T(ban?'g2BanAsk':'kickAsk',{n:B(n)}),T(ban?'g2Ban':'kick')).then(v=>v&&kick(n,ban))})}
 /* moments forts : un cœur pendant la révélation */
 const g2HeartBtn=c=>{if(!c||c.kind=='door')return '';const l=c.lk||[],on=l.includes(me.name);return `<button type="button" class="g2heart ${on?'on':''}" id="g2h" aria-pressed="${on}" data-tip="${esc(T('g2HeartTip'))}"><span class="g2hi">${on?'❤️':'🤍'}</span><span>${T('g2Heart')}</span>${l.length?`<b>${l.length}</b>`:''}</button>`};
