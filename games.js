@@ -41,12 +41,16 @@ function gPool(s,k,n){const t=+s.tone||0,w=t==2?[.3,.3,.4]:t==1?[.55,.45,0]:[1,0
 
 /* ---------- moteur ---------- */
 const gOn=s=>s.order.filter(n=>{const p=P(n);return p&&p.online!==false});
-function gWait(g,sec,st,rv){g.st=st;g.k++;g.done={};g.need=null;g.dl=Date.now()+sec*1000;g.sec=sec;g.rv=rv?1:0}
+/* sablier : durée de base × facteur de l'hôte (TF : 1,5 / 1 / 0,7, comme l'Expédition). TF 0 = pas de sablier : g.dl=-1,
+   on avance seulement quand tout le monde a fini. Toutes les durées de jeu passent par gWait. */
+const gTF=()=>{try{return typeof st!='undefined'&&st?+(st.timer??1):1}catch(e){return 1}};/* = TF() hors mode éclair (propre à l'Expédition) */
+function gWait(g,sec,st,rv){const f=gTF();sec=Math.round(sec*(f||1));g.st=st;g.k++;g.done={};g.need=null;g.dl=f?Date.now()+sec*1000:-1;g.sec=sec;g.rv=rv?1:0}
+const gLate=g=>g.dl>0&&Date.now()>g.dl;
 const gNeed=s=>{const g=s.game;return gOn(s).filter(n=>!g.need||g.need.includes(n))};
 const gAll=s=>gNeed(s).every(n=>s.game.done[n]);
 function gFin(s){const g=s.game,r=GAMES[g.id].fin(s)||{};s.gres={pts:r.pts||g.sc,coop:r.coop||null};g.dl=0;s.phase='gend'}
 function gCheck(s){const g=s.game;let i=0;
- while(s.phase=='game'&&g.dl&&(gAll(s)||Date.now()>g.dl)&&i++<6){g.dl=0;GAMES[g.id].next(s);if(g.over){gFin(s);break}}}
+ while(s.phase=='game'&&g.dl&&(gAll(s)||gLate(g))&&i++<6){g.dl=0;GAMES[g.id].next(s);if(g.over){gFin(s);break}}}
 function gStart(s){const id=s.gsel;s.game={id,k:0,r:0,n:0,sc:{},done:{},rx:{}};s.order.forEach(n=>s.game.sc[n]=0);s.gres=null;s.phase='game';s.gid=Date.now().toString(36);GAMES[id].init(s);gCheck(s)}
 /* @games : appelé en tête de act() ; true = géré ici */
 W.GAct=function(s,from,a){const t=a&&a.t;
@@ -66,7 +70,7 @@ W.GAct=function(s,from,a){const t=a&&a.t;
  return false};
 W.GHide=function(name,s){if(!s||s.phase!='game'||!s.game)return s;const G=GAMES[s.game.id];return G&&G.hide?{...s,game:G.hide(s.game,name,s)}:s};
 W.GKick=function(s,name){s.order=s.order.filter(x=>x!=name);if(s.phase!='game'||!s.game)return;if(s.order.length<2)gFin(s);else gCheck(s)};
-W.gTick=function(){try{if(isHost&&st&&st.phase=='game'&&st.game&&st.game.dl&&(Date.now()>st.game.dl||gAll(st))){gCheck(st);bump()}}catch(e){}};
+W.gTick=function(){try{if(isHost&&st&&st.phase=='game'&&st.game&&st.game.dl&&(gLate(st.game)||gAll(st))){gCheck(st);bump()}}catch(e){}};
 if(typeof setInterval!='undefined'&&typeof document!='undefined')setInterval(W.gTick,1000);
 
 /* ---------- aides de vue ---------- */
@@ -89,10 +93,10 @@ W.GView=function(){const s=isHost?GHide(meN(),st):st,g=s.game;if(!g||!GAMES[g.id
  if(s.v!==GV.v){GV.v=s.v;GV.t=Date.now()}
  if(s.phase=='gend')return gEndView(s);
  const G=GAMES[g.id],v=G.view(s)||{},two=s.order.length==2;
- const rem=g.dl?Math.max(0,(g.dl-(s.updatedAt||Date.now())-(Date.now()-GV.t))/1000):0;
+ const rem=g.dl>0?Math.max(0,(g.dl-(s.updatedAt||Date.now())-(Date.now()-GV.t))/1000):0;
  const rk='r_'+g.id+(two&&GI18N.fr.ui['r_'+g.id+'2']?'2':'');
  const head=`<div class="ghd"><span class="gic">${G.icon}</span><b>${GT('n_'+g.id)}</b>${g.n?`<span class="grd">${Math.min(g.r+1,g.n)} / ${g.n}</span>`:''}${meN()==s.host?`<button class="gstop" id="gstop" aria-label="${esc(GT('stopAsk'))}" data-tip="${esc(GT('stopAsk'))}">✕</button>`:''}</div>
- ${g.dl?`<div class="gsab" aria-hidden="true"><i style="animation-duration:${g.sec}s;animation-delay:-${Math.max(0,g.sec-rem).toFixed(2)}s"></i></div>`:''}
+ ${g.dl>0?`<div class="gsab" aria-hidden="true"><i style="animation-duration:${g.sec}s;animation-delay:-${Math.max(0,g.sec-rem).toFixed(2)}s"></i></div>`:''}
  ${g.k<=1?`<p class="grule">${GT(rk)}</p>`:''}`;
  const h={...gHint(s),...v};const ob=v.bind;
  return{...h,html:`<div class="gw g-${g.id}${g.k>1?' gnx':''}">${head}${v.html}</div>`,bind(){
@@ -116,7 +120,8 @@ W.GLobby=function(host,on,E){const sel=st.gsel&&GAMES[st.gsel]?st.gsel:'';
   return `<${tag} class="gtile ggt ${sel==id?'sel':''}" ${host?`data-gsel="${id}" ${ok?'':'disabled'}`:''}><span class="gi">${id?G.icon:'⛵'}</span><span class="gt"><b>${id?GT('n_'+id):GT('exp')}</b><span class="mut">${id?GT('d_'+id):GT('expD')}</span></span><span class="gtags">${(id?G.tags:['social']).map(t=>`<i class="gtg-${t}">${GT('t_'+t)}</i>`).join('')}</span><span class="gmin">≈ ${id?G.dur:(E||'?')} min · ${id?G.min:2}–${id?G.max:8} 👤</span></${tag}>`};
  let h=`<div class="card"><h3>🎲 ${GT('room')}</h3><div class="gtiles">${host?['',...Object.keys(GAMES)].map(tile).join(''):tile(sel)}</div>${host?'':`<p class="gby">${T('chosenBy',{n:B(st.host)})}</p>`}</div>`;
  if(sel){const G=GAMES[sel],ok=on>=G.min&&on<=G.max,rk='r_'+sel+(on==2&&GI18N.fr.ui['r_'+sel+'2']?'2':'');
-  h+=(G.tone?g2ToneCard(host):'')+`<div class="card"><p class="grule">${GT(rk)}</p>${ok?'':`<p class="err">${GT('needP',{a:G.min,b:G.max})}</p>`}
+  let tm='';try{if(!G.rt){const tf=st.timer??1;tm=`<h3 class="gh">${T('timerT')}</h3>${host?`<div class="gseg">${TIM.map((v,i)=>`<button data-tm="${i}" class="${v==tf?'sel':''}">${T('tm'+i)}</button>`).join('')}</div>`:`<p class="gval">${T('tm'+TIM.indexOf(tf))}</p>`}<p class="gsub">${T(tf?'timerD':'timer0D')}</p>`}}catch(e){}
+  h+=(G.tone?g2ToneCard(host):'')+`<div class="card"><p class="grule">${GT(rk)}</p>${ok?'':`<p class="err">${GT('needP',{a:G.min,b:G.max})}</p>`}${tm}
   ${host?`<button class="pri wide" id="start" ${ok?'':'disabled'}>${GT('play',{g:GT('n_'+sel)})}</button>`:`<p class="gby">${GT('waitHost')}</p>`}</div>`}
  return h};
 
@@ -414,12 +419,14 @@ GAMES.arc={icon:'🏝️',min:2,max:8,dur:12,tags:['skill'],T:arcT,V:arcV,gd:arc
   if(mine.pp!=null)o+=`<circle class="bt0" cx="${f(X(mine.pp))}" cy="${f(Y(mine.pp))}" r="3.4" style="fill:${col(m)}"/>`;
   if(mine.pf!=null)o+=rock(mine.pf,'mf');
   const at={};s.order.forEach(p=>{const b=g.bt[p];if(b!=null)(at[b]=at[b]||[]).push(p)});
-  for(const b in at){const L=at[b],n=L.length;L.forEach((p,i)=>{const a=n>1?2*Math.PI*i/n-Math.PI/2:0,rr=n>1?(n>4?4.4:3.6):0,x=X(+b)+rr*Math.cos(a),y=Y(+b)+rr*Math.sin(a);
+  /* case ciblable occupée : les bateaux remontent un peu, l'icône d'ordre prend le bas de la case (aucun chevauchement) */
+  const tgs=new Set((tg||[]).filter(t=>t[1]!='p'&&t[1]!='f').map(t=>t[0]));
+  for(const b in at){const L=at[b],n=L.length,up=tgs.has(+b);L.forEach((p,i)=>{const a=n>1?2*Math.PI*i/n-Math.PI/2:0,rr=n>1?(n>4?(up?3.4:4.4):(up?2.9:3.6)):0,sm=n>4||(up&&n>2),x=X(+b)+rr*Math.cos(a)*(up&&n>1?1.25:1),y=Y(+b)+rr*Math.sin(a)-(up?(n>1?2:2.4):0);
    const mv=(ev.mv||{})[p],d=mv?` style="--dx:${f(X(mv[0])-X(mv[1]))}px;--dy:${f(Y(mv[0])-Y(mv[1]))}px"`:'';
-   o+=`<g class="bt${mv?' mv':''}${p==m?' me':''}"${d}><circle cx="${f(x)}" cy="${f(y)}" r="${n>4?2.5:3}" style="fill:${col(p)}"/><text x="${f(x)}" y="${f(y)}">${esc(([...p][0]||'').toUpperCase())}</text></g>`})}
+   o+=`<g class="bt${mv?' mv':''}${p==m?' me':''}"${d}><circle cx="${f(x)}" cy="${f(y)}" r="${sm?2.3:n>1?2.7:3}" style="fill:${col(p)}"/><text x="${f(x)}" y="${f(y)}">${esc(([...p][0]||'').toUpperCase())}</text></g>`})}
   const gl={m:'⛵',b:'🏝️',r:'🌊',g:'🛡️',p:'⚓',f:'🪨'};
   (tg||[]).forEach(([c,k])=>{const on=mine.c===c||(k=='p'&&mine.pp===c)||(k=='f'&&mine.pf===c);
-   o+=`<polygon class="tg${on?' on':''}" points="${hx(c,.96)}" data-ac="${c}" role="button" aria-label="${esc(GT('k_'+k))}"/>`+(k=='p'||k=='f'?'':lbl(c,gl[k],'gl'+(on?' on':''),5.2))});
+   o+=`<polygon class="tg${on?' on':''}" points="${hx(c,.96)}" data-ac="${c}" role="button" aria-label="${esc(GT('k_'+k))}"/>`+(k=='p'||k=='f'?'':lbl(c,gl[k],'gl'+(on?' on':'')+(at[c]?' sm':''),at[c]?6.3:5.2))});
   return o+'</svg>'},
  view(s){const g=s.game,m=meN(),play=s.order.includes(m);
   const nx={};for(const c in g.isl)nx[g.isl[c]]=(nx[g.isl[c]]||0)+arcV(g,+c);
@@ -434,6 +441,117 @@ GAMES.arc={icon:'🏝️',min:2,max:8,dur:12,tags:['skill'],T:arcT,V:arcV,gd:arc
   return{html:`<div class="card c">${chips}<p class="arcst">${left==1?GT(fin?'afin1':'atide1'):GT(fin?'afin':'atide',{k:left})}${ev.tide?` · <b>${GT('asunk')}</b>`:(ev.cx||[]).length?` · <b class="arccx">✕ ${GT('acx')}</b>`:''}</p>
    ${this.svg(s,tg,{c})}<p class="arcmy">${!play?'':k?`${GT('amine')} : <b>${GT('k_'+k)}</b>`:GT('apick')}</p><p class="arclg mut">${['m','b','r','g'].map(x=>GT('k_'+x)).join(' · ')}</p></div>`,bind}},
  endView(s){const g=s.game;return `<div class="arcsc">${s.order.map((p,i)=>`<span class="gchip ga" ${dl(i,.3)}>${DT(p)}${esc(p)} · 🏝️ ${(g.ss[p]||{}).b||0} · 🌊 ${(g.ss[p]||{}).r||0}</span>`).join('')}</div><p class="mut arclg">🏝️ ${GT('abuilt')} · 🌊 ${GT('araid')}</p>`},
+ fin(s){return{pts:s.game.sc}}};
+
+/* =====================================================================
+   🎭 LES MASQUES — fiche (confiance / trahison, 3-8 joueurs)
+   5 manches. Chaque manche : duos secrets tirés au sort (nombre impair : un trio), en limitant les rencontres répétées.
+     Chacun reçoit un masque marin au hasard (🐙🪼🐡…) et ne voit QUE le masque de son duo, jamais son nom.
+   Étapes : message anonyme au duo (75 s, modifiable jusqu'à la fin de l'étape ; invitation tirée sans remise dans une
+     réserve par ton : 26 tout public / 16 coquines / 16 trash) → choix secret Partager ou Garder (40 s, modifiable, sans
+     choix = Garder) → révélation (prêt/20 s) : ton résultat + « la mer des masques » (tous les duos, en masques seulement).
+   Gains : Partager/Partager = 4 chacun la 1re fois avec cette personne, 2 ensuite ; Garder face à Partager = 4 / 2 ;
+     Garder/Garder = 2/2. Réseau : chaque NOUVELLE personne avec qui tu partages à deux rapporte +2, +4, +6… à partir de la
+     2e (la 1re ne rapporte rien de plus) → faire confiance à des gens différents paie ; un couple qui se reconnaît (code,
+     même pièce) ne gagne qu'un lien, et ses rencontres répétées valent 2 comme un double Garder. Trio : moyenne des
+     face-à-face + liens. Pas de choix dominant : 1re rencontre, partager vaut 4+réseau contre 4 ; rencontre répétée,
+     garder vaut 4 contre 2 — et on ne sait pas qui est derrière le masque. Un « +2 » après un double partage trahit une
+     rencontre répétée : indice.
+   Scores secrets pendant la partie (sinon on déduirait son duo). Finale : les 2 premiers (ex æquo : tirage au sort)
+     jouent 16 points à visage découvert : tous deux Partager = 8 chacun ; un seul Voler = 16 pour lui ; tous deux Voler =
+     −8 chacun (jeu de la poule mouillée : voler n'est pas dominant). Les autres parient sur l'issue (+4 si juste).
+     Fin : constellation de qui a trahi qui (vert partage, rouge trahison fléchée, gris double Garder).
+   SIM (.sim/msk.js, hors site, 3000 parties/taille ; styles prudente = partage si la mer partage, agressive = garde et
+     vole toujours, imitatrice = rend ce qu'on lui a fait, hasard, naïve = partage toujours) :
+     sièges n=4 25.1/25.9/24.4/24.6 · n=8 11.7–13.3 (12.5 attendu). Victoire relative à 1/n : agressive 140–156 % à 3-6
+     joueurs mais 107 % à 7-8 ; naïve 57 % à 4 mais 113-115 % à 7-8 ; prudente 107–123 % ; imitatrice 72–86 % : aucun style
+     ne gagne partout. Couple qui se reconnaît et partage toujours entre eux : 55 % de victoires à 4 (50 % attendu),
+     56 % à 6 (33 %), 41 % à 8 (25 %) ; versions rejetées : 8/4/2 sans réseau (couple 77 % à 4), cagnotte « vol
+     dominant » (agressive 200 %).
+   ===================================================================== */
+const MKE=['🐙','🪼','🐡','🦀','🐢','🦑','🐠','🦞','🐬','🦭'];
+const mkPair=(a,b)=>a<b?a+'|'+b:b+'|'+a;
+const mkPay=(c1,c2,k)=>c1=='P'&&c2=='P'?(k?2:4):c1=='G'&&c2=='P'?4:2;
+GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,MKE,pay:mkPay,
+ init(s){const g=s.game;g.n=5;g.r=0;g.pc={};g.mt={};g.net={};g.h=[];g.pub=[];g.q=gPool(s,'msk',g.n);this.round(s)},
+ round(s){const g=s.game,on=s.order;let best=null,bv=1e9;
+  for(let t=0;t<40;t++){const o=shuf(on),gr=[];for(let i=0;i+1<o.length;i+=2)gr.push([o[i],o[i+1]]);if(o.length%2)gr[gr.length-1].push(o[o.length-1]);
+   let v=0;gr.forEach(x=>{for(let i=0;i<x.length;i++)for(let j=i+1;j<x.length;j++)v+=(g.mt[mkPair(x[i],x[j])]||0)**2});v+=Math.random()*.1;if(v<bv){bv=v;best=gr}}
+  g.grp=best;g.mk={};const ms=shuf(MKE.map((x,i)=>i));on.forEach((p,i)=>g.mk[p]=ms[i]);g.msg={};g.ch={};g.gain={};g.nb={};gWait(g,75,'m')},
+ act(s,from,a){const g=s.game;
+  if(g.st=='m'&&typeof a.w=='string'){g.msg[from]=tidy(a.w).slice(0,140);g.done[from]=1;return true}
+  if(g.st=='c'&&(a.v=='P'||a.v=='G')){g.ch[from]=a.v;g.done[from]=1;return true}
+  if(g.st=='f'){if(g.fin.includes(from)){if(a.v=='P'||a.v=='V'){g.fc[from]=a.v;g.done[from]=1;return true}}
+   else if([0,1,2].includes(a.b)){g.bet[from]=a.b;g.done[from]=1;return true}}},
+ next(s){const g=s.game;
+  if(g.st=='m'){gWait(g,40,'c');return}
+  if(g.st=='c'){this.resolve(s);gWait(g,20,'r',1);return}
+  if(g.st=='r'){g.r++;if(g.r<g.n){this.round(s);return}this.final(s);return}
+  if(g.st=='f'){this.fres(s);gWait(g,25,'F',1);return}
+  if(g.st=='F'){g.over=1}},
+ resolve(s){const g=s.game,ch={},rec={grp:g.grp.map(x=>[...x]),mk:{...g.mk},ch:{},msg:{...g.msg},gain:{}},pub=[];
+  s.order.forEach(p=>ch[p]=g.ch[p]||'G');
+  g.grp.forEach(x=>{const tot={},nb={};x.forEach(p=>{tot[p]=0;nb[p]=0});
+   for(let i=0;i<x.length;i++)for(let j=i+1;j<x.length;j++){const a=x[i],b=x[j],k=mkPair(a,b),pc=g.pc[k]||0;
+    tot[a]+=mkPay(ch[a],ch[b],pc);tot[b]+=mkPay(ch[b],ch[a],pc);
+    if(ch[a]=='P'&&ch[b]=='P'){g.pc[k]=pc+1;if(!pc)[a,b].forEach(p=>{g.net[p]=(g.net[p]||0)+1;nb[p]+=2*(g.net[p]-1)})}g.mt[k]=(g.mt[k]||0)+1}
+   x.forEach(p=>{const v=tot[p]/(x.length-1)+nb[p];g.gain[p]=v;g.nb[p]=nb[p];g.sc[p]+=v;rec.gain[p]=v;rec.ch[p]=ch[p]});
+   pub.push(shuf(x).map(p=>[g.mk[p],ch[p],g.gain[p]]))});
+  g.h.push(rec);g.pub.push(shuf(pub))},
+ final(s){const g=s.game,fin=shuf(s.order).sort((a,b)=>g.sc[b]-g.sc[a]).slice(0,2);/* ex æquo : tirage au sort (symétrique) */
+  g.fin=fin;g.pot=16;g.fc={};g.bet={};delete g.grp;g.mk={};gWait(g,90,'f')},
+ fres(s){const g=s.game,c={};g.fin.forEach(p=>c[p]=g.fc[p]||'V');const st=g.fin.filter(p=>c[p]=='V'),out=st.length==0?0:st.length==1?1:2,add={};
+  g.fin.forEach(p=>add[p]=out==0?Math.floor(g.pot/g.fin.length):out==1?(c[p]=='V'?g.pot:0):(c[p]=='V'?-8:0));
+  s.order.forEach(p=>{if(!g.fin.includes(p))add[p]=g.bet[p]===out?4:0});for(const p in add)g.sc[p]+=add[p];g.fr={c,out,add}},
+ hide(g,n,s){const o={...g};delete o.grp;delete o.mk;delete o.h;delete o.pc;delete o.mt;delete o.msg;delete o.ch;delete o.gain;
+  o.sc={[n]:g.sc[n]};const gr=(g.grp||[]).find(x=>x.includes(n))||[],pt=gr.filter(p=>p!=n);
+  o.me={m:g.mk?g.mk[n]:null,pt:pt.map(p=>g.mk[p]),msg:g.msg?g.msg[n]:null,ch:g.ch?g.ch[n]:null};
+  if(g.st=='c'||g.st=='r')o.me.pm=pt.map(p=>g.msg[p]||'');
+  if(g.st=='r'){o.me.pc=pt.map(p=>g.ch[p]||'G');o.me.gain=g.gain[n];o.me.nb=(g.nb||{})[n]||0;o.me.ch=g.ch[n]||'G'}delete o.nb;delete o.net;
+  if(g.st=='f'){o.fc=hideOwn(g.fc,n);o.bet=hideOwn(g.bet,n)}return o},
+ mn(i){return `<span class="mkm"><span class="mke">${MKE[i]||'❔'}</span> ${esc(GL('mkn')[i]||'')}</span>`},
+ view(s){const g=s.game,m=meN(),me=g.me||{},R=GAMES.msk;
+  const duo=me.pt&&me.pt.length?me.pt.map(i=>R.mn(i)).join(''):'';
+  const head=g.st=='m'||g.st=='c'||g.st=='r'?`<div class="mkhd"><span class="mkme ga">${GT('ymask')} ${R.mn(me.m)}</span><span class="mkvs ga" ${dl(1)}>${GT(me.pt.length>1?'ytrio':'yduo')} ${duo}</span></div>`:'';
+  if(g.st=='m'){const pq=g.q[g.r];
+   if(g.done[m]&&R.ed!==g.k)return{html:`<div class="card c">${head}<div class="mkbub mine ga" ${dl(2)}>${me.msg?esc(me.msg):`<i class="mut">${GT('mnone')}</i>`}</div><p class="gnote ga" ${dl(3)}>${GT('msent')}</p><button class="ghost mked" id="gedit">✏️ ${GT('medit')}</button></div>`,
+    bind(){$('#gedit').onclick=()=>{R.ed=g.k;drafts['gmw'+g.k]=me.msg||'';render()}}};
+   return{html:`<div class="card c">${head}${pq?`<p class="mktip ga" ${dl(2)}>💡 ${esc(GC('msk',pq))}</p>`:''}<textarea data-d="gmw${g.k}" rows="3" maxlength="140" placeholder="${esc(GT('mph'))}"></textarea>
+    <div class="gbtns2"><button class="ghost" id="gskip">${GT('mskip')}</button><button class="pri" id="gsend">${GT('send')}</button></div></div>`,
+    bind(){const t=$(`[data-d="gmw${g.k}"]`);$('#gsend').onclick=()=>{R.ed=null;gs({w:tidy(t.value)})};$('#gskip').onclick=()=>{R.ed=null;gs({w:''})}}}}
+  const msgs=(me.pm||[]).map((x,i)=>`<div class="mkbub ga" ${dl(i+2)}><span class="mkfrom">${MKE[me.pt[i]]}</span>${x?esc(x):`<i class="mut">${GT('mnone')}</i>`}</div>`).join('');
+  if(g.st=='c')return{html:`<div class="card c">${head}<p class="gq2">${GT('mread')}</p>${msgs}
+   <div class="gpk mkch">${['P','G'].map((v,i)=>`<button class="ga gdec ${me.ch==v?'sel':''}" ${dl(i,.3)} data-gm="${v}">${GT('k'+v)}</button>`).join('')}</div></div>`,
+   bind(){$$('[data-gm]').forEach(x=>x.onclick=()=>gs({v:x.dataset.gm}))}};
+  if(g.st=='r'){const sea=(g.pub[g.r]||[]).map((gr,i)=>`<div class="mksea ga" ${dl(i,.4)}>${gr.map(([k,c,v])=>`<span class="mkc ${c=='P'?'p':'g'} ${k===me.m?'me':''}">${MKE[k]} ${c=='P'?'🤝':'🔒'} <b>+${v}</b></span>`).join('')}</div>`).join('');
+   const rep=me.ch=='P'&&(me.pc||[]).every(c=>c=='P')&&me.gain<4&&me.pt.length==1;
+   return{html:`<div class="card c">${head}<div class="mkres">${(me.pc||[]).map((c,i)=>`<p class="ga" ${dl(i+1)}>${MKE[me.pt[i]]} ${GT(c=='P'?'mshared':'mkept')}</p>`).join('')}
+    <p class="gbig2 ga ${me.gain>=4?'ok':''}" ${dl(3)}>+${me.gain}</p>${me.nb?`<p class="mknet ga" ${dl(4)}>🕸️ ${GT('mnet',{v:me.nb})}</p>`:''}${rep?`<p class="mut ga" ${dl(4)}>${GT('mrep')}</p>`:''}<p class="gcof">🔒 ${GT('mtot',{v:g.sc[m]??0})}</p></div>
+    <h3 class="gh3">🌊 ${GT('msea')}</h3>${sea}</div>`,bind(){if(me.gain>=4&&!RM())sparkles($('.mkres .gbig2'),me.nb?14:8)}}}
+  const fin=g.fin||[],isF=fin.includes(m),names=fin.map(NM).join(' & ');
+  if(g.st=='f'){const top=`<div class="mkfin ga"><span class="gbig">🎭</span><b>${GT('mfinT')}</b><p>${GT('mfinD',{n:names,v:g.pot})}</p><p class="mut">${GT('mfinC')}</p></div>`;
+   if(isF)return{html:`<div class="card c">${top}<div class="gpk mkch">${['P','V'].map((v,i)=>`<button class="ga gdec ${g.fc[m]==v?'sel':''}" ${dl(i,.3)} data-gf="${v}">${GT('k'+v)}</button>`).join('')}</div><p class="gcof">🔒 ${GT('mtot',{v:g.sc[m]??0})}</p></div>`,
+    bind(){$$('[data-gf]').forEach(x=>x.onclick=()=>gs({v:x.dataset.gf}))}};
+   return{html:`<div class="card c">${top}<p class="gq2">${GT('mbet')}</p><div class="gab">${[0,1,2].map(i=>`<button class="gopt ga ${g.bet[m]===i?'sel':''}" ${dl(i,.3)} data-gb="${i}">${GT('mb'+i)}</button>`).join('')}</div></div>`,
+    bind(){$$('[data-gb]').forEach(x=>x.onclick=()=>gs({b:+x.dataset.gb}))}}}
+  const fr=g.fr||{c:{},add:{}};
+  return{html:`<div class="card c"><div class="mkfin"><b>${GT('mfinT')}</b></div><div class="gduo mkduo">${fin.map((p,i)=>`<div class="ga" ${dl(i*2,.1)}>${DT(p)}<b>${esc(p)}</b><br><span class="gtag ${fr.c[p]=='P'?'':'no'}">${GT('k'+fr.c[p])}</span><br><b>+${fr.add[p]||0}</b></div>`).join('')}</div>
+   <p class="gbig2 ga ok" ${dl(4)}>${GT('mb'+fr.out)}</p>${isF?'':`<p class="gnote ga" ${dl(5)}>${g.bet[m]===fr.out?GT('mbetok'):'—'}</p>`}</div>`,
+   bind(){if(fr.out==0&&!RM())sparkles($('.mkduo'),16)}}},
+ endView(s){const g=s.game,o=s.order,n=o.length,W=220,cx=110,cy=110,rr=82,pos={};o.forEach((p,i)=>{const a=2*Math.PI*i/n-Math.PI/2;pos[p]=[cx+rr*Math.cos(a),cy+rr*Math.sin(a)]});
+  const E={};(g.h||[]).forEach(r=>r.grp.forEach(x=>{for(let i=0;i<x.length;i++)for(let j=i+1;j<x.length;j++){const a=x[i],b=x[j],k=mkPair(a,b),e=E[k]=E[k]||{a:a<b?a:b,b:a<b?b:a,pp:0,gg:0,t:{}};
+   const ca=r.ch[a],cb=r.ch[b];if(ca=='P'&&cb=='P')e.pp++;else if(ca=='G'&&cb=='G')e.gg++;else{const tr=ca=='G'?a:b;e.t[tr]=(e.t[tr]||0)+1}}}));
+  const f=v=>v.toFixed(1);let svg=`<svg class="mkcst" viewBox="0 0 ${W} ${W}" role="img" aria-label="${esc(GT('mconst'))}"><defs><marker id="mkar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--bad)"/></marker></defs>`;
+  const ln=(a,b,cl,off,mk)=>{const [x1,y1]=pos[a],[x2,y2]=pos[b],dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy)||1,nx=-dy/L*off,ny=dx/L*off,sh=14/L;
+   return `<line class="${cl}" x1="${f(x1+dx*sh+nx)}" y1="${f(y1+dy*sh+ny)}" x2="${f(x2-dx*sh+nx)}" y2="${f(y2-dy*sh+ny)}"${mk?' marker-end="url(#mkar)"':''}/>`};
+  let li=0;for(const k in E){const e=E[k];const d=li++*.08;
+   if(e.pp)svg+=`<g class="mkl" style="animation-delay:${d.toFixed(2)}s">${ln(e.a,e.b,'pp',0)}</g>`;
+   else if(!Object.keys(e.t).length&&e.gg)svg+=`<g class="mkl" style="animation-delay:${d.toFixed(2)}s">${ln(e.a,e.b,'gg',0)}</g>`;
+   for(const t in e.t)svg+=`<g class="mkl" style="animation-delay:${d.toFixed(2)}s">${ln(t,t==e.a?e.b:e.a,'tr',t==e.a?3:-3,1)}</g>`}
+  o.forEach(p=>{const [x,y]=pos[p];svg+=`<circle cx="${f(x)}" cy="${f(y)}" r="9" style="fill:${col(p)}"/><text class="mkn" x="${f(x)}" y="${f(y+(y<cy?-14:20))}">${esc(p)}</text>`});
+  svg+='</svg>';
+  const tr=o.map(p=>{const v=[];for(const k in E){const e=E[k];if(e.t[p])v.push(e.a==p?e.b:e.a)}return [p,v]}).filter(x=>x[1].length);
+  return `<h3 class="gh3">✨ ${GT('mconst')}</h3>${svg}<p class="mut arclg">${GT('mlegend')}</p>${tr.length?`<div class="mktr">${tr.map(([p,v],i)=>`<p class="ga" ${dl(i,.4)}>${B(p)} ${GT('mbetr')} ${v.map(B).join(', ')}</p>`).join('')}</div>`:`<p class="gnote">${GT('mnobetr')}</p>`}`},
  fin(s){return{pts:s.game.sc}}};
 
 /* ---------- styles (injectés) ---------- */
@@ -550,7 +668,7 @@ section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) b
 .arcb{display:block;width:100%;max-width:500px;margin:2px auto 0;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;overflow:visible}
 .arcb .h{stroke:var(--paper);stroke-width:.9;stroke-linejoin:round}
 .arcb .r0{fill:#3f9fb2}.arcb .r1{fill:#62b7c5}.arcb .r2{fill:#8fcfd7}.arcb .r3{fill:#b9e4e8}
-.arcb .dead{fill:var(--edge);opacity:.28}
+.arcb .dead{fill:var(--paper);fill-opacity:.12;stroke:var(--mut);stroke-opacity:.55;stroke-width:.6;stroke-dasharray:1.6 1.4}.arcb .gl.sm{font-size:3.8px}
 .arcb .sink{opacity:0;animation:arcsink 1.2s ease both}@keyframes arcsink{from{opacity:1}}
 .arcb text{text-anchor:middle;dominant-baseline:central;pointer-events:none}
 .arcb .v{font:800 4.2px Nunito,sans-serif;fill:#fff;opacity:.75}
@@ -570,8 +688,32 @@ section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) b
 [data-theme=dark] .arcb .r0{fill:#2a7f97}[data-theme=dark] .arcb .r1{fill:#21627a}[data-theme=dark] .arcb .r2{fill:#1b4e66}[data-theme=dark] .arcb .r3{fill:#163f55}
 [data-theme=dark] .arcb .v{fill:#bfe6ee;opacity:.7}[data-theme=dark] .arcb .isl{stroke:#e9f6f8}[data-theme=dark] .arcb .rk circle{fill:#8d9ea6;stroke:#53646b}
 [data-theme=dark] .arcb .tg.on{fill:#ff8a3d55}
+/* 🎭 Les Masques */
+.mkhd{display:flex;flex-wrap:wrap;gap:6px 10px;justify-content:center;margin:0 0 10px;font:700 14px Nunito;color:var(--mut)}
+.mkme,.mkvs{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:99px;background:var(--paper2);border:2px solid var(--edge)}
+.mkvs{border-color:var(--acc2);flex-wrap:wrap;justify-content:center;border-radius:18px}.mkhd .mke{font-size:20px;line-height:1}.mkm{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;color:var(--txt)}
+.mktip{font:700 14px Nunito;color:var(--deep);margin:0 0 8px;text-align:center}
+.g-msk textarea{width:100%;box-sizing:border-box;min-height:76px}
+.gbtns2{display:flex;gap:8px;margin-top:8px}.gbtns2 button{flex:1}
+.mkbub{position:relative;text-align:start;background:var(--paper2);border:2px solid var(--edge);border-radius:18px 18px 18px 6px;padding:10px 14px 10px 46px;margin:8px 0;font:600 16px/1.4 Nunito;overflow-wrap:anywhere;min-height:24px}
+[dir=rtl] .mkbub{padding:10px 46px 10px 14px;border-radius:18px 18px 6px 18px}
+.mkbub.mine{padding:12px 14px;border-radius:18px 18px 6px 18px;border-color:var(--acc2);text-align:center}
+.mkfrom{position:absolute;inset-inline-start:10px;top:8px;font-size:24px;line-height:1}
+.mked{margin-top:10px;font-size:14px;padding:6px 14px}
+.mkch{margin-top:14px}.mkch>button{flex:1 1 40%}
+.mkres p{margin:4px 0;font:700 16px Nunito}.mknet{color:var(--ink)}
+.mksea{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:6px 0;padding:6px;border-radius:14px;background:var(--paper2)}
+.mkc{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;font:700 14px Nunito;background:var(--paper);border:2px solid var(--edge)}
+.mkc.p{border-color:#8fd8bd}.mkc.g{border-color:#f3b88c}.mkc.me{outline:2px solid var(--acc);outline-offset:1px}.mkc b{font-size:13px}
+.mkfin{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;font:600 19px Fredoka,Nunito}.mkfin p{margin:0;font:600 15px/1.4 Nunito}
+.mkcst{display:block;width:100%;max-width:300px;margin:4px auto 0;overflow:visible}
+.mkcst line{stroke-width:2.2;stroke-linecap:round}.mkcst .pp{stroke:var(--ink)}.mkcst .gg{stroke:var(--mut);stroke-dasharray:3 4;opacity:.6}.mkcst .tr{stroke:var(--bad)}
+.mkcst circle{stroke:var(--paper);stroke-width:2.5}.mkcst .mkn{font:800 10px Nunito,sans-serif;fill:var(--txt);text-anchor:middle;dominant-baseline:central}
+.mkl{animation:fi .5s ease both}.still .mkl{animation:none}
+.mktr p{margin:4px 0;font:600 14px Nunito;text-align:center}
+[data-theme=dark] .mkc.p{border-color:#2c7a62}[data-theme=dark] .mkc.g{border-color:#7a4a2a}
 @media (max-width:420px){.grow2{flex-direction:column}.gq{font-size:19px}.gseed{font-size:26px}.gbr{grid-template-columns:minmax(0,7em) 1fr 1.6em}.gtf{width:78px}.gcamps{gap:6px}}
-@media (prefers-reduced-motion:reduce){.gw .ga,.gw .gbar,.gfloat,.gev .gbig,.grx,.arcb *,.gw.gnx>.card{animation:none!important}.gsab i{animation-duration:0s!important;display:none}}
+@media (prefers-reduced-motion:reduce){.gw .ga,.gw .gbar,.gfloat,.gev .gbig,.grx,.arcb *,.gw.gnx>.card,.mkl{animation:none!important}.gsab i{animation-duration:0s!important;display:none}}
 `;(document.head||document.documentElement).appendChild(c)}
 
 /* =====================================================================
@@ -900,4 +1042,133 @@ asetup:`Toque numa casa da borda para o seu porto ⚓, depois numa casa do anel 
 k_m:`⛵ Navegar`,k_b:`🏝️ Construir aqui`,k_r:`🌊 Afundar a ilhota`,k_g:`🛡️ Ficar`,k_p:`seu porto`,k_f:`seu recife`,
 atide:`Colheita em {k} turnos`,atide1:`Colheita no fim deste turno`,afin:`Última colheita em {k} turnos`,afin1:`Último turno: colheita final`,asunk:`a maré engoliu a borda`,acx:`ordens anuladas (mesma casa)`,
 amine:`Sua ordem`,apick:`Toque numa casa destacada`,aharv:`Colheita`,afinal:`Colheita final`,atidec:`A maré sobe: a borda vai ser engolida.`,abuilt:`ilhotas construídas`,araid:`ilhotas afundadas`});
+const GMSK=(l,o,c)=>{Object.assign(GI18N[l].ui,o);Object.assign(GI18N[l],c)};
+GMSK('fr',{n_msk:`Les Masques`,d_msk:`Duos secrets et masqués : partager ou garder ?`,
+r_msk:`Chaque manche, tu es en duo secret avec un masque marin : écris-lui un message anonyme, puis choisis en secret Partager ou Garder. Partager à deux rapporte 4 chacun (2 si vous aviez déjà partagé ensemble) et agrandit ton réseau : +2, +4, +6… dès la 2e personne différente ; Garder rapporte 4 si l'autre partage (2 pour lui), sinon 2. À la fin, les deux premiers jouent 16 points à visage découvert : tous Partager (8 chacun), un seul Voler (16 pour lui), tous Voler (−8 chacun).`,
+ymask:`Ton masque`,yduo:`Ton duo`,ytrio:`Ton trio`,mph:`Ton message anonyme…`,mskip:`Rien à dire`,msent:`Message envoyé`,mnone:`(pas de message)`,mread:`Ce qu'on t'a écrit`,
+kP:`🤝 Partager`,kG:`🔒 Garder`,kV:`🗡️ Voler`,mshared:`a partagé`,mkept:`a gardé`,mrep:`Seulement 2 : vous aviez déjà partagé ensemble…`,mnet:`réseau : +{v}`,mtot:`Ton total (secret) : {v}`,msea:`La mer des masques`,
+mfinT:`Le dernier masque tombe`,mfinD:`{n} jouent {v} points à visage découvert`,mfinC:`Tous Partager : on divise. Un seul Voler : il prend tout. Tous Voler : −8 chacun.`,
+mbet:`Ton pari (+4 si tu vois juste)`,mb0:`Ils partagent`,mb1:`Un seul vole`,mb2:`Ils volent tous les deux`,mbetok:`Pari gagné : +4`,
+mconst:`Constellation des masques`,mlegend:`vert : partage mutuel · rouge : trahison (flèche vers la victime) · gris : chacun a gardé`,mbetr:`a trahi`,mnobetr:`Personne n'a trahi personne !`},
+{mkn:`le Poulpe|la Méduse|le Poisson-globe|le Crabe|la Tortue|le Calmar|le Poisson-clown|le Homard|le Dauphin|le Phoque`,
+msk:`Convaincs ton masque de partager|Donne un vrai indice sur qui tu es|Donne un faux indice sur qui tu es|Fais une promesse|Annonce ton plan pour cette manche|Pose une question piège|Fais un compliment sans te trahir|Avoue un petit défaut|Menace gentiment|Décris ton humeur en trois mots|Invente un mot de passe pour se reconnaître|Fais rire ton masque`,
+msk1:`Séduis ton masque en une phrase|Propose un rendez-vous secret|Fais un compliment osé|Décris ton baiser idéal|Promets un câlin si vous partagez|Écris une phrase de drague de pirate|Avoue ce qui te fait craquer|Chuchote un secret tendre`,
+msk2:`Fais ton offre la plus indécente|Avoue un fantasme inavouable|Promets un gage hot si vous partagez|Décris ta nuit idéale sans filtre|Insulte ton masque avec amour|Fais une proposition qui ferait rougir le groupe|Balance un secret d'alcôve|Négocie comme dans un film pour adultes`});
+GMSK('en',{n_msk:`The Masks`,d_msk:`Secret masked duos: share or keep?`,
+r_msk:`Each round you're in a secret duo with a sea mask: send it an anonymous message, then secretly choose Share or Keep. Sharing together gives 4 each (2 if you've already shared together) and grows your network: +2, +4, +6… from the 2nd different person; Keep gives 4 if the other shares (2 for them), otherwise 2. At the end, the top two play for 16 points face to face: both Share (8 each), one Steals (16 for them), both Steal (−8 each).`,
+ymask:`Your mask`,yduo:`Your duo`,ytrio:`Your trio`,mph:`Your anonymous message…`,mskip:`Nothing to say`,msent:`Message sent`,mnone:`(no message)`,mread:`What you were sent`,
+kP:`🤝 Share`,kG:`🔒 Keep`,kV:`🗡️ Steal`,mshared:`shared`,mkept:`kept`,mrep:`Only 2: you had already shared together…`,mnet:`network: +{v}`,mtot:`Your total (secret): {v}`,msea:`The sea of masks`,
+mfinT:`The last mask falls`,mfinD:`{n} play for {v} points face to face`,mfinC:`Both Share: split it. One Steals: they take it all. Both Steal: −8 each.`,
+mbet:`Your bet (+4 if right)`,mb0:`They share`,mb1:`One of them steals`,mb2:`They both steal`,mbetok:`Bet won: +4`,
+mconst:`Constellation of masks`,mlegend:`green: mutual share · red: betrayal (arrow to the victim) · grey: both kept`,mbetr:`betrayed`,mnobetr:`Nobody betrayed anybody!`},
+{mkn:`the Octopus|the Jellyfish|the Pufferfish|the Crab|the Turtle|the Squid|the Clownfish|the Lobster|the Dolphin|the Seal`,
+msk:`Convince your mask to share|Give a true clue about who you are|Give a false clue about who you are|Make a promise|Announce your plan for this round|Ask a trick question|Pay a compliment without giving yourself away|Admit a small flaw|Make a friendly threat|Describe your mood in three words|Invent a password to recognise each other|Make your mask laugh`,
+msk1:`Seduce your mask in one sentence|Suggest a secret date|Pay a daring compliment|Describe your ideal kiss|Promise a cuddle if you both share|Write a pirate pick-up line|Admit what makes you melt|Whisper a tender secret`,
+msk2:`Make your most indecent offer|Admit an unspeakable fantasy|Promise a hot dare if you both share|Describe your ideal night, no filter|Insult your mask lovingly|Make a proposal that would make the group blush|Spill a bedroom secret|Negotiate like in an adult film`});
+GMSK('es',{n_msk:`Las Máscaras`,d_msk:`Dúos secretos y enmascarados: ¿compartir o guardar?`,
+r_msk:`Cada ronda estás en un dúo secreto con una máscara marina: mándale un mensaje anónimo y elige en secreto Compartir o Guardar. Compartir los dos da 4 a cada uno (2 si ya habíais compartido juntos) y amplía tu red: +2, +4, +6… desde la 2.ª persona distinta; Guardar da 4 si el otro comparte (2 para él), si no 2. Al final, los dos primeros se juegan 16 puntos cara a cara: los dos Comparten (8 cada uno), uno solo Roba (16 para él), los dos Roban (−8 cada uno).`,
+ymask:`Tu máscara`,yduo:`Tu dúo`,ytrio:`Tu trío`,mph:`Tu mensaje anónimo…`,mskip:`Nada que decir`,msent:`Mensaje enviado`,mnone:`(sin mensaje)`,mread:`Lo que te han escrito`,
+kP:`🤝 Compartir`,kG:`🔒 Guardar`,kV:`🗡️ Robar`,mshared:`compartió`,mkept:`guardó`,mrep:`Solo 2: ya habíais compartido juntos…`,mnet:`red: +{v}`,mtot:`Tu total (secreto): {v}`,msea:`El mar de las máscaras`,
+mfinT:`Cae la última máscara`,mfinD:`{n} se juegan {v} puntos cara a cara`,mfinC:`Los dos Comparten: se reparte. Uno solo Roba: se lo lleva todo. Los dos Roban: −8 cada uno.`,
+mbet:`Tu apuesta (+4 si aciertas)`,mb0:`Comparten`,mb1:`Uno solo roba`,mb2:`Roban los dos`,mbetok:`Apuesta ganada: +4`,
+mconst:`Constelación de las máscaras`,mlegend:`verde: compartir mutuo · rojo: traición (flecha hacia la víctima) · gris: los dos guardaron`,mbetr:`traicionó a`,mnobetr:`¡Nadie traicionó a nadie!`},
+{mkn:`el Pulpo|la Medusa|el Pez globo|el Cangrejo|la Tortuga|el Calamar|el Pez payaso|la Langosta|el Delfín|la Foca`,
+msk:`Convence a tu máscara de compartir|Da una pista verdadera sobre quién eres|Da una pista falsa sobre quién eres|Haz una promesa|Anuncia tu plan para esta ronda|Haz una pregunta trampa|Haz un cumplido sin delatarte|Confiesa un pequeño defecto|Amenaza con cariño|Describe tu humor en tres palabras|Inventa una contraseña para reconoceros|Haz reír a tu máscara`,
+msk1:`Seduce a tu máscara en una frase|Propón una cita secreta|Haz un cumplido atrevido|Describe tu beso ideal|Promete un abrazo si compartís|Escribe una frase de ligue pirata|Confiesa lo que te derrite|Susurra un secreto tierno`,
+msk2:`Haz tu oferta más indecente|Confiesa una fantasía inconfesable|Promete un reto picante si compartís|Describe tu noche ideal sin filtro|Insulta a tu máscara con amor|Haz una propuesta que sonrojaría al grupo|Suelta un secreto de alcoba|Negocia como en una película para adultos`});
+GMSK('it',{n_msk:`Le Maschere`,d_msk:`Coppie segrete e mascherate: condividere o tenere?`,
+r_msk:`A ogni manche sei in coppia segreta con una maschera marina: mandale un messaggio anonimo, poi scegli in segreto Condividi o Tieni. Condividere in due dà 4 a testa (2 se avevate già condiviso insieme) e allarga la tua rete: +2, +4, +6… dalla 2ª persona diversa; Tenere dà 4 se l'altro condivide (2 per lui), altrimenti 2. Alla fine i primi due si giocano 16 punti faccia a faccia: entrambi Condividono (8 a testa), uno solo Ruba (16 per lui), entrambi Rubano (−8 a testa).`,
+ymask:`La tua maschera`,yduo:`La tua coppia`,ytrio:`Il tuo trio`,mph:`Il tuo messaggio anonimo…`,mskip:`Niente da dire`,msent:`Messaggio inviato`,mnone:`(nessun messaggio)`,mread:`Cosa ti hanno scritto`,
+kP:`🤝 Condividi`,kG:`🔒 Tieni`,kV:`🗡️ Ruba`,mshared:`ha condiviso`,mkept:`ha tenuto`,mrep:`Solo 2: avevate già condiviso insieme…`,mnet:`rete: +{v}`,mtot:`Il tuo totale (segreto): {v}`,msea:`Il mare delle maschere`,
+mfinT:`Cade l'ultima maschera`,mfinD:`{n} si giocano {v} punti faccia a faccia`,mfinC:`Entrambi Condividono: si divide. Uno solo Ruba: prende tutto. Entrambi Rubano: −8 a testa.`,
+mbet:`La tua scommessa (+4 se indovini)`,mb0:`Condividono`,mb1:`Uno solo ruba`,mb2:`Rubano entrambi`,mbetok:`Scommessa vinta: +4`,
+mconst:`Costellazione delle maschere`,mlegend:`verde: condivisione reciproca · rosso: tradimento (freccia verso la vittima) · grigio: entrambi hanno tenuto`,mbetr:`ha tradito`,mnobetr:`Nessuno ha tradito nessuno!`},
+{mkn:`il Polpo|la Medusa|il Pesce palla|il Granchio|la Tartaruga|il Calamaro|il Pesce pagliaccio|l'Aragosta|il Delfino|la Foca`,
+msk:`Convinci la tua maschera a condividere|Dai un indizio vero su chi sei|Dai un indizio falso su chi sei|Fai una promessa|Annuncia il tuo piano per questa manche|Fai una domanda trabocchetto|Fai un complimento senza tradirti|Confessa un piccolo difetto|Minaccia con dolcezza|Descrivi il tuo umore in tre parole|Inventa una parola d'ordine per riconoscervi|Fai ridere la tua maschera`,
+msk1:`Seduci la tua maschera in una frase|Proponi un appuntamento segreto|Fai un complimento audace|Descrivi il tuo bacio ideale|Prometti un abbraccio se condividete|Scrivi una frase da rimorchio piratesca|Confessa cosa ti fa sciogliere|Sussurra un segreto tenero`,
+msk2:`Fai la tua offerta più indecente|Confessa una fantasia inconfessabile|Prometti una penitenza hot se condividete|Descrivi la tua notte ideale senza filtri|Insulta la tua maschera con amore|Fai una proposta che farebbe arrossire il gruppo|Svela un segreto da camera da letto|Tratta come in un film per adulti`});
+GMSK('de',{n_msk:`Die Masken`,d_msk:`Geheime, maskierte Duos: teilen oder behalten?`,
+r_msk:`Jede Runde bist du in einem geheimen Duo mit einer Meeresmaske: schick ihr eine anonyme Nachricht und wähle dann geheim Teilen oder Behalten. Teilen beide, bekommt jeder 4 (2, wenn ihr schon zusammen geteilt habt) und dein Netz wächst: +2, +4, +6… ab der 2. verschiedenen Person; Behalten bringt 4, wenn der andere teilt (2 für ihn), sonst 2. Am Ende spielen die zwei Ersten offen um 16 Punkte: beide Teilen (je 8), einer Stiehlt (16 für ihn), beide Stehlen (je −8).`,
+ymask:`Deine Maske`,yduo:`Dein Duo`,ytrio:`Dein Trio`,mph:`Deine anonyme Nachricht…`,mskip:`Nichts zu sagen`,msent:`Nachricht gesendet`,mnone:`(keine Nachricht)`,mread:`Was man dir geschrieben hat`,
+kP:`🤝 Teilen`,kG:`🔒 Behalten`,kV:`🗡️ Stehlen`,mshared:`hat geteilt`,mkept:`hat behalten`,mrep:`Nur 2: ihr hattet schon zusammen geteilt…`,mnet:`Netz: +{v}`,mtot:`Dein Stand (geheim): {v}`,msea:`Das Meer der Masken`,
+mfinT:`Die letzte Maske fällt`,mfinD:`{n} spielen offen um {v} Punkte`,mfinC:`Beide Teilen: wird geteilt. Einer Stiehlt: er nimmt alles. Beide Stehlen: je −8.`,
+mbet:`Deine Wette (+4 bei Treffer)`,mb0:`Sie teilen`,mb1:`Einer stiehlt`,mb2:`Beide stehlen`,mbetok:`Wette gewonnen: +4`,
+mconst:`Sternbild der Masken`,mlegend:`grün: gegenseitig geteilt · rot: Verrat (Pfeil zum Opfer) · grau: beide behalten`,mbetr:`hat verraten:`,mnobetr:`Niemand hat jemanden verraten!`},
+{mkn:`der Krake|die Qualle|der Kugelfisch|die Krabbe|die Schildkröte|der Tintenfisch|der Clownfisch|der Hummer|der Delfin|die Robbe`,
+msk:`Überzeug deine Maske zu teilen|Gib einen echten Hinweis, wer du bist|Gib einen falschen Hinweis, wer du bist|Gib ein Versprechen|Verkünde deinen Plan für diese Runde|Stell eine Fangfrage|Mach ein Kompliment, ohne dich zu verraten|Gib eine kleine Schwäche zu|Droh nett|Beschreib deine Laune in drei Wörtern|Erfinde ein Passwort zum Wiedererkennen|Bring deine Maske zum Lachen`,
+msk1:`Verführ deine Maske in einem Satz|Schlag ein geheimes Date vor|Mach ein gewagtes Kompliment|Beschreib deinen idealen Kuss|Versprich eine Umarmung, wenn ihr teilt|Schreib einen Piraten-Anmachspruch|Gesteh, was dich schwach macht|Flüstere ein zärtliches Geheimnis`,
+msk2:`Mach dein unanständigstes Angebot|Gesteh eine unaussprechliche Fantasie|Versprich eine heiße Mutprobe, wenn ihr teilt|Beschreib deine ideale Nacht ohne Filter|Beleidige deine Maske liebevoll|Mach einen Vorschlag, bei dem die Gruppe rot wird|Verrat ein Schlafzimmergeheimnis|Verhandle wie in einem Erwachsenenfilm`});
+GMSK('ru',{n_msk:`Маски`,d_msk:`Тайные пары в масках: делиться или оставить себе?`,
+r_msk:`Каждый раунд ты в тайной паре с морской маской: отправь ей анонимное сообщение, затем тайно выбери «Делиться» или «Оставить». Если делитесь оба — по 4 каждому (2, если вы уже делились вместе), и твоя сеть растёт: +2, +4, +6… со 2-го разного человека; «Оставить» даёт 4, если другой делится (ему 2), иначе 2. В конце двое лидеров открыто играют на 16 очков: оба делятся (по 8), один крадёт (16 ему), оба крадут (по −8).`,
+ymask:`Твоя маска`,yduo:`Твоя пара`,ytrio:`Твоя тройка`,mph:`Твоё анонимное сообщение…`,mskip:`Нечего сказать`,msent:`Сообщение отправлено`,mnone:`(нет сообщения)`,mread:`Что тебе написали`,
+kP:`🤝 Делиться`,kG:`🔒 Оставить`,kV:`🗡️ Украсть`,mshared:`поделился(-ась)`,mkept:`оставил(а) себе`,mrep:`Только 2: вы уже делились вместе…`,mnet:`сеть: +{v}`,mtot:`Твой счёт (тайно): {v}`,msea:`Море масок`,
+mfinT:`Падает последняя маска`,mfinD:`{n} открыто играют на {v} очков`,mfinC:`Оба делятся: поровну. Один крадёт: забирает всё. Оба крадут: по −8.`,
+mbet:`Твоя ставка (+4, если угадаешь)`,mb0:`Они делятся`,mb1:`Один крадёт`,mb2:`Оба крадут`,mbetok:`Ставка сыграла: +4`,
+mconst:`Созвездие масок`,mlegend:`зелёный: взаимный обмен · красный: предательство (стрелка к жертве) · серый: оба оставили`,mbetr:`предал(а)`,mnobetr:`Никто никого не предал!`},
+{mkn:`Осьминог|Медуза|Рыба-шар|Краб|Черепаха|Кальмар|Рыба-клоун|Омар|Дельфин|Тюлень`,
+msk:`Убеди свою маску делиться|Дай правдивую подсказку, кто ты|Дай ложную подсказку, кто ты|Дай обещание|Объяви свой план на этот раунд|Задай каверзный вопрос|Сделай комплимент, не выдав себя|Признайся в маленьком недостатке|Ласково пригрози|Опиши настроение тремя словами|Придумай пароль, чтобы узнать друг друга|Рассмеши свою маску`,
+msk1:`Соблазни свою маску одной фразой|Предложи тайное свидание|Сделай смелый комплимент|Опиши свой идеальный поцелуй|Пообещай объятия, если оба поделитесь|Напиши пиратскую фразу для флирта|Признайся, от чего тает сердце|Прошепчи нежный секрет`,
+msk2:`Сделай самое неприличное предложение|Признайся в запретной фантазии|Пообещай горячее задание, если оба поделитесь|Опиши идеальную ночь без фильтров|Оскорби свою маску с любовью|Сделай предложение, от которого покраснеет вся группа|Выдай постельный секрет|Торгуйся как во взрослом фильме`});
+GMSK('zh',{n_msk:`面具`,d_msk:`秘密蒙面搭档：分享还是独占？`,
+r_msk:`每轮你会和一个海洋面具秘密组队：先给它发一条匿名消息，再秘密选择“分享”或“独占”。双方都分享各得4分（若你们之前已一起分享过则为2分），并扩大你的人脉：从第2个不同的人起 +2、+4、+6……；独占时若对方分享你得4分（对方2分），否则2分。最后，前两名当面争夺16分：都分享（各8分），一人偷（他得16分），都偷（各−8分）。`,
+ymask:`你的面具`,yduo:`你的搭档`,ytrio:`你的三人组`,mph:`你的匿名消息……`,mskip:`无话可说`,msent:`消息已发送`,mnone:`（没有消息）`,mread:`你收到的消息`,
+kP:`🤝 分享`,kG:`🔒 独占`,kV:`🗡️ 偷`,mshared:`选择了分享`,mkept:`选择了独占`,mrep:`只有2分：你们之前已经一起分享过……`,mnet:`人脉：+{v}`,mtot:`你的总分（保密）：{v}`,msea:`面具之海`,
+mfinT:`最后的面具落下`,mfinD:`{n} 当面争夺 {v} 分`,mfinC:`都分享：平分。一人偷：他全拿。都偷：各−8。`,
+mbet:`你的押注（猜对 +4）`,mb0:`他们分享`,mb1:`只有一人偷`,mb2:`两人都偷`,mbetok:`押注成功：+4`,
+mconst:`面具星座`,mlegend:`绿色：互相分享 · 红色：背叛（箭头指向受害者） · 灰色：双方都独占`,mbetr:`背叛了`,mnobetr:`没有人背叛任何人！`},
+{mkn:`章鱼|水母|河豚|螃蟹|海龟|鱿鱼|小丑鱼|龙虾|海豚|海豹`,
+msk:`说服你的面具选择分享|给出一个关于你身份的真线索|给出一个关于你身份的假线索|许下一个承诺|宣布你这一轮的计划|问一个陷阱问题|夸对方一句但别暴露自己|承认一个小缺点|温柔地威胁一下|用三个词描述你的心情|编一个暗号好认出彼此|把你的面具逗笑`,
+msk1:`用一句话撩你的面具|约一次秘密约会|说一句大胆的赞美|描述你理想中的吻|承诺如果都分享就抱一下|写一句海盗式搭讪|坦白什么让你心动|悄悄说一个温柔的秘密`,
+msk2:`提出你最不正经的条件|坦白一个难以启齿的幻想|承诺如果都分享就来个火辣惩罚|毫无保留地描述你理想的夜晚|用爱来骂你的面具|提一个会让全场脸红的建议|爆一个床笫秘密|像成人电影里那样讨价还价`});
+GMSK('he',{n_msk:`המסכות`,d_msk:`זוגות סודיים במסכות: לחלוק או לשמור?`,
+r_msk:`בכל סבב אתם בזוג סודי עם מסכה ימית: שלחו לה הודעה אנונימית, ואז בחרו בסוד לחלוק או לשמור. אם שניכם חולקים, כל אחד מקבל 4 (2 אם כבר חלקתם יחד) והרשת שלכם גדלה: ‎+2, ‎+4, ‎+6… מהאדם השני השונה; לשמור נותן 4 אם השני חולק (לו 2), אחרת 2. בסוף, שני המובילים משחקים על 16 נקודות פנים אל פנים: שניהם חולקים (8 לכל אחד), אחד גונב (16 לו), שניהם גונבים (‎−8 לכל אחד).`,
+ymask:`המסכה שלך`,yduo:`הזוג שלך`,ytrio:`השלישייה שלך`,mph:`ההודעה האנונימית שלך…`,mskip:`אין מה להגיד`,msent:`ההודעה נשלחה`,mnone:`(אין הודעה)`,mread:`מה כתבו לך`,
+kP:`🤝 לחלוק`,kG:`🔒 לשמור`,kV:`🗡️ לגנוב`,mshared:`חלק/ה`,mkept:`שמר/ה`,mrep:`רק 2: כבר חלקתם יחד…`,mnet:`רשת: ‎+{v}`,mtot:`הסכום שלך (סודי): {v}`,msea:`ים המסכות`,
+mfinT:`המסכה האחרונה נופלת`,mfinD:`{n} משחקים על {v} נקודות פנים אל פנים`,mfinC:`שניהם חולקים: מתחלקים. אחד גונב: לוקח הכול. שניהם גונבים: ‎−8 לכל אחד.`,
+mbet:`ההימור שלך (‎+4 אם צדקת)`,mb0:`הם חולקים`,mb1:`רק אחד גונב`,mb2:`שניהם גונבים`,mbetok:`ההימור הצליח: ‎+4`,
+mconst:`קבוצת הכוכבים של המסכות`,mlegend:`ירוק: חלוקה הדדית · אדום: בגידה (חץ אל הקורבן) · אפור: שניהם שמרו`,mbetr:`בגד/ה ב`,mnobetr:`אף אחד לא בגד באף אחד!`},
+{mkn:`התמנון|המדוזה|הנפוחית|הסרטן|הצב|הדיונון|דג הליצן|הלובסטר|הדולפין|כלב הים`,
+msk:`שכנעו את המסכה לחלוק|תנו רמז אמיתי מי אתם|תנו רמז מטעה מי אתם|הבטיחו משהו|הכריזו על התוכנית שלכם לסבב|שאלו שאלה מכשילה|תנו מחמאה בלי להסגיר את עצמכם|הודו בחיסרון קטן|איימו בעדינות|תארו את מצב הרוח בשלוש מילים|המציאו סיסמה כדי לזהות זה את זה|הצחיקו את המסכה`,
+msk1:`פתו את המסכה במשפט אחד|הציעו דייט סודי|תנו מחמאה נועזת|תארו את הנשיקה האידיאלית|הבטיחו חיבוק אם שניכם חולקים|כתבו משפט התחלה של פיראט|הודו במה שממיס אתכם|לחשו סוד רך`,
+msk2:`הציעו את ההצעה הכי לא צנועה|הודו בפנטזיה שאסור לספר|הבטיחו משימה לוהטת אם שניכם חולקים|תארו את הלילה האידיאלי בלי פילטר|העליבו את המסכה באהבה|הציעו משהו שיסמיק את כל הקבוצה|גלו סוד מחדר השינה|התמקחו כמו בסרט למבוגרים`});
+GMSK('pt',{n_msk:`As Máscaras`,d_msk:`Duplas secretas e mascaradas: dividir ou guardar?`,
+r_msk:`A cada rodada você forma uma dupla secreta com uma máscara marinha: mande uma mensagem anônima e escolha em segredo Dividir ou Guardar. Dividir os dois dá 4 a cada um (2 se vocês já dividiram juntos) e aumenta sua rede: +2, +4, +6… a partir da 2ª pessoa diferente; Guardar dá 4 se o outro divide (2 para ele), senão 2. No fim, os dois primeiros disputam 16 pontos cara a cara: os dois Dividem (8 cada), um só Rouba (16 para ele), os dois Roubam (−8 cada).`,
+ymask:`Sua máscara`,yduo:`Sua dupla`,ytrio:`Seu trio`,mph:`Sua mensagem anônima…`,mskip:`Nada a dizer`,msent:`Mensagem enviada`,mnone:`(sem mensagem)`,mread:`O que te escreveram`,
+kP:`🤝 Dividir`,kG:`🔒 Guardar`,kV:`🗡️ Roubar`,mshared:`dividiu`,mkept:`guardou`,mrep:`Só 2: vocês já tinham dividido juntos…`,mnet:`rede: +{v}`,mtot:`Seu total (secreto): {v}`,msea:`O mar das máscaras`,
+mfinT:`Cai a última máscara`,mfinD:`{n} disputam {v} pontos cara a cara`,mfinC:`Os dois Dividem: reparte-se. Um só Rouba: leva tudo. Os dois Roubam: −8 cada.`,
+mbet:`Sua aposta (+4 se acertar)`,mb0:`Eles dividem`,mb1:`Um só rouba`,mb2:`Os dois roubam`,mbetok:`Aposta certa: +4`,
+mconst:`Constelação das máscaras`,mlegend:`verde: divisão mútua · vermelho: traição (seta para a vítima) · cinza: os dois guardaram`,mbetr:`traiu`,mnobetr:`Ninguém traiu ninguém!`},
+{mkn:`o Polvo|a Água-viva|o Baiacu|o Caranguejo|a Tartaruga|a Lula|o Peixe-palhaço|a Lagosta|o Golfinho|a Foca`,
+msk:`Convença sua máscara a dividir|Dê uma pista verdadeira sobre quem você é|Dê uma pista falsa sobre quem você é|Faça uma promessa|Anuncie seu plano para esta rodada|Faça uma pergunta capciosa|Faça um elogio sem se entregar|Confesse um pequeno defeito|Ameace com carinho|Descreva seu humor em três palavras|Invente uma senha para se reconhecerem|Faça sua máscara rir`,
+msk1:`Seduza sua máscara numa frase|Proponha um encontro secreto|Faça um elogio ousado|Descreva seu beijo ideal|Prometa um abraço se os dois dividirem|Escreva uma cantada de pirata|Confesse o que te derrete|Sussurre um segredo carinhoso`,
+msk2:`Faça sua oferta mais indecente|Confesse uma fantasia inconfessável|Prometa um desafio picante se os dois dividirem|Descreva sua noite ideal sem filtro|Xingue sua máscara com amor|Faça uma proposta que deixaria o grupo vermelho|Solte um segredo de alcova|Negocie como num filme adulto`});
+/* Les Masques : réserves d'invitations élargies (aucune répétition dans une partie : gPool tire sans remise) */
+const GMX=(l,ed,a,b,c)=>{GI18N[l].ui.medit=ed;GI18N[l].msk+='|'+a;GI18N[l].msk1+='|'+b;GI18N[l].msk2+='|'+c};
+GMX('fr',`Modifier`,`Jure sur quelque chose de précieux|Raconte un souvenir sans donner de nom|Écris en rimes|Parle comme un pirate|Cite une chanson qui résume ta stratégie|Décris ton masque idéal|Donne un conseil de survie en mer|Avoue si tu as déjà trahi cette partie|Lance un défi|Écris ton message en emojis seulement|Propose une alliance pour la suite|Fais semblant d'être quelqu'un d'autre|Raconte ce que tu feras avec tes points|Dis une vérité que personne ne croira`,
+`Avoue ton type en trois mots|Propose une danse sous l'eau|Décris le rendez-vous parfait sur un bateau|Fais une déclaration enflammée|Avoue ton pêché mignon|Écris un message comme un poème d'amour|Propose un pacte scellé d'un baiser|Dis ce que tu murmurerais à l'oreille`,
+`Avoue ta pire expérience au lit|Décris ton fantasme en trois mots|Propose un deal sans vêtements|Avoue l'endroit le plus fou où tu l'as fait|Fais une promesse que tu regretteras demain|Écris le sexto le plus nul possible|Décris ton jouet préféré sans le nommer|Balance ce que tu n'as jamais osé demander`);
+GMX('en',`Edit`,`Swear on something precious|Tell a memory without naming anyone|Write in rhyme|Talk like a pirate|Quote a song that sums up your strategy|Describe your ideal mask|Give a sea-survival tip|Admit whether you've betrayed anyone yet|Throw down a challenge|Write your message in emojis only|Propose an alliance for later|Pretend to be someone else|Say what you'll do with your points|Tell a truth nobody will believe`,
+`Admit your type in three words|Suggest an underwater dance|Describe the perfect date on a boat|Make a fiery declaration|Admit your sweet weakness|Write it like a love poem|Propose a pact sealed with a kiss|Say what you'd whisper in their ear`,
+`Admit your worst experience in bed|Describe your fantasy in three words|Propose a deal with no clothes on|Admit the wildest place you've done it|Make a promise you'll regret tomorrow|Write the worst possible sext|Describe your favourite toy without naming it|Spill what you've never dared ask for`);
+GMX('es',`Editar`,`Jura por algo valioso|Cuenta un recuerdo sin dar nombres|Escribe en rima|Habla como un pirata|Cita una canción que resuma tu estrategia|Describe tu máscara ideal|Da un consejo para sobrevivir en el mar|Confiesa si ya has traicionado en esta partida|Lanza un reto|Escribe tu mensaje solo con emojis|Propón una alianza para después|Finge ser otra persona|Cuenta qué harás con tus puntos|Di una verdad que nadie creerá`,
+`Confiesa tu tipo en tres palabras|Propón un baile bajo el agua|Describe la cita perfecta en un barco|Haz una declaración ardiente|Confiesa tu debilidad dulce|Escríbelo como un poema de amor|Propón un pacto sellado con un beso|Di lo que susurrarías al oído`,
+`Confiesa tu peor experiencia en la cama|Describe tu fantasía en tres palabras|Propón un trato sin ropa|Confiesa el sitio más loco donde lo has hecho|Haz una promesa de la que te arrepentirás mañana|Escribe el peor sexting posible|Describe tu juguete favorito sin nombrarlo|Suelta lo que nunca te atreviste a pedir`);
+GMX('it',`Modifica`,`Giura su qualcosa di prezioso|Racconta un ricordo senza fare nomi|Scrivi in rima|Parla come un pirata|Cita una canzone che riassume la tua strategia|Descrivi la tua maschera ideale|Dai un consiglio per sopravvivere in mare|Confessa se hai già tradito in questa partita|Lancia una sfida|Scrivi il messaggio solo con emoji|Proponi un'alleanza per dopo|Fingi di essere qualcun altro|Racconta cosa farai con i tuoi punti|Di' una verità a cui nessuno crederà`,
+`Confessa il tuo tipo in tre parole|Proponi un ballo sott'acqua|Descrivi l'appuntamento perfetto su una barca|Fai una dichiarazione infuocata|Confessa il tuo peccato di gola|Scrivilo come una poesia d'amore|Proponi un patto sigillato da un bacio|Di' cosa sussurreresti all'orecchio`,
+`Confessa la tua peggior esperienza a letto|Descrivi la tua fantasia in tre parole|Proponi un patto senza vestiti|Confessa il posto più folle dove l'hai fatto|Fai una promessa di cui ti pentirai domani|Scrivi il sexting peggiore possibile|Descrivi il tuo giocattolo preferito senza nominarlo|Svela ciò che non hai mai osato chiedere`);
+GMX('de',`Ändern`,`Schwöre auf etwas Kostbares|Erzähl eine Erinnerung ohne Namen|Schreib in Reimen|Sprich wie ein Pirat|Zitier ein Lied, das deine Strategie beschreibt|Beschreib deine ideale Maske|Gib einen Überlebenstipp auf See|Gib zu, ob du schon verraten hast|Stell eine Herausforderung|Schreib nur in Emojis|Schlag ein Bündnis für später vor|Gib dich als jemand anderes aus|Sag, was du mit deinen Punkten machst|Sag eine Wahrheit, die niemand glaubt`,
+`Verrat deinen Typ in drei Wörtern|Schlag einen Tanz unter Wasser vor|Beschreib das perfekte Date auf einem Boot|Mach eine feurige Liebeserklärung|Gesteh deine süße Schwäche|Schreib es wie ein Liebesgedicht|Schlag einen Pakt vor, besiegelt mit einem Kuss|Sag, was du ins Ohr flüstern würdest`,
+`Gesteh dein schlimmstes Erlebnis im Bett|Beschreib deine Fantasie in drei Wörtern|Schlag einen Deal ohne Kleidung vor|Gesteh den verrücktesten Ort, an dem du es getan hast|Gib ein Versprechen, das du morgen bereust|Schreib den schlechtesten Sexting-Satz|Beschreib dein Lieblingsspielzeug, ohne es zu nennen|Verrat, was du dich nie zu fragen getraut hast`);
+GMX('ru',`Изменить`,`Поклянись чем-то дорогим|Расскажи воспоминание без имён|Напиши в рифму|Говори как пират|Процитируй песню о своей стратегии|Опиши свою идеальную маску|Дай совет по выживанию в море|Признайся, предавал(а) ли ты уже|Брось вызов|Напиши только эмодзи|Предложи союз на будущее|Притворись кем-то другим|Расскажи, что сделаешь со своими очками|Скажи правду, в которую никто не поверит`,
+`Опиши свой типаж тремя словами|Предложи танец под водой|Опиши идеальное свидание на лодке|Сделай пылкое признание|Признайся в милой слабости|Напиши как любовное стихотворение|Предложи союз, скреплённый поцелуем|Скажи, что бы ты прошептал(а) на ушко`,
+`Признайся в худшем опыте в постели|Опиши фантазию тремя словами|Предложи сделку без одежды|Признайся, где было самое безумное место|Дай обещание, о котором завтра пожалеешь|Напиши самый неудачный секстинг|Опиши любимую игрушку, не называя её|Выдай то, о чём никогда не решался(-ась) попросить`);
+GMX('zh',`修改`,`以珍贵的东西发誓|讲一段回忆但别提名字|用押韵的方式写|像海盗一样说话|引用一首概括你策略的歌|描述你理想中的面具|给一个海上求生建议|坦白你这局是否已经背叛过|发起一个挑战|只用表情符号写消息|提议之后结盟|假装成另一个人|说说你要拿分数做什么|说一个没人会信的真相`,
+`用三个词说出你喜欢的类型|邀请对方水下共舞|描述船上的完美约会|来一段炽热的表白|坦白你的小甜蜜弱点|写得像一首情诗|提议一个以吻为誓的约定|说出你会在耳边低语的话`,
+`坦白你最糟的床上经历|用三个词描述你的幻想|提议一个不穿衣服的交易|坦白你做过最疯狂的地点|许一个明天会后悔的承诺|写一条最烂的情色短信|不说名字描述你最爱的玩具|说出你从来不敢开口要的东西`);
+GMX('he',`לערוך`,`השביעו במשהו יקר|ספרו זיכרון בלי שמות|כתבו בחרוזים|דברו כמו פיראט|צטטו שיר שמסכם את האסטרטגיה|תארו את המסכה האידיאלית|תנו טיפ הישרדות בים|הודו אם כבר בגדתם במשחק|זרקו אתגר|כתבו רק באימוג'ים|הציעו ברית להמשך|העמידו פנים שאתם מישהו אחר|ספרו מה תעשו עם הנקודות|אמרו אמת שאף אחד לא יאמין לה`,
+`תארו את הטיפוס שלכם בשלוש מילים|הציעו ריקוד מתחת למים|תארו דייט מושלם על סירה|הצהירו הצהרה לוהטת|הודו בחולשה המתוקה שלכם|כתבו כמו שיר אהבה|הציעו ברית שנחתמת בנשיקה|אמרו מה הייתם לוחשים באוזן`,
+`הודו בחוויה הכי גרועה במיטה|תארו את הפנטזיה בשלוש מילים|הציעו עסקה בלי בגדים|הודו במקום הכי מטורף שעשיתם את זה|הבטיחו משהו שתתחרטו עליו מחר|כתבו את הסקסטינג הכי גרוע|תארו את הצעצוע האהוב בלי לנקוב בשמו|גלו מה אף פעם לא העזתם לבקש`);
+GMX('pt',`Editar`,`Jure por algo precioso|Conte uma lembrança sem citar nomes|Escreva rimando|Fale como um pirata|Cite uma música que resuma sua estratégia|Descreva sua máscara ideal|Dê uma dica de sobrevivência no mar|Confesse se já traiu nesta partida|Lance um desafio|Escreva só com emojis|Proponha uma aliança para depois|Finja ser outra pessoa|Conte o que vai fazer com seus pontos|Diga uma verdade em que ninguém vai acreditar`,
+`Confesse seu tipo em três palavras|Proponha uma dança debaixo d'água|Descreva o encontro perfeito num barco|Faça uma declaração ardente|Confesse sua fraqueza doce|Escreva como um poema de amor|Proponha um pacto selado com um beijo|Diga o que sussurraria no ouvido`,
+`Confesse sua pior experiência na cama|Descreva sua fantasia em três palavras|Proponha um acordo sem roupa|Confesse o lugar mais louco onde já transou|Faça uma promessa da qual vai se arrepender amanhã|Escreva o pior sexting possível|Descreva seu brinquedo favorito sem dizer o nome|Solte o que nunca teve coragem de pedir`);
 })();
