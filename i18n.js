@@ -761,6 +761,10 @@ he:{"g4BetT": "מידת הביטחון", "g4B0": "ניחוש", "g4B1": "די {g:
 pt:{"g4BetT": "Sua convicção", "g4B0": "Vou tentar", "g4B1": "Bem {g:seguro|segura|seguro}", "g4B2": "Ponho a mão no fogo", "g4Gold": "🔥 {n}: acertou, em tinta dourada!", "g4Miss": "{n} tinha certeza absoluta… {o}, conte por quê!", "g4FlagOpt": "Uma bandeira basta, as outras são opcionais.", "g4Flag1": "Finque pelo menos uma bandeira.", "g4Phare": "O Farol ilumina…", "g4Read": "Leitura mais certeira", "g4Surp": "Ilha mais surpreendente", "g4Love": "Momento mais amado", "g4Mir": "Reflexos idênticos"}};
 for(const l in EXT_GAME4)if(I18N[l])Object.assign(I18N[l].ui,EXT_GAME4[l]);
 
+/* @i18n-wo2 */
+const EXT_WO2={fr:{g3WoD:"Un vote rapide pour tout le monde : on passe à la suite quand chacun a voté."},en:{g3WoD:"A quick vote for everyone: the game moves on once everyone has voted."},es:{g3WoD:"Una votación rápida para todo el grupo: se sigue cuando todo el mundo ha votado."},it:{g3WoD:"Un voto veloce per tutto il gruppo: si va avanti quando ognuno ha votato."},de:{g3WoD:"Eine schnelle Abstimmung für alle: Es geht weiter, sobald alle abgestimmt haben."},ru:{g3WoD:"Быстрое голосование для всех: игра продолжится, когда проголосуют все."},zh:{g3WoD:"所有人快速投票：大家都投完后就继续。"},he:{g3WoD:"הצבעה מהירה לכולם: ממשיכים כשכולם הצביעו."},pt:{g3WoD:"Uma votação rápida para todo o grupo: segue quando todo mundo tiver votado."}};
+for(const l in EXT_WO2)if(I18N[l])Object.assign(I18N[l].ui,EXT_WO2[l]);
+
 /* @i18n-polish */
 const EXT_POL={fr:{timerD:"Le sablier laisse le temps de réfléchir et d'écrire, puis avance tout seul quand on regarde les réponses"},
 en:{timerD:"The hourglass leaves plenty of time to think and write, then moves on by itself while you look at the answers"},
