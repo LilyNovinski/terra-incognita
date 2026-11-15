@@ -50,8 +50,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Rubik:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sacramento&text=by&display=swap">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="i18n.js?v=20261115d"></script>
-<script src="decks.js?v=2"></script>
+<script src="i18n.js?v=20261115f"></script>
+<script src="decks.js?v=3"></script>
 <style>
 :root{--sea1:#bdeef0;--sea2:#69c9d3;--deep:#0e5866;--deep2:#0a4652;--paper:#fffaf0;--paper2:#fbf0d9;--edge:#ead6ae;--edge2:#d8bd88;--txt:#3b2a1b;--mut:#8a7660;--acc:#ff8a3d;--acc-d:#d9661f;--acc2:#ffb15c;--ink:#1d8e6c;--sur:#d9661f;--ear:#5869b5;--bad:#d64b3c;--gold:#f2b84b}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -535,7 +535,7 @@ button:focus-visible,.reg:focus-visible,select:focus-visible{outline:3px solid #
 .ch-send{flex:none;width:42px;height:42px;padding:0;border-radius:50%;display:grid;place-items:center;background:linear-gradient(180deg,var(--acc2),var(--acc));border-color:var(--acc-d);color:#fff;box-shadow:0 3px 0 var(--acc-d)}
 .ch-send svg{width:20px;height:20px;margin-inline-start:-2px}
 [dir=rtl] .ch-send svg{transform:scaleX(-1)}
-.ch-badge{position:absolute;top:-5px;inset-inline-end:-5px;min-width:19px;height:19px;padding:0 5px;border-radius:99px;background:var(--acc);color:#fff;font:800 11px/19px Nunito,sans-serif;font-style:normal;text-align:center;border:2px solid #fff;transform:scale(0);transition:transform .25s cubic-bezier(.3,1.6,.5,1)}
+.ch-badge{position:absolute;top:-5px;inset-inline-end:-5px;min-width:19px;height:19px;padding:0 4px;box-sizing:border-box;display:grid;place-items:center;border-radius:99px;background:var(--acc);color:#fff;font:800 11px/1 Nunito,sans-serif;font-variant-numeric:tabular-nums;font-style:normal;text-align:center;border:2px solid #fff;transform:scale(0);transition:transform .25s cubic-bezier(.3,1.6,.5,1)}
 .ch-badge.on{transform:scale(1)}
 .ch-hb{position:relative;flex:none;width:44px;height:44px;padding:0!important;border-radius:50%;display:grid;place-items:center;font-size:20px!important;box-shadow:0 3px 0 var(--edge2)}
 .ch-peek{position:fixed;z-index:23;max-width:260px;background:var(--paper);border:2px solid var(--edge);border-radius:16px;padding:8px 12px;font-size:13px;box-shadow:0 4px 0 var(--edge2),0 10px 24px #0e586633;display:flex;gap:6px;cursor:pointer;opacity:0;transform:translateY(8px) scale(.95);pointer-events:none;transition:opacity .25s,transform .3s cubic-bezier(.3,1.5,.5,1)}
@@ -1210,7 +1210,8 @@ html:not([data-theme=dark]) .banner .mut{display:inline-block;max-width:100%;pad
 .gauge:not(.on){visibility:hidden}
 .tmr.calm .tplus{display:none}
 .tmr.calm .tring{opacity:.75}
-.tmr.calm .tring::after{content:"⏳";position:relative;font-size:16px;line-height:1}
+.tmr.calm .tring::after{content:"";position:relative;width:15px;height:15px;background:currentColor;-webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 3h12M6 21h12'/><path d='M7.5 3c0 4.2 4.5 5.6 4.5 9s-4.5 4.8-4.5 9M16.5 3c0 4.2-4.5 5.6-4.5 9s4.5 4.8 4.5 9'/><path d='M9.6 18.6c.8-1.3 3.9-1.3 4.8 0z' fill='%23000' stroke-width='1.4'/></svg>") center/contain no-repeat;mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 3h12M6 21h12'/><path d='M7.5 3c0 4.2 4.5 5.6 4.5 9s-4.5 4.8-4.5 9M16.5 3c0 4.2-4.5 5.6-4.5 9s4.5 4.8 4.5 9'/><path d='M9.6 18.6c.8-1.3 3.9-1.3 4.8 0z' fill='%23000' stroke-width='1.4'/></svg>") center/contain no-repeat;opacity:.8}
+.hgi{display:inline-block;width:.95em;height:.95em;vertical-align:-.12em;background:currentColor;-webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 3h12M6 21h12'/><path d='M7.5 3c0 4.2 4.5 5.6 4.5 9s-4.5 4.8-4.5 9M16.5 3c0 4.2-4.5 5.6-4.5 9s4.5 4.8 4.5 9'/><path d='M9.6 18.6c.8-1.3 3.9-1.3 4.8 0z' fill='%23000' stroke-width='1.4'/></svg>") center/contain no-repeat;mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 3h12M6 21h12'/><path d='M7.5 3c0 4.2 4.5 5.6 4.5 9s-4.5 4.8-4.5 9M16.5 3c0 4.2-4.5 5.6-4.5 9s4.5 4.8 4.5 9'/><path d='M9.6 18.6c.8-1.3 3.9-1.3 4.8 0z' fill='%23000' stroke-width='1.4'/></svg>") center/contain no-repeat}
 .g2km,[data-theme=dark] .g2km{border-color:var(--acc)}
 .chip .kick{--kkb:#f3e5cc;width:40px;height:40px;margin:-9px -13px -9px -5px;background:radial-gradient(circle,var(--kkb) 10.5px,transparent 11.5px)!important}
 [data-theme=dark] .chip .kick{--kkb:#26475f}
@@ -1351,12 +1352,17 @@ const Q={
 
 const LOGO=(s,id='a')=>`<svg class="logo" width="${s}" height="${s}" viewBox="0 0 64 64" aria-hidden="true"><defs><clipPath id="lc${id}"><rect x="2" y="2" width="60" height="60" rx="17"/></clipPath><linearGradient id="lsd${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6df"/><stop offset=".6" stop-color="#ffd39b"/></linearGradient><linearGradient id="lsn${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f2848"/><stop offset=".62" stop-color="#2d5a86"/></linearGradient><linearGradient id="lwd${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#55cdd2"/><stop offset="1" stop-color="#137487"/></linearGradient><linearGradient id="lwn${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22708e"/><stop offset="1" stop-color="#0a2f4a"/></linearGradient><linearGradient id="lmt${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#63c98f"/><stop offset="1" stop-color="#23805f"/></linearGradient><mask id="lmk${id}"><circle cx="20" cy="21" r="7.5" fill="#fff"/><circle cx="24.5" cy="18" r="6.4" fill="#000"/></mask></defs><g clip-path="url(#lc${id})"><g class="lgd"><rect width="64" height="64" fill="url(#lsd${id})"/><circle cx="20" cy="23" r="12.5" fill="#ffb565" opacity=".35"/><circle cx="20" cy="23" r="8.2" fill="#ff8a3d"/><rect y="40" width="64" height="24" fill="url(#lwd${id})"/><path d="M13 45h13M16 48.5h7" stroke="#ffd2a1" stroke-width="1.6" stroke-linecap="round" opacity=".85"/></g><g class="lgn"><rect width="64" height="64" fill="url(#lsn${id})"/><circle cx="20" cy="21" r="12" fill="#ffe9b8" opacity=".13"/><circle cx="20" cy="21" r="7.5" fill="#ffe9b8" mask="url(#lmk${id})"/><g fill="#fff"><circle cx="44" cy="10" r="1"/><circle cx="55" cy="17" r=".8"/><circle cx="35" cy="7" r=".7"/><circle cx="8" cy="10" r=".7"/></g><rect y="40" width="64" height="24" fill="url(#lwn${id})"/><path d="M14 45h10M16 48.5h6" stroke="#ffe9b8" stroke-width="1.4" stroke-linecap="round" opacity=".55"/></g><path d="M11 41c5-6 10-15 16-19 3-2 5-1 7 2 4 5 7 11 13 17z" fill="url(#lmt${id})"/><path d="M27 22c3-2 5-1 7 2 4 5 7 11 13 17H34c-1-7-3-13-7-19z" fill="#145c45" opacity=".3"/><path d="M6 42c6-4 16-5.5 26-5.5S52 38 58 42c-6 2.4-16 3.6-26 3.6S12 44.4 6 42z" fill="#f7dba3"/><path d="M6 42c6 2.4 16 3.6 26 3.6S52 44.4 58 42c-5 3.2-14 5-26 5S11 45.2 6 42z" fill="#dda961"/><path d="M44 42c-.4-6 .8-11.5 4-17" fill="none" stroke="#8a5a2b" stroke-width="2.6" stroke-linecap="round"/><g fill="#2a9168"><path d="M48 25Q41 20 34.5 28Q42 23.5 48 25Z"/><path d="M48 25Q44 15 35.5 15.5Q44 18 48 25Z"/><path d="M48 25Q52 14 60.5 15.5Q53 18 48 25Z"/><path d="M48 25Q55 20 61.5 27.5Q54 23.5 48 25Z"/><path d="M48 25Q45.5 17 50.5 11.5Q48.5 18 48 25Z"/></g><circle cx="47" cy="26.3" r="1.3" fill="#6b3f1c"/><circle cx="49.2" cy="26.6" r="1.2" fill="#6b3f1c"/><ellipse cx="12" cy="37.5" rx="9" ry="2.3" fill="#fffaf0" opacity=".55"/><ellipse cx="56" cy="35" rx="7" ry="1.8" fill="#fffaf0" opacity=".45"/><path d="M6 53q4-2.6 8 0t8 0M38 57q4-2.6 8 0t8 0" fill="none" stroke="#fffaf0" stroke-width="1.8" stroke-linecap="round" opacity=".85"/></g><rect x="2" y="2" width="60" height="60" rx="17" fill="none" stroke="#fffaf0" stroke-width="2.6"/></svg>`;
 /* === game2 : paquets de questions (decks.js, facultatif) === */
+function qVarMerge(){try{const V=window.DECKS_VAR||{},by={};for(const q of Object.values(Q).flat())by[q.id]=q;
+ for(const l in V){if(!I18N[l])continue;const d=l=='fr'?null:(I18N[l].q=I18N[l].q||{});
+  for(const id in V[l]){const alt=V[l][id];if(typeof alt!='string'||!alt)continue;
+   if(l=='fr'){const q=by[id];if(q&&typeof q.q=='string'&&q.q.indexOf(' || ')<0)q.q+=' || '+alt;continue}
+   const t=d[id];if(typeof t=='string'){if(t.indexOf(' || ')<0)d[id]=t+' || '+alt}else if(Array.isArray(t)&&typeof t[0]=='string'&&t[0].indexOf(' || ')<0){d[id]=[t[0]+' || '+alt,...t.slice(1)]}}}}catch(e){}}
 (function g2Decks(){try{const X=Array.isArray(window.DECKS_EXTRA)?window.DECKS_EXTRA:[],ids=new Set(Object.values(Q).flat().map(q=>q.id));
  for(const x of X){if(!x||typeof x.id!='string'||typeof x.q!='string'||!Q[x.r]||ids.has(x.id))continue;const t=R[x.r].t;
   if(x.type&&x.type!=t)continue;if(t=='choix'&&!(Array.isArray(x.o)&&x.o.length>=2))continue;if(t=='echelle'&&(x.a==null||x.b==null))continue;
   const q={id:x.id,q:x.q,deck:['coquin','trash'].includes(x.deck)?x.deck:'base'};if(x.for=='f'||x.for=='m')q.for=x.for;if(t=='choix')q.o=x.o.slice(0,4);if(t=='echelle'){q.a=x.a;q.b=x.b}Q[x.r].push(q);ids.add(x.id)}
  const TT=window.DECKS_T||{};for(const l in TT){if(!I18N[l])continue;const d=I18N[l].q=I18N[l].q||{};
-  for(const id in TT[l]){const v=TT[l][id];if(typeof v=='string'||Array.isArray(v))d[id]=v;else if(v&&typeof v.q=='string')d[id]=Array.isArray(v.o)?[v.q,...v.o]:v.a!=null?[v.q,v.a,v.b]:v.q}}}catch(e){}})();
+  for(const id in TT[l]){const v=TT[l][id];if(typeof v=='string'||Array.isArray(v))d[id]=v;else if(v&&typeof v.q=='string')d[id]=Array.isArray(v.o)?[v.q,...v.o]:v.a!=null?[v.q,v.a,v.b]:v.q}}}catch(e){}})();qVarMerge();
 const QBY={};for(const r in Q)Q[r].forEach(q=>QBY[q.id]=q);
 const tidy=s=>String(s??'').replace(/\s+/g,' ').trim()
  .replace(/\s+([,.)…])/g,'$1').replace(/\(\s+/g,'(').replace(/,(?=\p{L})/gu,', ')
@@ -1364,7 +1370,10 @@ const tidy=s=>String(s??'').replace(/\s+/g,' ').trim()
  .replace(/^([^\p{L}\p{N}]*)(\p{Ll})/u,(m,a,b)=>a+b.toLocaleUpperCase());
 const unQ=s=>String(s).replace(/[\s?？؟¿.。…!！]+$/u,'');
 const QM=s=>{s=unQ(s);if(!s)return s;const l=LANG;return s+(/[　-鿿]/.test(s)?'？':l=='fr'?' ?':'?')};
-function LQ(q,y){const L=LQ0(q);if(!L)return L;const f=s=>gz(s,k=>k=='Y'?gOf(y):GME());return {...L,q:f(L.q),...(L.o?{o:L.o.map(f)}:{}),...(L.a!=null?{a:f(L.a),b:f(L.b)}:{})}}
+/* formulations multiples d'une question (« a || b ») : même choix pour tout le monde pendant un tour (graine = st.cur.id) */
+function qVar(s,id){if(typeof s!='string'||s.indexOf(' || ')<0)return s;const a=s.split(' || ');let z=String(id);try{if(st&&st.cur&&st.cur.q&&st.cur.q.id==id)z=st.cur.id}catch(e){}
+ let x=5381;for(const c of z+'#'+id)x=(x*33+c.charCodeAt(0))>>>0;return a[x%a.length]}
+function LQ(q,y){const L=LQ0(q);if(!L)return L;const f=s=>gz(s,k=>k=='Y'?gOf(y):GME());return {...L,q:f(q.custom?L.q:qVar(L.q,q.id)),...(L.o?{o:L.o.map(f)}:{}),...(L.a!=null?{a:f(L.a),b:f(L.b)}:{})}}
 function LQ0(q){if(!q)return q;if(q.custom)return {...q,q:QM(q.q)};const t=(D().q||{})[q.id];if(!t)return q;if(typeof t=='string')return {...q,q:t};
  if(q.o)return {...q,q:t[0],o:t.slice(1)};return {...q,q:t[0],a:t[1],b:t[2]}}
 const trimQ=s=>String(s).replace(/^[\s«»“”„"「」״]+|[\s«»“”„"「」״.。]+$/g,'');
@@ -1499,7 +1508,7 @@ function svgMap(c,t,opt={}){
  for(const r of ORDER){const on=s[r].n>0;now[r]=on;const clearing=on&&prev[r]===false;
   defs+=`<mask id="mk-${r}" maskUnits="userSpaceOnUse" x="-100" y="-100" width="1224" height="1016"><g fill="#fff" filter="url(#fb)">${regShape(r,'',1.12)}</g></mask>`;
   if(!on||clearing)fogs+=fogFor(r,clearing);
-  if(on&&!clearing)eOn+=edgeFor(r,true,false);else eUnk+=edgeFor(r,false,clearing);
+  if(!on||clearing)eUnk+=edgeFor(r,false,clearing);
   hots+=`<g class="reg ${on?'on':''} ${op[r]?'open':''} ${opt.pick==r?'pick':''}" data-r="${r}">${regShape(r,'hot')}</g>`;
   pins+=pinsFor(list,r);labels+=mapLabel(r,on,op[r],s[r],opt.interactive)}
  seenOpen[k]=now;
@@ -1670,6 +1679,8 @@ void main(){
   if(fz>.25){float c1=caus(fq*1.2-vec2(20.),t*.36),c2=caus(fq*1.6-vec2(23.,17.),-t*.29+7.);
    col+=lc*min(min(c1,c2),1.)*w*exp(-K*(.35+1.2*(1.-fz)))*mix(.26,.07,N)*smoothstep(.3,.95,fz);}
  }
+ float mk=.5+.5*sin(t*.011)*sin(t*.0047+1.3);vec3 mc=mix(vec3(.2,.46,.46),vec3(.03,.07,.16),N);
+ col=mix(col,mc*(1.-.35*y),(.05+.17*mk)*(.35+.65*y)*(.75+.5*fbm(uv*vec2(as,1.)*1.4+vec2(t*.012,-t*.007))));
  vec2 vg=uv-.5;col*=1.-.3*dot(vg,vg)*mix(1.,1.6,N);
  col+=(h21(gl_FragCoord.xy+fract(t*7.))-.5)/160.;
  gl_FragColor=vec4(col,1.);
@@ -2169,10 +2180,16 @@ function send(a){if(a&&a.t=='flags'&&st)MYFL={gid:st.gid,v:a.v};if(isHost)act(me
 /* =========================================================
    RÈGLES (exécutées par l'hôte uniquement)
    ========================================================= */
-function pickQ(r,t){const used=st.used[t]||[],seen=(st.qseen||{})[t]||[],tn=st.tone||0;
+/* questions déjà posées sur cet appareil (hôte), d'une partie à l'autre */
+const SEENQ_K='terra:seenQ';function seenQ(){try{const a=JSON.parse(localStorage.getItem(SEENQ_K)||'[]');return Array.isArray(a)?a:[]}catch(e){return []}}
+function seenQAdd(id){if(id==null)return;try{const a=seenQ().filter(x=>x!==id);a.push(id);localStorage.setItem(SEENQ_K,JSON.stringify(a.slice(-400)))}catch(e){}}
+function pickQ(r,t){const q=pickQ0(r,t);if(q&&!q.custom)seenQAdd(q.id);return q}
+function pickQ0(r,t){const SQ=seenQ(),SI=new Map(SQ.map((id,i)=>[id,i]));const used=st.used[t]||[],seen=(st.qseen||{})[t]||[],tn=st.tone||0;
  /* ton : tout public toujours ; coquin si tone>=1 ; trash si tone==2 ; environ 60 % de questions du ton choisi */
  const gt=gOf(t),gk=q=>!q.for||q.for==gt,ok=q=>gk(q)&&(!q.deck||q.deck=='base'||(q.deck=='coquin'&&tn>=1)||(q.deck=='trash'&&tn==2)),all=Q[r].filter(ok);
- const fresh=a=>{const f=a.filter(q=>!used.includes(q.id)),g=f.filter(q=>!seen.includes(q.id));return g.length?g:f};
+ const fresh=a=>{const f=a.filter(q=>!used.includes(q.id)),g0=f.filter(q=>!seen.includes(q.id)),g=g0.length?g0:f;if(!g.length)return g;
+  const n=g.filter(q=>!SI.has(q.id));if(n.length)return n;/* tout a déjà été vu ici : on reprend les plus anciennes */
+  const o=g.slice().sort((x,y)=>SI.get(x.id)-SI.get(y.id));return o.slice(0,Math.max(1,Math.ceil(o.length/3)))};
  const want=tn==2?['trash','coquin']:tn==1?['coquin']:[];let l=[];
  if(want.length&&Math.random()<.6)for(const d of want){l=fresh(all.filter(q=>q.deck==d));if(l.length)break}
  if(!l.length&&gt!='n'&&Math.random()<.1)l=fresh(all.filter(q=>q.for&&q.deck=='base'));/* gender : une question rien que pour elle / pour lui, de temps en temps */
@@ -2216,7 +2233,7 @@ function act(from,a){const s=st;if(!P(from))return;g2Resp(from,a);
  case 'listened':if(s.phase!='question'||s.cur.type!='ecoute'||from!=s.cur.terr)return;s.cur.kw=gKw(a.kw);land('ear');break;
  case 'toName':if(s.phase!='reveal'||(from!=s.cur.explorer&&from!=s.host))return;if(Object.values(s.cur.result).some(x=>!x))s.phase='name';else land('ink');break;
  case 'name':if(s.phase!='name'||from!=s.cur.terr)return;s.cur.placeName=tidy(a.v).replace(/[\s.,;:。、]+$/u,'').slice(0,50);land('named');break;
- case 'next':if(s.phase!='landed'||(from!=s.cur.explorer&&from!=s.host))return;if(gMirror(s))break;s.turn++;s.cur=null;s.phase=s.turn>=s.total?'end':'map';break;
+ case 'next':if(s.phase!='landed'||(from!=s.cur.explorer&&from!=s.host))return;if(!a.force&&!g3All(s.cur))return;if(gMirror(s))break;s.turn++;s.cur=null;s.phase=s.turn>=s.total?'end':'map';break;
  case 'skip':if(from!=s.host||s.phase=='lobby'||s.phase=='end'||s.phase=='carnet')return;if(s.mode=='mir')s.lp=s.cur&&!s.cur.mir?s.cur.explorer:explorer();s.turn++;s.cur=null;s.phase=s.turn>=s.total?'end':'map';break;
  case 'finish':if(from!=s.host)return;s.cur=null;s.phase='end';break;
  case 'flags':if(s.phase!='end')return;const fv={};for(const n in (a.v||{}))fv[n]=tidy(a.v[n]).slice(0,240);if(s.anon){if(SECF.gid!==s.gid)SECF={gid:s.gid,f:{}};SECF.f[from]=fv;s.flags[from]=true}else s.flags[from]=fv;
@@ -2313,7 +2330,7 @@ function tmDur(){const s=st,f=TF();let k=s.phase,soft=false;
  let d=TB[k];if(d==null)return null;if(MODE()=='esc'&&(k=='reveal'||k=='landed'))d/=2;return {d:d*f,soft,calm:!!TCALM[k]&&!s.cur?.grace}}
 function tmSync(){const s=st;if(!s||!isHost)return false;let ch=false;
  if(s.anon&&s.phase=='map'&&s.order.filter(n=>P(n)&&P(n).online).length<3){s.anon=false;ch=true}if(s.phase!='lobby'&&g2Track(s))ch=true;
- if(s.phase!='lobby'&&s.tt!=null&&s.turn!==s.tTurn){if(s.tTurn!=null&&s.turn>s.tTurn){(s.td=s.td||[]).push(Date.now()-s.tt);if(s.td.length>30)s.td.shift()}s.tTurn=s.turn;s.tt=Date.now();ch=true}
+ if(s.phase!='lobby'&&s.tt!=null&&s.turn!==s.tTurn){if(s.tTurn!=null&&s.turn>s.tTurn){(s.td=s.td||[]).push(Date.now()-s.tt);sptAdd(MODE(),(Date.now()-s.tt)/1000);if(s.td.length>30)s.td.shift()}s.tTurn=s.turn;s.tt=Date.now();ch=true}
  if(s.phase=='end'&&MODE()=='esc'){gFinish(s);ch=true}
  if(MODE()=='por'&&s.phase=='map'&&s.turn>0&&s.turn%(s.L||s.length)==0&&s.pf!==s.turn){s.pf=s.turn;s.phase='pfiche';ch=true}
  if(s.cur&&s.phase=='question'&&SEC.cid!==s.cur.id){const a=(s.cur.sent||[]).length+(s.cur.answered?1:0);gSec(s.cur);if((s.cur.sent||[]).length+(s.cur.answered?1:0)!==a)ch=true}
@@ -2334,7 +2351,7 @@ function gExpire(){const s=st,c=s.cur;
   checkAll(true);return;
  case 'reveal':act(s.host,{t:'toName'});return;
  case 'name':act(c.terr,{t:'name',v:''});return;
- case 'landed':act(s.host,{t:'next'});return;
+ case 'landed':act(s.host,{t:'next',force:1});return;
  case 'end':gFinish(s);return;
  case 'pfiche':s.phase='map';return}}
 function gTick(){if(!st)return;gRing();if(!isHost)return;let ch=tmSync();
@@ -2346,8 +2363,11 @@ function gSim(meteo,L,esc){const cnt={};ORDER.forEach(r=>cnt[r]=0);const out=[];
  for(let i=0;i<L;i++){const op=ORDER.filter(r=>(R[r].lvl||0)<=meteo&&(esc||!R[r].need.length||R[r].need.some(x=>cnt[x]>0)));
   let b=op[0];for(const r of op)if(cnt[r]<cnt[b])b=r;cnt[b]++;out.push(R[b].t)}return out}
 const gTurnS=(t,k)=>t=='ecoute'?155:t=='libre'?173+15*k:110+5*k;
+const SPT_K='terra:spt',sptAll=()=>{try{return JSON.parse(localStorage.getItem(SPT_K)||'{}')||{}}catch(e){return {}}};
+function sptAdd(mode,sec){if(!(sec>20&&sec<900))return;try{const a=sptAll(),o=a[mode]||{s:0,n:0},w=Math.min(o.n,30);a[mode]={s:(o.s*w+sec)/(w+1),n:o.n+1};localStorage.setItem(SPT_K,JSON.stringify(a))}catch(e){}}
+function sptGet(mode){const o=sptAll()[mode];return o&&o.n>=2?o.s:(mode=='esc'?110:160)}
 function gEst(o){const n=Math.max(2,o.n),esc=o.mode=='esc',L=esc?2:o.len,f=EF[esc?.7:o.tf]??1,k=n-1;
- const per=gSim(o.meteo,L,esc).reduce((a,t)=>a+gTurnS(t,k),0)*f,endS=(esc?0:20*n)+90;
+ const per=sptGet(o.mode||'exp')*L*(f/(EF[1]||1)),endS=(esc?0:20*n)+90;
  return {min:Math.max(5,Math.round((per*n+60+endS)/300)*5),perTurn:per/L,endS}}
 function gProg(){const s=st,w={question:.25,judge:.5,reveal:.65,name:.75,landed:.9}[s.phase]||0,done=Math.min(s.total,s.turn+w);
  const E=gEst({n:s.order.length,mode:MODE(),meteo:s.meteo,len:s.L||s.length,tf:s.timer??1}),td=s.td||[];
@@ -2596,7 +2616,7 @@ function gLobbyBody(host,my,on){
  <div class="card"><h3>${T('lenT')}</h3>
   ${isEsc?'':host?seg([3,5,7].map(v=>[v,T('len'+v)]),st.length,'data-len'):`<p class="gval">${T('len'+st.length)}</p>`}
   <p class="gsub">${isEsc?'⚡ ':''}${T('zonesPP',{z:L})} · ≈ ${E} min</p>
-  <h3 class="gh">⏳ ${T('timerT')}</h3>
+  <h3 class="gh"><i class="hgi" aria-hidden="true"></i> ${T('timerT')}</h3>
   ${isEsc?`<p class="gval">⚡ ${T('tm3')}</p>`:host?seg(TIM.map((v,i)=>[i,T('tm'+i)]),TIM.indexOf(tf),'data-tm'):`<p class="gval">${T('tm'+TIM.indexOf(tf))}</p>`}
   <p class="gsub">${T(isEsc||tf?'timerD':'timer0D')}</p>
   ${on>=3?`<h3 class="gh">🎭 ${T('anonT')}</h3>${host?`<button class="gsw ${an?'on':''}" id="anon" role="switch" aria-checked="${an}"><i></i><span>${T('anonD')}</span></button>`:`<p class="gval">${an?'✓ '+T('anonD'):T('anonOff')}</p>`}`:''}
@@ -2720,7 +2740,8 @@ function vName(){const c=st.cur,terr=c.terr==me.name,key=c.id+':name';
    const i=$(`[data-d="${key}"]`);i.onkeydown=e=>{if(e.key=='Enter')$('#ok').click()}}}}
 
 /* ---------- Atterrissage ---------- */
-function vLanded(){const c=st.cur,dv=driver(c),can=me.name==dv,iAm=c.terr!=me.name,tn=esc(c.terr);
+const g3All=c=>{if(!c||c.kind=='door')return true;const h=g3H(c.id);return !h||(g3Done(h)&&g3WoDone(c))};
+function vLanded(){const c=st.cur,dv=driver(c),can=me.name==dv&&g3All(c),iAm=c.terr!=me.name,tn=esc(c.terr);
  const title=T({door:'tDoor',ear:'tEar',ink:'tInk',named:'tNamed'}[c.kind]);
  const sub={door:()=>T('sDoor',{n:tn}),ear:()=>T('sEar'),ink:()=>T('sInk',{n:tn}),named:()=>T('sNamed',{p:esc(c.placeName||T('noname')),n:tn})}[c.kind]();
  const colr={door:'#aaa',ear:'var(--ear)',ink:'var(--ink)',named:'var(--sur)'}[c.kind];
@@ -2750,20 +2771,21 @@ function vEnd(){const mine=st.flags[me.name],os=others(me.name);if(!os.includes(
 /* ---------- Carnet ---------- */
 function constellation(){const n=st.order.length,W=400,H=n>2?260:150,cx=200,cy=H/2,rad=n>2?95:120;
  const pos={};st.order.forEach((p,i)=>{const a=n>2?-Math.PI/2+i/n*Math.PI*2:Math.PI*i;pos[p]=[cx+Math.cos(a)*rad,cy+Math.sin(a)*(n>2?rad*.9:0)]});
- let s=`<svg viewBox="0 0 ${W} ${H}" style="width:100%">`;
+ let s=`<svg viewBox="0 0 ${W} ${H}" style="width:100%">`,s0='',s1='',s2='';
  for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){const a=st.order[i],b=st.order[j];
   /* game2 : fil = lieux découverts entre deux personnes (dans les deux sens) ; 3 épaisseurs nettes + le chiffre */
   const w=[...mapOf(a,b),...mapOf(b,a)].filter(l=>l.kind!='door').length,[x1,y1]=pos[a],[x2,y2]=pos[b],ti=g2Tier(w);
-  if(!w){s+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#b9a68a" stroke-width="2" stroke-dasharray="2 7" stroke-linecap="round" opacity=".7"/>`;continue}
+  if(!w){s0+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#b9a68a" stroke-width="2" stroke-dasharray="2 7" stroke-linecap="round" opacity=".7"/>`;continue}
   const mx=(x1+x2)/2,my=(y1+y2)/2;
-  s+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${G2TC[ti]}" stroke-width="${G2TW[ti]}" stroke-linecap="round"/><g class="g2pill"><circle cx="${mx}" cy="${my}" r="12" fill="#fffaf0" stroke="${G2TC[ti]}" stroke-width="2.5"/><text x="${mx}" y="${my+4.5}" text-anchor="middle" font-size="13" font-weight="800" font-family="Nunito,Rubik,sans-serif" fill="#3b2a1b">${w}</text></g>`}
- st.order.forEach(p=>{const [x,y]=pos[p];s+=`<circle cx="${x}" cy="${y}" r="14" fill="${col(p)}" stroke="#fff" stroke-width="5"/><text x="${x}" y="${y+30}" text-anchor="middle" font-size="14" font-weight="700" font-family="Nunito,Rubik,sans-serif" fill="#3b2a1b">${esc(p)}</text>`});
+  s1+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${G2TC[ti]}" stroke-width="${G2TW[ti]}" stroke-linecap="round"/>`;s2+=`<g class="g2pill"><circle cx="${mx}" cy="${my}" r="12" fill="#fffaf0" stroke="${G2TC[ti]}" stroke-width="2.5"/><text x="${mx}" y="${my+4.5}" text-anchor="middle" font-size="13" font-weight="800" font-family="Nunito,Rubik,sans-serif" fill="#3b2a1b">${w}</text></g>`}
+ s+=s0+s1+s2;st.order.forEach(p=>{const [x,y]=pos[p];s+=`<circle cx="${x}" cy="${y}" r="14" fill="${col(p)}" stroke="#fff" stroke-width="5"/><text x="${x}" y="${y+30}" text-anchor="middle" font-size="14" font-weight="700" font-family="Nunito,Rubik,sans-serif" fill="#3b2a1b">${esc(p)}</text>`});
  const lg=(ti,l)=>`<span><svg width="34" height="14" aria-hidden="true"><line x1="3" y1="7" x2="31" y2="7" stroke="${ti<0?'#b9a68a':G2TC[ti]}" stroke-width="${ti<0?2:G2TW[ti]}" ${ti<0?'stroke-dasharray="2 7"':''} stroke-linecap="round"/></svg>${l}</span>`;
  return s+`</svg><div class="g2leg">${lg(0,T('g2L1'))}${lg(1,T('g2L2'))}${lg(2,T('g2L3'))}${lg(-1,T('g2L0'))}</div>`}
 const G2TW=[3,8,14],G2TC=['#f6b26b','#ff8a3d','#e2603e'],g2Tier=w=>w>=6?2:w>=3?1:0;
 function vCarnet(){const host=me.name==st.host;
  return {mine:host,hint:host?T('againHint'):T('bye',{n:esc(st.host)}),
   html:`${g3Steps('carnet')}<div class="banner"><p class="serif">${T('logbook')}</p><p class="mut" style="margin-top:6px">${T('expCount',{c:st.log.length})}</p></div>
+  ${st.log.length&&st.log.at(-1).hist&&st.log.at(-1).hist.length?`<button class="pri wide" data-rev="${st.log.length-1}">📖 ${T('review')}</button>`:''}
   <div class="card"><p class="mut c">${T('thread')}</p>${constellation()}</div>
   ${st.log.slice().reverse().map((e,i)=>`<div class="card flat"><p class="mut">${T('expLine',{i:st.log.length-i,d:new Date(e.date).toLocaleDateString(D().loc,{day:'numeric',month:'long',year:'numeric'}),m:MN(e.meteo)})}</p>
    ${Object.entries(e.flags).flatMap(([from,to])=>Object.entries(to).filter(([n])=>n==me.name||from==me.name).map(([n,txt])=>`<p style="margin-top:10px;font-size:14px"><span class="mut">${e.anon?'✉️':`<span style="color:${col(from)}">${esc(from)}</span>`} →<span style="color:${col(n)}">${esc(n)}</span></span><br>${QQ(esc(txt))}</p>`)).join('')}${e.hist&&e.hist.length?`<button class="ghost" data-rev="${st.log.length-1-i}" style="margin-top:6px">${T('review')}</button>`:''}</div>`).join('')}
@@ -2888,10 +2910,10 @@ const g3D=d=>new Date(d).toLocaleDateString(D().loc,{day:'numeric',month:'long'}
 function g3PastFor(t,r){const tn=st.tone||0,used=st.used[t]||[],out=[];
  for(const e of st.log||[])for(const h of e.hist||[]){if(h.terr!=t||h.r!=r||!h.q||!h.q.id||h.kind=='door'||used.includes(h.q.id))continue;const q=QBY[h.q.id];
   if(!q||(q.deck=='coquin'&&tn<1)||(q.deck=='trash'&&tn<2)||(q.for&&q.for!=gOf(t)))continue;const rv=h.rv&&h.rv[0],k=h.placeName?'pn':rv?'rv':h.kw?'kw':'',t2=h.placeName||(rv&&(rv.v||rv))||h.kw||'';
-  if(h.answer==null&&!t2)continue;out.push({id:h.q.id,p:{a:h.answer??null,t:String(t2).slice(0,140),k,d:e.date}})}
+  if(h.answer==null&&!t2)continue;if(Date.now()-(e.date||0)<3*864e5)continue;out.push({id:h.q.id,p:{a:h.answer??null,t:String(t2).slice(0,140),k,d:e.date}})}
  return out.length?out[rnd(out.length)]:null}
 function g3Pick(s,from,t,custom){const c=s.cur;
- if(!custom&&s.turn>0){const p=g3PastFor(t,c.r);if(p&&rnd(100)<40&&QBY[p.id]){c.q=QBY[p.id];c.past=p.p}}
+ if(!custom&&s.turn>0){const p=g3PastFor(t,c.r);if(p&&(s.pastN||0)<2&&rnd(100)<15&&QBY[p.id]){c.q=QBY[p.id];c.past=p.p;s.pastN=(s.pastN||0)+1}}
  if(s.turn>=1&&s.turn-(s.evT??-9)>=2&&rnd(100)<24){const L=Object.keys(G3EI).filter(k=>!(k=='whirl'&&s.mode=='mir')&&!(k=='rainbow'&&s.order.length!=2)&&!(k=='shell'&&c.type=='ecoute')&&!(k=='bottle'&&MODE()=='esc'));
   const k=L[rnd(L.length)];c.ev=k;s.evT=s.turn;if(k=='bottle')s.bottles[from]=(s.bottles[from]||0)+1}}
 /* hôte, juste après land() : relie l'entrée d'historique au tour, compare le miroir, programme un « Qui de nous… » */
