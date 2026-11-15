@@ -52,7 +52,7 @@
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="i18n.js?v=20261115h"></script>
 <script src="decks.js?v=5"></script>
-<script src="games.js?v=1"></script><!-- @games -->
+<script src="games.js?v=2"></script><!-- @games -->
 <style>
 :root{--sea1:#bdeef0;--sea2:#69c9d3;--deep:#0e5866;--deep2:#0a4652;--paper:#fffaf0;--paper2:#fbf0d9;--edge:#ead6ae;--edge2:#d8bd88;--txt:#3b2a1b;--mut:#8a7660;--acc:#ff8a3d;--acc-d:#d9661f;--acc2:#ffb15c;--ink:#1d8e6c;--sur:#d9661f;--ear:#5869b5;--bad:#d64b3c;--gold:#f2b84b}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -2633,7 +2633,7 @@ function gLobbyBody(host,my,on){
  const onl=st.players.filter(p=>p.online),md=st.mode=='mir'&&on!=2?'exp':!st.mode&&on==2?'mir':MODE(),isEsc=md=='esc',mt=Math.min(2,...onl.map(p=>st.votes[p.name]??1));
  const tf=st.timer??1,an=!!st.anon&&on>=3,L=isEsc?2:st.length,est=o=>gEst({n:on,mode:md,meteo:mt,len:st.length,tf,...o}).min,E=est();
  const by=host?'':`<p class="gby">${T('chosenBy',{n:B(st.host)})}</p>`;
- const GX=GLobby(host,on);if(st.gsel)return GX;/* @games */
+ const GX=GLobby(host,on,E);if(st.gsel)return GX;/* @games */
  const tile=m=>{const dis=m=='mir'&&on!=2,tag=host?'button':'div';return `<${tag} class="gtile ${md==m?'sel':''}" ${host?`data-mode="${m}" ${dis?'disabled':''}`:''}><span class="gi">${GMI[m]}</span><span class="gt"><b>${T('mo_'+m)}</b><span class="mut">${T(dis?'mirOnly':'mo_'+m+'D')}</span></span><span class="gmin">≈ ${est({mode:m})} min</span></${tag}>`};
  const seg=(items,cur,attr)=>`<div class="gseg">${items.map(([v,l])=>`<button ${attr}="${v}" class="${cur==v?'sel':''}">${l}</button>`).join('')}</div>`;
  return `${GX}<div class="card"><h3>${T('modeT')}</h3><div class="gtiles">${host?['exp','esc','por','mir'].map(tile).join(''):tile(md)}</div>${by}</div>

@@ -111,9 +111,9 @@ function gEndView(s){const g=s.game,G=GAMES[g.id],R=s.gres||{pts:{}},host=meN()=
   if(GV.fx!=='end'+s.gid){GV.fx='end'+s.gid;if(!RM())setTimeout(()=>{try{confetti(rows[0]&&rows[0][0]==meN()||R.coop?50:24)}catch(e){}},350)}}}}
 
 /* @games : carte « Salle de jeux » du salon */
-W.GLobby=function(host,on){const sel=st.gsel&&GAMES[st.gsel]?st.gsel:'';
- const tile=id=>{const G=GAMES[id],ok=!id||(on>=G.min&&on<=G.max),tag=host?'button':'div';
-  return `<${tag} class="gtile ggt ${sel==id?'sel':''}" ${host?`data-gsel="${id}" ${ok?'':'disabled'}`:''}><span class="gi">${id?G.icon:'⛵'}</span><span class="gt"><b>${id?GT('n_'+id):GT('exp')}</b><span class="mut">${id?GT('d_'+id):GT('expD')}</span></span>${id?`<span class="gtags">${G.tags.map(t=>`<i class="gtg-${t}">${GT('t_'+t)}</i>`).join('')}</span><span class="gmin">≈ ${G.dur} min · ${G.min}–${G.max} 👤</span>`:''}</${tag}>`};
+W.GLobby=function(host,on,E){const sel=st.gsel&&GAMES[st.gsel]?st.gsel:'';
+ const tile=id=>{const G=GAMES[id],ok=!id||on<=G.max,tag=host?'button':'div';
+  return `<${tag} class="gtile ggt ${sel==id?'sel':''}" ${host?`data-gsel="${id}" ${ok?'':'disabled'}`:''}><span class="gi">${id?G.icon:'⛵'}</span><span class="gt"><b>${id?GT('n_'+id):GT('exp')}</b><span class="mut">${id?GT('d_'+id):GT('expD')}</span></span><span class="gtags">${(id?G.tags:['social']).map(t=>`<i class="gtg-${t}">${GT('t_'+t)}</i>`).join('')}</span><span class="gmin">≈ ${id?G.dur:(E||'?')} min · ${id?G.min:2}–${id?G.max:8} 👤</span></${tag}>`};
  let h=`<div class="card"><h3>🎲 ${GT('room')}</h3><div class="gtiles">${host?['',...Object.keys(GAMES)].map(tile).join(''):tile(sel)}</div>${host?'':`<p class="gby">${T('chosenBy',{n:B(st.host)})}</p>`}</div>`;
  if(sel){const G=GAMES[sel],ok=on>=G.min&&on<=G.max,rk='r_'+sel+(on==2&&GI18N.fr.ui['r_'+sel+'2']?'2':'');
   h+=(G.tone?g2ToneCard(host):'')+`<div class="card"><p class="grule">${GT(rk)}</p>${ok?'':`<p class="err">${GT('needP',{a:G.min,b:G.max})}</p>`}
