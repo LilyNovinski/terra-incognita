@@ -109,7 +109,7 @@ W.GAct=function(s,from,a){const t=a&&a.t;
   if(s.phase=='lobby'&&s.players.some(p=>p.name==from)&&Array.isArray(a.v)&&a.v.length==2&&a.v[0]!==a.v[1]&&a.v.every(n=>typeof n=='string'&&s.players.some(p=>p.name==n))){
    const k=a.v[0]<a.v[1]?a.v[0]+'|'+a.v[1]:a.v[1]+'|'+a.v[0],L=s.gtie||[];if(L.includes(k)){if(a.v.includes(from))return true;s.gtie=L.filter(x=>x!=k)}else s.gtie=[...L,k].slice(-8);bump()}return true}
  if(t=='gx'&&a.v=='stop'){if(from==s.host&&s.phase=='game'&&s.game){gFin(s);bump()}return true}
- if(t=='gx'){if(from!=s.host||s.phase!='gend')return true;s.players=s.players.filter(p=>p.online);
+ if(t=='gx'){if(from!=s.host||s.phase!='gend')return true;s.players.forEach(p=>{if(!p.online&&isLinked(p.name))p.online=true});s.players=s.players.filter(p=>p.online);
   const G=GAMES[s.game.id],on=gPl(s);s.gspec=(s.gspec||[]).filter(n=>P(n));
   if(a.v=='again'&&on.length>=G.min&&on.length<=G.max){s.gsel=s.game.id;s.order=on;gStart(s)}else{s.phase='lobby';s.game=null;s.gres=null}
   bump();return true}

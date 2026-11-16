@@ -2112,7 +2112,8 @@ function migrate(to,eForce){
  let line=st.players.filter(p=>p.online&&p.name!=old).map(p=>p.name);
  if(to&&line.includes(to))line=[to,...line.filter(n=>n!=to)];
  let k=line.indexOf(me.name);if(k<0)k=line.length;
- let claimAt=t0+k*2500,claiming=false,busy=false;
+ /* garde-fou : passage de main désigné → les autres n'ont qu'une vue partielle (secrets des jeux) : ils ne prennent la place qu'en dernier recours (25 s) */
+ let claimAt=to&&to!=me.name&&line.includes(to)?t0+25000+k*2500:t0+k*2500,claiming=false,busy=false;
  let probed=!!to;
  const tick=()=>{
   if(!probed){probed=true;busy=true;
@@ -2124,7 +2125,7 @@ function migrate(to,eForce){
    const p=new Peer(hid(code,e),{debug:0});
    p.on('open',()=>{if(my!==migSeq||!migrating||isHost){try{p.destroy()}catch(x){}return}becomeHost(p,e)});
    p.on('error',er=>{if(peer===p&&isHost){if(er.type=='network'||er.type=='server-error')toast(T('srvDown'));return}
-    if(peer!==p){try{p.destroy()}catch(x){}claiming=false;claimAt=Date.now()+5000}})}
+    if(peer!==p){try{p.destroy()}catch(x){}claiming=false;claimAt=Date.now()+(to==me.name?1200:5000)}})}
   if(!busy&&!isHost&&migrating&&Date.now()-t0>(to&&to!=me.name?1500:0)){busy=true;clientPeer(()=>{if(my!==migSeq||!migrating||isHost){busy=false;return}connectTo(hid(code,e),()=>{busy=false},9000)})}
   setTimeout(tick,900)};
  tick()}
@@ -2157,6 +2158,15 @@ function claimBeacon(){
  b.on('error',er=>{if(er.type=='peer-unavailable')return;if(beacon===b){beacon=null;try{b.destroy()}catch(x){}setTimeout(()=>{if(isHost&&peer===hp&&st&&st.code==code)claimBeacon()},5000)}})}
 function dropBeacon(){const b=beacon;beacon=null;try{b&&b.destroy()}catch(x){}}
 
+/* garde-fou en dur : la liste des joueurs suit les VRAIES connexions — connecté = en ligne, et personne de connecté
+   ne disparaît de la liste (quelle que soit la cause : migration, passage de main, retour au salon) */
+function hostHeal(){if(!isHost||!st)return;let ch=false;
+ for(const id in conns){const c=conns[id],n=c.pname;if(!n||!c.open)continue;const p=P(n);
+  if(p){if(!p.online){p.online=true;p.peer=c.peer;ch=true}}
+  else if(st.phase=='lobby'&&st.players.length<8&&!(st.banned||[]).includes(n)){const color=PAL.find(x=>!st.players.some(y=>y.color==x))||PAL[0];
+   st.players.push({name:n,color,g:GMEM[n]||GN(),online:true,peer:c.peer});ch=true}}
+ const mp=P(me.name);if(mp&&!mp.online){mp.online=true;mp.peer='host';ch=true}
+ if(ch){if(st.phase=='question'&&st.cur)checkAll();bump()}}
 /* départ volontaire de l'hôte : on désigne quelqu'un en ligne */
 function handoff(){if(!isHost||!st)return false;
  const h=st.players.find(p=>p.name!=me.name&&p.online&&isLinked(p.name));if(!h)return false;
@@ -2169,6 +2179,7 @@ setInterval(()=>{
  if(!st)return;
  if(!isHost){if(document.hidden){lastSeen=Date.now();return}if(!migrating&&hostConn&&hostConn.open&&Date.now()-lastSeen>9000)migrate();return}
  broadcast({t:'ping'});
+ hostHeal();
  if(Object.keys(conns).length||st.players.length<2){aloneSince=0;return}
  aloneSince=aloneSince||Date.now();
  if(Date.now()-aloneSince>15000&&!probing&&peer&&peer.open){probing=true;
@@ -2187,7 +2198,9 @@ skinFix(document.body);new MutationObserver(ms=>{for(const m of ms){if(m.type=='
 function giveHost(n){if(!isHost||!st||n==me.name)return;const p=P(n);if(!p||!p.online||!isLinked(n)){toast(T('giveHostNo'));return}
  const s=JSON.parse(JSON.stringify(st));s.gave=me.name;
  for(const id in conns){const c=conns[id];if(c.open)try{c.send({t:'handoff',to:n,st:c.pname==n?s:viewFor(c.pname,s)})}catch(e){}}
- st=viewFor(me.name,s);delete st.gave;const old=peer;setTimeout(()=>{isHost=false;conns={};peer=null;try{old&&old.destroy()}catch(e){}migrate(n)},600)}
+ st=viewFor(me.name,s);delete st.gave;const old=peer;
+ /* garde-fou : on cesse d'être hôte immédiatement (aucun départ simulé, aucun état partiel diffusé) ; l'ancien lien vit encore 1 s pour livrer le passage de main */
+ isHost=false;conns={};peer=null;dropBeacon();setTimeout(()=>{try{old&&old.destroy()}catch(e){}},1000);migrate(n);render()}
 /* retour sur l'onglet (téléphone) : on ne se croit pas abandonné ; si le lien est tombé, on rejoint l'hôte actuel au lieu de prendre sa place */
 document.addEventListener('visibilitychange',()=>{if(document.hidden||!st||isHost)return;lastSeen=Date.now();
  if(!migrating&&(!hostConn||!hostConn.open))migrate()});
@@ -2429,7 +2442,7 @@ function act(from,a){const s=st;if(!P(from))return;if(GAct(s,from,a))return;/* @
  case 'finish':if(from!=s.host)return;s.cur=null;s.phase='end';break;
  case 'flags':if(s.phase!='end')return;const fv={};for(const n in (a.v||{}))fv[n]=tidy(a.v[n]).slice(0,240);if(s.anon){if(SECF.gid!==s.gid)SECF={gid:s.gid,f:{}};SECF.f[from]=fv;s.flags[from]=true}else s.flags[from]=fv;
   gFlagsCheck(s);break;
- case 'again':if(from!=s.host)return;s.phase='lobby';s.votes={};s.cur=null;s.players=s.players.filter(p=>p.online);break;
+ case 'again':if(from!=s.host)return;s.phase='lobby';s.votes={};s.cur=null;s.players.forEach(p=>{if(!p.online&&isLinked(p.name))p.online=true});s.players=s.players.filter(p=>p.online);break;
  case 'mode':if(from!=s.host||s.phase!='lobby'||!['exp','esc','por','mir'].includes(a.v))return;s.mode=a.v;break;
  case 'timer':if(from!=s.host||s.phase!='lobby'||!TIM.includes(a.v))return;s.timer=a.v;break;
  case 'anon':if(from!=s.host||s.phase!='lobby')return;s.anon=!!a.v;break;
