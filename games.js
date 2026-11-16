@@ -129,6 +129,12 @@ function gHint(s){const g=s.game,m=meN(),need=gNeed(s);
  const w=need.filter(n=>!g.done[n]);return{hint:GT('waitN',{n:w.map(B).join(', ')})}}
 const pick=(names,cur,attr,ex)=>`<div class="gpk">${names.filter(n=>n!=ex).map((n,i)=>`<button class="ga ${cur==n?'sel':''}" ${dl(i)} ${attr}="${esc(n)}">${DT(n)}<span>${n==meN()?GT('me'):esc(n)}</span></button>`).join('')}</div>`;
 const norm=w=>String(w||'').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,'').replace(/^(.{4,})[sx]$/,'$1');
+/* nombres lisibles : pluriel par langue, points signés (« +3 points », « −8 pts »), temps restant d'une étape */
+const gPlI=(v,l)=>{v=Math.abs(+v||0);l=l||(typeof LANG!='undefined'?LANG:'fr');if(l=='zh')return 0;if(l=='ru'){const a=v%10,b=v%100;return Number.isInteger(v)?(a==1&&b!=11?0:a>=2&&a<=4&&(b<12||b>14)?1:2):1}return l=='fr'?(v<2?0:1):(v==1?0:1)};
+const GTn=W.GTn=(k,v,x)=>{const f=GT(k,{v,...(x||{})}).split('|');return f[Math.min(gPlI(parseFloat(String(v).replace('−','-'))),f.length-1)]};
+const gSg=v=>v>0?'+'+v:v<0?'−'+Math.abs(v):'0';
+const gP=v=>GTn('pts',gSg(+v||0)).replace(/^(\S+)/,'$1'),gPs=v=>GTn('ptsS',gSg(+v||0));
+const gRem=s=>{const g=s.game;return g&&g.dl>0?Math.max(0,(g.dl-((s.updatedAt||Date.now())+(Date.now()-(typeof RCV!='undefined'&&RCV||Date.now()))))/1000):0};
 const hideOwn=(o,n)=>{const r={};for(const k in o||{})r[k]=k==n?o[k]:null;return r};
 
 /* animations d'entrée : une seule fois par étape (clé jeu + g.k). Un nouveau rendu dans la même étape (offre, réaction,
@@ -159,10 +165,10 @@ W.GView=function(){const s=isHost?GHide(meN(),st):st,g=s.game;if(!g||!GAMES[g.id
  if(s.phase=='gend')return gEndView(s);
  const spc=!s.order.includes(meN());
  const G=GAMES[g.id],v=G.view(s)||{},two=s.order.length==2;
- const rem=g.dl>0?Math.max(0,(g.dl-((s.updatedAt||Date.now())+(Date.now()-(RCV||Date.now()))))/1000):0;
+ const rem=gRem(s);
  const rk='r_'+g.id+(two&&GI18N.fr.ui['r_'+g.id+'2']?'2':'');
  const head=`<div class="ghd"><span class="gic">${G.icon}</span><b>${GT('n_'+g.id)}</b>${g.n?`<span class="grd">${Math.min(g.r+1,g.n)} / ${g.n}</span>`:''}${meN()==s.host?`<button class="gstop" id="gstop" aria-label="${esc(GT('stopAsk'))}" data-tip="${esc(GT('stopAsk'))}">✕</button>`:''}</div>
- ${spc?`<p class="gspc0">👀 ${GT((s.gspec||[]).includes(meN())?'specT2':'specT')}</p>`:''}${g.dl>0?`<div class="gsab" data-gan aria-hidden="true"><i style="animation-duration:${g.sec}s;animation-delay:-${Math.max(0,g.sec-rem).toFixed(2)}s"></i></div>`:''}
+ ${spc?`<p class="gspc0">👀 ${GT((s.gspec||[]).includes(meN())?'specT2':'specT')}</p>`:''}${g.dl>0&&!(G.clk&&G.clk(g))?`<div class="gsab" data-gan aria-hidden="true"><i style="animation-duration:${g.sec}s;animation-delay:-${Math.max(0,g.sec-rem).toFixed(2)}s"></i></div>`:''}
  ${g.k<=1?`<p class="grule">${GT(rk)}</p>${g.nod?`<p class="gnod ga" ${dl(2)}>📜 ${GT('lgLast',{t:gLogT({g:g.id,...g.nod})})}</p>`:''}`:''}`;
  const h={...gHint(s),...v};const ob=v.bind;
  if(spc){delete h.hintBtn;h.mine=false}
@@ -348,8 +354,8 @@ GAMES.vag={icon:'🌊',min:2,max:8,dur:5,tags:['skill'],tone:true,
      $('#gsend').onclick=go;i.onkeydown=e=>{if(e.key=='Enter')go()};if(matchMedia('(pointer:fine)').matches&&document.activeElement!==i)i.focus()}}}
   const r=g.res[g.r]||{w:{}};
   if(two){const [a,b]=s.order,ok=r.ok;return{html:`<div class="card c">${head}<div class="gduo">${[a,b].map((n,i)=>`<div class="ga" ${dl(i)}>${DT(n)}<b>${esc(r.w[n]||'—')}</b>${r.b?`<br><span class="mut">→ ${esc(r.b[n]||'—')}</span>`:''}</div>`).join('')}</div>
-   <p class="gbig2 ga ${ok?'ok':''}" ${dl(3)}>${ok==2?GT('vsame')+' +2':ok==1?GT('vpont')+' +1':GT('vmiss')}</p></div>`,bind(){if(ok&&!RM())sparkles($('.gbig2'),ok==2?18:8)}}}
-  return{html:`<div class="card">${head}${(r.gr||[]).map((l,i)=>`<div class="ggr ga ${l.length>1?'hit':''}" ${dl(i,.1)}><b>${esc(r.w[l[0]])}</b><span>${l.map(n=>`<span class="gchip">${DT(n)}${esc(n)}</span>`).join('')}</span>${l.length>1?`<i class="gpt">+${r.pts[l[0]]}</i>`:''}</div>`).join('')}
+   <p class="gbig2 ga ${ok?'ok':''}" ${dl(3)}>${ok==2?GT('vsame')+' · '+gP(2):ok==1?GT('vpont')+' · '+gP(1):GT('vmiss')}</p></div>`,bind(){if(ok&&!RM())sparkles($('.gbig2'),ok==2?18:8)}}}
+  return{html:`<div class="card">${head}${(r.gr||[]).map((l,i)=>`<div class="ggr ga ${l.length>1?'hit':''}" ${dl(i,.1)}><b>${esc(r.w[l[0]])}</b><span>${l.map(n=>`<span class="gchip">${DT(n)}${esc(n)}</span>`).join('')}</span>${l.length>1?`<i class="gpt">${gPs(r.pts[l[0]])}</i>`:''}</div>`).join('')}
    ${s.order.filter(n=>!r.w[n]).length?`<p class="mut">… ${s.order.filter(n=>!r.w[n]).map(esc).join(', ')}</p>`:''}</div>`,bind(){if((r.pts||{})[m]&&!RM())sparkles($('.ggr.hit'),10)}}},
  fin(s){const g=s.game;if(s.order.length==2){const v=g.sc[s.order[0]];return{pts:g.sc,coop:{v,max:g.n*2}}}return{pts:g.sc}},
  endView(s){const R=s.gres;if(!R.coop)return '';const f=R.coop.v/R.coop.max,lv=f>=.6?2:f>=.3?1:0;
@@ -428,9 +434,9 @@ GAMES.pec={bag:PBAG,icon:'🦪',min:2,max:8,dur:7,tags:['chance'],
   const evh=ev.it==null?'':typeof ev.it=='number'?`<div class="gev ga pearl"><span class="gpl big v${ev.it}">${ev.it}</span>${ev.x==2?`<b>${GT('pdouble')}</b>`:''}</div>`
    :ev.it=='m'?`<div class="gev ga jel"><span class="gbig">🪼</span><b>${GT('pjel')}</b>${ev.t.length?`<span>${ev.t.map(NM).join(', ')} −½</span>`:''}</div>`
    :`<div class="gev ga shk ${g.sh>=2?'dead':''}"><span class="gbig">🦈</span><b>${g.sh>=2?GT('pdead'):GT('pshark')} (${g.sh}/2)</b></div>`;
-  const divers=`<div class="gdv">${g.ps.filter(n=>g.fil[n]!=null).map((n,i)=>{const d=g.down.includes(n);return `<span class="gchip ${d?'dn':'up'} ${n==m?'me':''}">${d?'🤿':'⛵'} ${DT(n)}${n=='~'?'🐟':esc(n)} <b>${d?g.fil[n]:g.upv[n]!=null?'+'+g.upv[n]:g.lost[n]?'✗':''}</b>${g.rx[n]&&d?` <span class="grx">${g.rx[n]}</span>`:''}</span>`}).join('')}</div>`;
+  const divers=`<div class="gdv">${g.ps.filter(n=>g.fil[n]!=null).map((n,i)=>{const d=g.down.includes(n);return `<span class="gchip ${d?'dn':'up'} ${n==m?'me':''}">${d?'🤿':'⛵'} ${DT(n)}${n=='~'?'🐟':esc(n)} <b>${d?g.fil[n]:g.upv[n]!=null?gPs(g.upv[n]):g.lost[n]?'✗':''}</b>${g.rx[n]&&d?` <span class="grx">${g.rx[n]}</span>`:''}</span>`}).join('')}</div>`;
   const cof=!s.order.includes(m)?'':`<p class="gcof">🔒 ${GT('pcof')} : <b>${g.cof[m]??0}</b> <span class="mut">· ${GT('psecret')}</span></p>`;
-  if(g.st=='e'){const h=g.mh.at(-1)||{upv:{},lost:{}};return{html:`<div class="card c">${evh}<h3>${GT('pmanche')}</h3><div class="gdv">${g.ps.map((n,i)=>`<span class="gchip ga" ${dl(i,.2)}>${DT(n)}${n=='~'?'🐟':esc(n)} <b>${h.upv[n]!=null?'+'+h.upv[n]:h.lost[n]?'✗ −'+h.lost[n]:'0'}</b></span>`).join('')}</div>${cof}</div>`}}
+  if(g.st=='e'){const h=g.mh.at(-1)||{upv:{},lost:{}};return{html:`<div class="card c">${evh}<h3>${GT('pmanche')}</h3><div class="gdv">${g.ps.map((n,i)=>`<span class="gchip ga" ${dl(i,.2)}>${DT(n)}${n=='~'?'🐟':esc(n)} <b>${h.upv[n]!=null?gPs(h.upv[n]):h.lost[n]?'✗ '+GT('pLostN',{v:h.lost[n]}):gPs(0)}</b></span>`).join('')}</div>${cof}</div>`}}
   return{html:`<div class="card c">${evh}${divers}${down?`<p class="gfil">${GT('pfil')} : <b>${g.fil[m]}</b></p><div class="gpk">${[['u','pup','⛵'],['d','pdown','🤿']].map(([v,k,ic],i)=>`<button class="ga gdec ${g.ch[m]==v?'sel':''}" ${dl(i)} data-gd="${v}">${ic} ${GT(k)}</button>`).join('')}</div>
    <div class="grxb">${RX.map(e=>`<button class="ghost" data-grx="${e}" aria-label="${e}">${e}</button>`).join('')}</div>`:`<p class="gnote">${g.upv[m]!=null?GT('pyouup',{v:g.upv[m]}):g.lost[m]?GT('pdead'):''}</p>`}${bag}${cof}</div>`,
    bind(){$$('[data-gd]').forEach(x=>x.onclick=()=>gs({v:x.dataset.gd}));$$('[data-grx]').forEach(x=>x.onclick=()=>send({t:'g',rx:x.dataset.grx}))}}},
@@ -530,7 +536,7 @@ GAMES.arc={icon:'🏝️',min:2,max:8,dur:12,tags:['skill'],T:arcT,V:arcV,gd:arc
   if(g.st=='s'){const tg=play?AX.map((x,i)=>i).filter(i=>AX[i][2]==g.R||AX[i][2]==g.R-1).map(i=>[i,AX[i][2]==g.R?'p':'f']):[];
    return{html:`<div class="card c"><p class="arcst">${GT('asetup')}</p>${this.svg(s,tg,{pp:g.pp[m],pf:g.pf[m]})}<p class="arclg mut">⚓ ${GT('k_p')} · 🪨 ${GT('k_f')}</p></div>`,bind}}
   if(g.st=='h'){const h=g.hv[g.hv.length-1]||{},last=g.r>=g.n;
-   return{html:`<div class="card c"><p class="arcst"><b>🦪 ${GT(last?'afinal':'aharv')}</b></p><div class="arcsc">${s.order.map((p,i)=>`<span class="gchip ga ${p==m?'me':''}" ${dl(i,.2)}>${DT(p)}${esc(p)} <b>+${h[p]||0}</b></span>`).join('')}</div>${this.svg(s)}
+   return{html:`<div class="card c"><p class="arcst"><b>🦪 ${GT(last?'afinal':'aharv')}</b></p><div class="arcsc">${s.order.map((p,i)=>`<span class="gchip ga ${p==m?'me':''}" ${dl(i,.2)}>${DT(p)}${esc(p)} <b>${gPs(h[p]||0)}</b></span>`).join('')}</div>${this.svg(s)}
     ${last?'':`<p class="gnote ga" ${dl(3,.3)}>🌊 ${GT('atidec')}</p>`}</div>`,bind(){if((h[m]||0)>0&&!RM())sparkles($('.arcsc .me'),10)}}}
   const left=4-g.r%4,fin=g.r>=g.n-4,tg=play?arcT(g,m):[],c=g.o[m],k=c!=null&&(tg.find(t=>t[0]==c)||[])[1],ev=g.ev||{};
   const chips=`<div class="arcsc">${s.order.map(p=>`<span class="gchip ${p==m?'me':''}">${DT(p)}${esc(p)} <b>${g.sc[p]||0}</b>🦪${nx[p]?`<i class="mut">+${nx[p]}</i>`:''}</span>`).join('')}</div>`;
@@ -634,11 +640,11 @@ GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,ties:true,MK
    ${me.pt.length>1?me.pt.map((t,j)=>`<div class="mkrow ga" ${dl(j+3)}><span class="mkto">${R.mn(t)}${sh((me.ptr||[])[j])}</span><div class="gpk mkch sm">${['P','G'].map(v=>`<button class="gdec ${(me.ch||[])[j]==v?'sel':''}" data-gm="${v}" data-to="${t}">${GT('k'+v)}</button>`).join('')}</div></div>`).join(''):`<div class="gpk mkch">${['P','G'].map((v,i)=>`<button class="ga gdec ${(me.ch||[])[0]==v?'sel':''}" ${dl(i,.3)} data-gm="${v}">${GT('k'+v)}</button>`).join('')}</div>`}
    ${(me.ptr||[]).some(Boolean)?`<p class="mut mkshd">🦈 ${GT('mshD')}</p>`:''}</div>`,
    bind(){$$('[data-gm]').forEach(x=>x.onclick=()=>gs(x.dataset.to!=null?{v:x.dataset.gm,to:+x.dataset.to}:{v:x.dataset.gm}))}};
-  if(g.st=='r'){const sea=(g.pub[g.r]||[]).map((gr,i)=>`<div class="mksea ga" ${dl(i,.4)}>${gr.map(([k,c,v])=>`<span class="mkc ${c=='P'?'p':'g'} ${k===me.m?'me':''}">${MKE[k]} ${c=='P'?'🤝🏻':'🔒'} <b>+${v}</b></span>`).join('')}</div>`).join('');
+  if(g.st=='r'){const sea=(g.pub[g.r]||[]).map((gr,i)=>`<div class="mksea ga" ${dl(i,.4)}>${gr.map(([k,c,v])=>`<span class="mkc ${c=='P'?'p':'g'} ${k===me.m?'me':''}">${MKE[k]} ${c=='P'?'🤝🏻':'🔒'} <b dir="ltr">${gPs(v)}</b></span>`).join('')}</div>`).join('');
    if(sp)return{html:`<div class="card c"><h3 class="gh3">🌊 ${GT('msea')}</h3>${sea}</div>`};
    const rep=me.hab;
    return{html:`<div class="card c">${head}<div class="mkres">${(me.pc||[]).map((c,i)=>`<p class="ga" ${dl(i+1)}>${MKE[me.pt[i]]} ${GT(c=='P'?'mshared':'mkept')}${me.pt.length>1?` <span class="mut">· ${esc(GT('me'))} ${me.ch[i]=='P'?'🤝🏻':'🔒'}</span>`:''}</p>`).join('')}
-    <p class="gbig2 ga ${me.gain>=4?'ok':''}" ${dl(3)}>+${me.gain}</p>${me.nb?`<p class="mknet ga" ${dl(4)}>🕸️ ${GT('mnet',{v:me.nb})}</p>`:''}${rep?`<p class="mut ga" ${dl(4)}>🔁 ${GT('mrep')}</p>`:''}${me.tm?`<p class="mut ga" ${dl(4)}>🔗 ${GT('mtieM')}</p>`:''}${me.mtr?`<p class="mut ga" ${dl(5)}>${sh(me.mtr)} ${GT('myshk',{v:me.mtr})}</p>`:''}<p class="gcof">🔒 ${GT('mtot',{v:g.sc[m]??0})}</p></div>
+    <p class="gbig2 ga ${me.gain>=4?'ok':''}" ${dl(3)}>${gP(me.gain)}</p>${me.nb?`<p class="mknet ga" ${dl(4)}>🕸️ ${GT('mnet',{v:me.nb})}</p>`:''}${rep?`<p class="mut ga" ${dl(4)}>🔁 ${GT('mrep')}</p>`:''}${me.tm?`<p class="mut ga" ${dl(4)}>🔗 ${GT('mtieM')}</p>`:''}${me.mtr?`<p class="mut ga" ${dl(5)}>${sh(me.mtr)} ${GT('myshk',{v:me.mtr})}</p>`:''}<p class="gcof">🔒 ${GT('mtot',{v:g.sc[m]??0})}</p></div>
     <h3 class="gh3">🌊 ${GT('msea')}</h3>${sea}</div>`,bind(){if(me.gain>=4&&!RM())sparkles($('.mkres .gbig2'),me.nb?14:8)}}}
   const fin=g.fin||[],isF=fin.includes(m),names=fin.map((p,i)=>NM(p)+((g.ftr||[])[i]?' 🦈'+(g.ftr[i]>1?'×'+g.ftr[i]:''):'')).join(' & ');
   if(g.st=='f'){const top=`<div class="mkfin ga"><span class="gbig">🎭</span><b>${GT('mfinT')}</b><p>${GT('mfinD',{n:names,v:g.pot})}</p><p class="mut">${GT('mfinC')}</p></div>`;
@@ -648,7 +654,7 @@ GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,ties:true,MK
    return{html:`<div class="card c">${top}<p class="gq2">${GT('mbet')}</p><div class="gab">${[0,1,2].map(i=>`<button class="gopt ga ${g.bet[m]===i?'sel':''}" ${dl(i,.3)} data-gb="${i}">${GT('mb'+i)}</button>`).join('')}</div></div>`,
     bind(){$$('[data-gb]').forEach(x=>x.onclick=()=>gs({b:+x.dataset.gb}))}}}
   const fr=g.fr||{c:{},add:{}};
-  return{html:`<div class="card c"><div class="mkfin"><b>${GT('mfinT')}</b></div><div class="gduo mkduo">${fin.map((p,i)=>`<div class="ga" ${dl(i*2,.1)}>${DT(p)}<b>${esc(p)}</b><br><span class="gtag ${fr.c[p]=='P'?'':'no'}">${GT('k'+fr.c[p])}</span><br><b>+${fr.add[p]||0}</b></div>`).join('')}</div>
+  return{html:`<div class="card c"><div class="mkfin"><b>${GT('mfinT')}</b></div><div class="gduo mkduo">${fin.map((p,i)=>`<div class="ga" ${dl(i*2,.1)}>${DT(p)}<b>${esc(p)}</b><br><span class="gtag ${fr.c[p]=='P'?'':'no'}">${GT('k'+fr.c[p])}</span><br><b class="mkadd ${(fr.add[p]||0)<0?'neg':''}">${(fr.add[p]||0)<0?GT('mLose',{v:GTn('pts',-fr.add[p])}):fr.add[p]?GT('mGain',{v:GTn('pts',fr.add[p])}):gP(0)}</b></div>`).join('')}</div>
    <p class="gbig2 ga ok" ${dl(4)}>${GT('mb'+fr.out)}</p>${isF||sp?'':`<p class="gnote ga" ${dl(5)}>${g.bet[m]===fr.out?GT('mbetok'):'—'}</p>`}</div>`,
    bind(){if(fr.out==0&&!RM())sparkles($('.mkduo'),16)}}},
  endView(s){const g=s.game,o=s.order,n=o.length,W=220,cx=110,cy=110,rr=82,pos={};o.forEach((p,i)=>{const a=2*Math.PI*i/n-Math.PI/2;pos[p]=[cx+rr*Math.cos(a),cy+rr*Math.sin(a)]});
@@ -734,7 +740,7 @@ GAMES.chn={icon:'🧭',min:4,max:8,dur:20,tags:['social'],CHI,NF:n=>n<=5?1:2,RL:
   return g.h.length?`<details class="chlog"><summary>📜 ${GT('chLog')} (${g.h.length})</summary>${g.h.map((w,i)=>`<div class="chlr"><b>${w.ok?'⛵':'💥'} ${i+1}</b> ${w.route.map((p,j)=>esc(p)+(mine[i]&&p==m?` ${R.ch(mine[i][0])}›${R.ch(mine[i][1])}`:w.ir==p&&w.ip?` ⛓️${R.ch(w.ip[0])}›${R.ch(w.ip[1],w.ip[0]!=w.ip[1]?'x':'')}`:'')).join(' <i class="charr">➜</i> ')}</div>`).join('')}</details>`:''},
  view(s){const g=s.game,m=meN(),R=GAMES.chn,N=!!(g.nf&&g.nf.includes(m));
   const hd=`<div class="chhd">${s.order.includes(m)?`<span class="chrole ga ${N?'n':''}">${N?'🏴‍☠️ '+GT('chN'):'🗼 '+GT('chC')}${N&&g.nf.length>1?' · '+g.nf.filter(p=>p!=m).map(B).join(', '):''}</span>`:''}
-   <span class="chsk ga" ${dl(1)} title="${esc(GT('chSkT',{v:g.th}))}">💥 ${g.sk}/${g.th} · ⛵ ${g.ok}</span>${g.irn?`<span class="chir ga" ${dl(2)}>⛓️ ${B(g.irn)}</span>`:''}</div>`;
+   <span class="chsk ga" ${dl(1)} title="${esc(GT('chSkT',{v:g.th}))}">💥 ${GT('chSkL',{v:g.sk,n:g.th})} · ⛵ ${GTn('chOkN',g.ok)}</span>${g.irn?`<span class="chir ga" ${dl(2)}>⛓️ ${B(g.irn)}</span>`:''}</div>`;
   const kn=(rc,ps)=>p=>p in rc||p in ps?[rc[p],ps[p]]:null;
   if(g.st=='p'){const me=m==g.hold,cap=g.route[0]==m;
    if(!me)return{html:`<div class="card c">${hd}${R.chain(g.route,g.hold,kn(g.rc,g.ps))}<p class="gnote ga" ${dl(2)}>${GT(g.route.length==1?'chWaitC':'chWait',{n:B(g.hold)})}</p>${g.lv&&g.route.length==1?R.lvote(g):''}${R.hlog(g,m)}</div>`};
@@ -1117,14 +1123,14 @@ GAMES.prl={icon:'⚫',min:3,max:8,dur:10,tags:['social'],tone:true,PRN,PRS,
  neck(s,H,r,m){if(!H||!H.length)return '';
   return `<div class="prnk"><p class="prnkh">📿 ${GT('prNeck')}</p>${H.map((h,t)=>{const G={};for(const p in h.pk)if(h.pk[p]!=null&&s.order.includes(p))(G[h.pk[p]]=G[h.pk[p]]||[]).push(p);
    const ec=r?r.ec[t]||{}:{},ks=Object.keys(G).sort((a,b)=>G[b].length-G[a].length);
-   return `<div class="prnr ga" ${dl(t)}><span class="prti">🌊${t+1}</span><span class="prgs">${ks.map(k=>`<span class="prg ${G[k].length>1?'two':''} ${ec[k]=='e'?'ec':ec[k]=='s'?'st':''}"><i>${h.tr[k]}</i>${G[k].map(p=>{const pk=r&&r.pe.includes(p);
+   return `<div class="prnr ga" ${dl(t)}><span class="prti">🌊 ${GT('prTn',{i:t+1})}</span><span class="prgs">${ks.map(k=>`<span class="prg ${G[k].length>1?'two':''} ${ec[k]=='e'?'ec':ec[k]=='s'?'st':''}"><i>${h.tr[k]}</i>${G[k].map(p=>{const pk=r&&r.pe.includes(p);
     return `<small class="${pk?'pk':''}">${pk?'<b class="prbk sm" aria-hidden="true"></b>':DT(p)}${esc(p==m?GT('me'):p)}</small>`}).join('')}${ec[k]=='s'?'<b class="prst" aria-hidden="true">✋🏻</b>':''}</span>`).join('')}</span></div>`}).join('')}</div>`},
  rview(s,r,m,L){if(!r)return{html:''};const R=this,cs=R.cs(r.q,L),nm=i=>cs[r.o[i]]||'';
   const ch=`<div class="prcf">${[...Array(PRL.NC).keys()].map(i=>{const ds=r.pe.filter(p=>r.dv[p]&&r.dv[p].c===i);
    return `<span class="prch ga ${i===r.t?'tru':'off'}" ${dl(i)}><span aria-hidden="true">${i===r.t?'💎':'🧰'}</span><b>${esc(nm(i))}</b>${ds.map(p=>`<em>🤿 ${esc(p)}</em>`).join('')}</span>`}).join('')}</div>`;
   const out=r.pe.map((p,i)=>{const d=r.dv[p]||{c:-1},v=d.ok?PRL.V[d.t]:r.pe.length>1?1:2;
    return `<p class="gnote prout ga" ${dl(i,.5)}><b class="prbk" aria-hidden="true"></b> ${d.ok?GT('prOk',{n:B(p),v,i:d.t+1}):GT(d.c<0?'prNo':'prKo',{n:B(p),v})}</p>`}).join('');
-  const pts=`<div class="gvl">${s.order.map((p,i)=>`<span class="gchip ga ${r.pts[p]?'ok':''} ${p==m?'me':''}" ${dl(i,.7)}>${r.pe.includes(p)?'<b class="prbk sm" aria-hidden="true"></b>':DT(p)}${esc(p)} ${r.pts[p]?'+'+r.pts[p]:'0'}</span>`).join('')}</div>`;
+  const pts=`<div class="gvl">${s.order.map((p,i)=>`<span class="gchip ga ${r.pts[p]?'ok':''} ${p==m?'me':''}" ${dl(i,.7)}>${r.pe.includes(p)?'<b class="prbk sm" aria-hidden="true"></b>':DT(p)}${esc(p)} ${gPs(r.pts[p]||0)}</span>`).join('')}</div>`;
   return{html:`<div class="card c"><p class="gpre">${GT('prTrue')}</p>${ch}${out}${R.neck(s,r.h,r,m)}<p class="prnkh prrd">${GT('prRd')}</p>${pts}</div>`,
    bind(){if(r.pts[m]&&!RM())sparkles($('.prch.tru')||$('.prcf'),Math.min(18,r.pts[m]*5))}}},
  view(s){const g=s.game,m=meN(),R=this,L=typeof LANG!='undefined'?LANG:'fr';
@@ -1153,7 +1159,9 @@ GAMES.prl={icon:'⚫',min:3,max:8,dur:10,tags:['social'],tone:true,PRN,PRS,
    Niveau k : chacun reçoit k vagues secrètes (nombres 1–100, tous différents). Il faut toutes les lâcher dans l'ordre
      croissant, à l'échelle du groupe, sans jamais dire de chiffre : pendant la partie le chat se tait (hôte : messages
      refusés), seules les 4 réactions restent.
-   Rythme partagé = coups de houle (6 s × sablier de l'hôte ; sans sablier : quand tout le monde a choisi). À chaque coup,
+   Rythme partagé = coups de houle (8 s × sablier de l'hôte, jamais moins de 7 s réelles ; sans sablier : quand tout le
+     monde a choisi). Chaque niveau s'ouvre sur un court moment « tes vagues » (5 s ou « Continuer ») pour les lire.
+     La jauge de la tempête est l'horloge : elle descend en continu pendant le coup. À chaque coup,
      en même temps et modifiable jusqu'à la fin du coup : 🌊 Lâcher (ma plus petite vague), ⏳ Retenir (défaut), 🌅 Vague
      calme. Pas de premier joueur : les vagues lâchées ensemble se rangent toutes seules ; une erreur n'arrive que si une
      vague PLUS BASSE reste en main → elle part dans l'écume (révélée), −1 ⛵ par coup fautif.
@@ -1174,18 +1182,18 @@ GAMES.prl={icon:'⚫',min:3,max:8,dur:10,tags:['social'],tone:true,PRN,PRS,
      Rejetés : mêmes niveaux pour tous (5 à 8 joueurs : 24–32 vagues au dernier niveau, 1–19 % en moyen),
      2 ⛵ partout (moyen 3–12 % dès 3 joueurs).
    ===================================================================== */
-const TMP={BT:6,CB:3,LV:n=>n==2?7:n==3?6:n==4?5:n==5?4:3,LF:n=>n==2?2:n==8?5:4,B:c=>Math.ceil(c*1.5)+8,BON:{2:'c',3:'l',5:'c',6:'l'}};
+const TMP={BT:8,BM:7,FT:5,CB:3,LV:n=>n==2?7:n==3?6:n==4?5:n==5?4:3,LF:n=>n==2?2:n==8?5:4,B:c=>Math.ceil(c*1.5)+8,BON:{2:'c',3:'l',5:'c',6:'l'}};
 const tpBand=v=>{const k=Math.floor((v-1)/10);return (10*k+1)+"–"+(10*k+10)};
-GAMES.tmp={icon:'⛈️',min:2,max:8,dur:8,tags:['skill'],mute:1,TMP,
+GAMES.tmp={icon:'⛈️',min:2,max:8,dur:8,tags:['skill'],mute:1,TMP,clk:g=>g.st=='b',
  init(s){const g=s.game,n=s.order.length;g.n=TMP.LV(n);g.life=TMP.LF(n);g.calm=1;g.hist=[];g.ok=0;this.deal(s)},
  deal(s){const g=s.game,k=g.r+1,d=shuf([...Array(100).keys()].map(i=>i+1));g.h={};s.order.forEach(p=>g.h[p]=d.splice(0,k).sort((a,b)=>a-b));
-  g.pl=[];g.ec=[];g.band={};g.left=g.B=TMP.B(k*s.order.length);g.ev=null;g.res=null;g.bt=0;g.since=0;g.nx=0;this.beat(s)},
+  g.pl=[];g.ec=[];g.band={};g.left=g.B=TMP.B(k*s.order.length);g.ev=null;g.res=null;g.bt=0;g.since=0;g.nx=0;g.ch={};this.pub(s);gWait(g,TMP.FT,'f',1)},
  hold(s){const g=s.game;return s.order.filter(p=>(g.h[p]||[]).length)},
  pub(s){const g=s.game;g.cnt={};s.order.forEach(p=>g.cnt[p]=(g.h[p]||[]).length)},
- beat(s){const g=s.game;g.ch={};gWait(g,TMP.BT,'b');g.need=this.hold(s);g.bt++;this.pub(s)},
+ beat(s){const g=s.game,f=gTF();g.ch={};gWait(g,f?Math.max(TMP.BT,TMP.BM/f):TMP.BT,'b');g.need=this.hold(s);g.bt++;this.pub(s)},
  act(s,from,a){const g=s.game;if(g.st!='b'||!(g.h[from]||[]).length||!['P','W','C'].includes(a.v))return;if(a.v=='C'&&g.calm<1)return;
   g.ch[from]=a.v;g.done[from]=1;return true},
- next(s){const g=s.game;if(g.st=='b'){this.res(s);return}
+ next(s){const g=s.game;if(g.st=='f'){this.beat(s);return}if(g.st=='b'){this.res(s);return}
   if(g.end){g.over=1;return}g.r++;this.deal(s)},
  res(s){const g=s.game,H=this.hold(s),on=new Set(gOn(s)),ch=g.ch,Ho=H.filter(p=>on.has(p));g.left--;
   const nc=Ho.filter(p=>ch[p]=='C').length;
@@ -1209,35 +1217,45 @@ GAMES.tmp={icon:'⛈️',min:2,max:8,dur:8,tags:['skill'],mute:1,TMP,
  /* secrets : chacun ne reçoit que SES vagues ; pendant un coup, on voit seulement qui demande la vague calme */
  hide(g,n){const o={...g};o.h={[n]:(g.h[n]||[]).slice()};
   if(g.st=='b'){o.ch={};for(const p in g.ch)if(p==n||g.ch[p]=='C')o.ch[p]=g.ch[p]}return o},
- sea(g,nw){const P=g.pl||[],E=g.ec||[];
-  return `<div class="tpsea" aria-hidden="true"><i class="tpln"></i>${E.map(x=>`<b class="tpw ec ${nw&&x.b==nw?'nw':''}" style="inset-inline-start:${x.v-1}%"><span>${x.v}</span></b>`).join('')}
-   ${P.map(x=>`<b class="tpw ${x.e?'bad':''} ${nw&&x.b==nw?'nw':''}" style="inset-inline-start:${x.v-1}%;--c:${col(x.p)}"><span>${x.v}</span></b>`).join('')}<span class="tp0">1</span><span class="tp1">100</span></div>`},
+ sea(g,nw){const P=g.pl||[],E=g.ec||[],ln={},last=[-99,-99];
+  /* numéros des vagues qui viennent de tomber : rangée du haut ou du bas, jamais à moins de 9 unités l'un de l'autre */
+  [...E.map(x=>({...x,k:'e'+x.v})),...P.map(x=>({...x,k:'p'+x.v}))].filter(x=>nw&&x.b==nw).sort((a,b)=>a.v-b.v).forEach(x=>{const r=x.v-last[0]>=9?0:x.v-last[1]>=9?1:last[0]<=last[1]?0:1;last[r]=x.v;ln[x.k]=r});
+  const lb=(k,v)=>ln[k]!=null?`<span class="${ln[k]?'dn':''}">${v}</span>`:'';
+  return `<div class="tpsea" aria-hidden="true"><i class="tpln"></i>${E.map(x=>`<b class="tpw ec ${nw&&x.b==nw?'nw':''}" style="inset-inline-start:${x.v-1}%">${lb('e'+x.v,x.v)}</b>`).join('')}
+   ${P.map(x=>`<b class="tpw ${x.e?'bad':''} ${nw&&x.b==nw?'nw':''}" style="inset-inline-start:${x.v-1}%;--c:${col(x.p)}">${lb('p'+x.v,x.v)}</b>`).join('')}<span class="tp0">1</span><span class="tp1">100</span></div>`},
+ /* petite légende : couleurs et icônes */
+ lg(){return `<p class="tplg"><span><i class="tpw0" style="--c:${col(meN())}"></i>${GT('tpLgW')}</span><span><i class="tpw0 bad"></i>${GT('tpLgB')}</span><span><i class="tpw0 ec"></i>${GT('tpLgE')}</span><span>⛵ ${GT('tpLgL')}</span><span>🌅 ${GT('tpLgC')}</span></p>`},
  /* réaction : bulle de 2,6 s, jouée une fois par envoi (les re-rendus de coup la continuent sans la relancer) */
  rxa(g,p){const t=(g.rxt||{})[p],e=(g.rx||{})[p];if(!t||!e)return '';const M=this.rxs=this.rxs||{};if(!M[p]||M[p].t!==t)M[p]={t,at:Date.now()};
   const age=Date.now()-M[p].at;return age<2600?`<span class="tprx" data-gan style="animation-delay:-${age}ms">${e}</span>`:''},
  seq(g){return `<div class="tpseq">${[...(g.pl||[]).map(x=>`<b class="${x.e?'bad':''}" style="--c:${col(x.p)}">${x.v}</b>`),...(g.ec||[]).map(x=>`<b class="ec">${x.v}</b>`)].join('')}</div>`},
  view(s){const g=s.game,m=meN(),R=this,my=(g.h||{})[m]||[],ch=g.ch||{};
-  const bar=`<div class="tpbar"><span class="tplf" title="⛵">${'⛵'.repeat(Math.max(0,g.life))}</span><span class="tpcl ${g.calm?'':'z'}" title="🌅">🌅 ${g.calm}</span><b class="tplv">${GT('tpLv',{v:g.r+1})}</b></div>`;
+  const bar=`<div class="tpbar"><span class="tplf" title="${esc(GT('tpLgL'))}">${'⛵'.repeat(Math.max(0,g.life))}</span><span class="tpcl ${g.calm?'':'z'}" title="${esc(GT('tpLgC'))}">🌅 ${g.calm}</span><b class="tplv">${GT('tpLv',{v:g.r+1})}</b></div>`;
+  if(g.st=='f'){const pl=s.order.includes(m);
+   return{html:`<div class="card c tpcard">${bar}<p class="gq2 ga">${GT(pl?'tpFocus':'tpFocusS')}</p>${pl&&my.length?`<div class="tphand tpfoc">${my.map((v,i)=>`<b class="tpv ga ${i?'':'lo'}" ${dl(i,.15)}>${v}</b>`).join('')}</div>`:''}
+    <p class="gsub ga" ${dl(3)}>${GT('tpFocusD',{v:GTn('tpBeatN',g.B)})}</p>${R.lg()}</div>`}}
   if(g.st=='r'){const r=g.res||{};
    const msg=r.ok?(r.storm?GT('tpStorm'):GT(r.lv>=g.n?'tpWin':'tpOk',{v:r.lv})):GT('tpSunk');
    return{html:`<div class="card c">${bar}<p class="gbig2 ga ${r.ok&&!r.storm?'ok':''}">${r.ok?(r.storm?'⛈️':'🌈'):'🌊'}</p><p class="gby2 ga" ${dl(1)}>${msg}</p>
     ${r.bon?`<p class="gnote ga ok" ${dl(2)}>${GT(r.bon=='l'?'tpBonL':'tpBonC')}</p>`:''}${R.sea(g,0)}${R.seq(g)}</div>`,
     bind(){if(r.ok&&!r.storm&&!RM())sparkles($('.gby2'),14)}}}
   const H=s.order.filter(p=>g.cnt[p]),nc=Object.values(ch).filter(v=>v=='C').length,ev=g.ev||{};
-  const evt=ev.t=='p'?ev.put.map(x=>`${DT(x.p)}<b>${x.v}</b>`).join(' '):ev.t=='x'?`💥 ${GT('tpX',{v:ev.lost.map(x=>x.v).join(', ')})}`:ev.t=='c'?`🌅 ${GT('tpC')}`:ev.t=='w'?GT('tpW'):GT('tpGo');
+  const evt=ev.t=='p'?ev.put.map(x=>`<span class="tpe">${DT(x.p)}<b>${x.v}</b></span>`).join(''):ev.t=='x'?`💥 ${GT('tpX',{v:ev.lost.map(x=>x.v).join(', ')})}`:ev.t=='c'?`🌅 ${GT('tpC')}`:ev.t=='w'?GT('tpW'):GT('tpGo');
   const crew=s.order.map(p=>{const k=g.cnt[p]||0,bd=g.band[p];
    return `<div class="tpm ${p==m?'me':''} ${k?'':'out'}"><span class="tpnm">${DT(p)}${p==m?esc(GT('me')):esc(p)}</span><span class="tpk">${k?'🌊'.repeat(Math.min(k,7)):'✓'}</span>
     ${bd!=null&&k?`<span class="tpbd" dir="ltr">${tpBand(bd*10+1)}</span>`:''}${ch[p]=='C'?'<span class="tpcq">🌅</span>':''}${g.done[p]&&k?'<i class="tpok" aria-hidden="true"></i>':''}${R.rxa(g,p)}</div>`}).join('');
   const c=ch[m]||'W',hand=my.length?`<div class="tphand">${my.map((v,i)=>`<b class="tpv ${i?'':'lo'}">${v}</b>`).join('')}</div>
    <div class="tpbt"><button class="tpgo ${c=='P'?'sel':''}" data-tp="P" aria-pressed="${c=='P'}">🌊 ${GT('tpPut',{v:my[0]})}</button><button class="ghost ${g.done[m]&&c=='W'?'sel':''}" data-tp="W" aria-pressed="${c=='W'}">⏳ ${GT('tpHold')}</button>
    <button class="ghost tpcb ${c=='C'?'sel':''}" data-tp="C" ${g.calm?'':'disabled'} aria-pressed="${c=='C'}">🌅 ${GT('tpCalm')}${nc?` <small>${nc}/${Math.max(1,Math.ceil(H.length/2))}</small>`:''}</button></div>`:s.order.includes(m)?`<p class="gnote">${GT('tpNone')}</p>`:'';
-  return{html:`<div class="card c tpcard">${bar}<div class="tpst"><span>⛈️ ${GT('tpLeft',{v:g.left})}</span><span class="tpsb"><i style="width:${Math.max(0,Math.min(100,100*g.left/g.B))}%"></i></span></div>
-   ${R.sea(g,g.bt-1)}<p class="tpev" aria-live="polite">${evt}</p><p class="tpsi">${GT('tpSince',{v:g.since})}</p><div class="tpcrew">${crew}</div>${hand}
+  /* la jauge EST l'horloge : elle glisse de « coups restants » à « un de moins » pendant le coup (calée sur le sablier) */
+  const ga=Math.max(0,Math.min(1,g.left/g.B)),gb=Math.max(0,Math.min(1,(g.left-1)/g.B)),rm=gRem(s),run=g.dl>0&&g.sec;
+  return{html:`<div class="card c tpcard">${bar}<div class="tpst"><span>⛈️ ${GTn('tpLeftN',g.left)}</span><span class="tpsb"><i data-gan style="--a:${ga.toFixed(4)};--b:${gb.toFixed(4)};${run?`animation-duration:${g.sec}s;animation-delay:-${Math.max(0,g.sec-rm).toFixed(2)}s`:'animation:none;transform:scaleX(var(--a))'}"></i></span></div>
+   ${R.sea(g,g.bt-1)}<p class="tpev" aria-live="polite">${evt}</p><p class="tpsi">${GT('tpSince',{v:g.since})}</p><div class="tpcrew">${crew}</div>${hand}${R.lg()}
    <div class="grxb tprxb">${RX.map(e=>`<button class="ghost" data-grx="${e}" aria-label="${e}">${e}</button>`).join('')}</div><p class="tpmu">🤫 ${GT('tpMute')}</p></div>`,
    bind(){$$('[data-tp]').forEach(b=>b.onclick=()=>gs({v:b.dataset.tp}));$$('[data-grx]').forEach(x=>x.onclick=()=>send({t:'g',rx:x.dataset.grx}))}}},
  endView(s){const g=s.game;
   return `<p class="gbig2 ga ${g.ok>=g.n?'ok':''}">${g.ok>=g.n?'🌈':'⛈️'} ${g.ok} / ${g.n}</p><p class="gnote ga" ${dl(1)}>${GT('tpEnd',{v:g.ok,n:g.n})}</p>
-   <div class="tpend">${(g.hist||[]).map((h,i)=>`<div class="ga" ${dl(i,.3)}><b>${GT('tpLv',{v:h.lv})}</b><span>${h.ok?(h.st?'⛈️':'✓'):'🌊'}${h.x?' · 💥×'+h.x:''}</span><span class="mut">${h.bt} 〰️</span></div>`).join('')}</div>`},
+   <div class="tpend">${(g.hist||[]).map((h,i)=>`<div class="ga" ${dl(i,.3)}><b>${GT('tpLv',{v:h.lv})}</b><span>${h.ok?(h.st?'⛈️':'✓'):'🌊'}${h.x?' · 💥 '+GTn('tpErrN',h.x):''}</span><span class="mut">${GTn('tpBeatN',h.bt)}</span></div>`).join('')}</div>`},
  fin(s){const g=s.game;return{pts:g.sc,coop:{v:g.ok,max:g.n}}}};
 /* @games : jeux silencieux (Tempête) — pendant la partie, le chat se tait (hôte et envoi) ; réactions seulement */
 W.GMute=s=>!!(s&&s.phase=='game'&&s.game&&GAMES[s.game.id]&&GAMES[s.game.id].mute);
@@ -1325,7 +1343,7 @@ GAMES.coq={icon:'🐚',min:2,max:8,dur:10,tags:['social','chance'],COQ,
    return `<div class="cqsl ${cur?'on':''} ${h?'past':''}">${this.lotH(h?h.lot:l,'xs')}${h?`<i class="cqsw">${h.w?DT(h.w):'↪'}</i>`:''}</div>`}).join('')}</div>`},
  /* résultat d'un lot : toutes les offres, égalités barrées */
  resH(h,m){if(!h)return '';const E=Object.entries(h.b).sort((a,b)=>b[1]-a[1]);
-  const who=h.w?`→ ${h.w==m?`<b>${esc(GT('me'))}</b>`:B(h.w)} <span class="cqpay" dir="ltr">−${h.b[h.w]} 🪙</span>`:`<b class="mut">↪ ${GT('cqCarry')}</b>`;
+  const who=h.w?`→ ${h.w==m?`<b>${esc(GT('me'))}</b>`:B(h.w)} <span class="cqpay">${GT('cqPay',{v:h.b[h.w]})}</span>`:`<b class="mut">↪ ${GT('cqCarry')}</b>`;
   return `<div class="cqres ga">${this.lotH(h.lot,'sm')}<span class="cqwho">${who}</span><span class="cqbids" dir="ltr">${E.map(([p,c],i)=>
    `<span class="cqbid ${p==h.w?'w':''} ${h.tie.includes(c)?'x':''}" ${dl(i,.12)}>${DT(p)}<b>${c}</b></span>`).join('')}</span></div>`},
  /* tableau des cotes : révélée / mon indice / ? ; annonces (▲ ▼ à la couleur de chacun), vérifiées quand la cote sort */
@@ -1360,7 +1378,7 @@ GAMES.coq={icon:'🐚',min:2,max:8,dur:10,tags:['social','chance'],COQ,
    <p class="cqnote">${GT(my==null?'cqAuto':'cqTie')}</p>${R.tips(g)}`:''}${R.board(s,g)}${R.crew(s,g,m)}</div>`,
    bind(){$$('[data-cq]').forEach(b=>b.onclick=()=>gs({c:+b.dataset.cq}))}}},
  endView(s){const g=s.game,T=g.T||this.tally(s),m=meN(),R=this;
-  return `${g.sea?`<p class="gnote mut">🌊 ${GT('cqSea')}</p>`:g.last?R.resH(g.last,m):''}<h3 class="gh3">🐚 ${GT('cqMk')}</h3>
+  return `<div class="cqendl">${g.sea?`<p class="gnote mut">🌊 ${GT('cqSea')}</p>`:g.last?R.resH(g.last,m):''}</div><h3 class="gh3">🐚 ${GT('cqMk')}</h3>
    <div class="cqfin">${[0,1,2,3,4].map((x,i)=>`<div class="cqfc ga" ${dl(i,.2)}>${cqS(x)}<b>${g.co[x]}</b><small>${esc(R.nm(x))}</small></div>`).join('')}</div>
    <div class="cqtl">${[...s.order].sort((a,b)=>T[b].t-T[a].t).map((p,i)=>{const t=T[p];
     return `<div class="cqtr ga ${p==m?'me':''}" ${dl(i,.5)}><span class="cqnm">${DT(p)}<b>${esc(p)}</b></span><span class="cqco">${R.coll(g.col[p])}</span>
@@ -1382,7 +1400,7 @@ const TU={c:['#ef8354','#2fa894','#9b7be8','#d9a520'],
  /* glisse de (x0,y0) vers (x,y) */
  mv(x0,y0,x,y,h,d,c,st){return TU.e(x,y,h,d,'m '+(c||''),`--x:${x0-x}px;--y:${y0-y}px;${st||''}`)},
  av(i,lab){const n=TU.n()[i]||'?';return `<b class="tav" style="--c:${TU.c[i]}">${esc([...n][0])}</b>${lab===false?'':`<small class="tnm">${esc(n)}</small>`}`},
- pt(v,cl){return `<b class="tpt ${cl||''}">${v}</b>`},
+ pt(v,cl){const m=String(v).match(/^([+−-]?)(\d+|½)$/);if(m)v=GTn('ptsS',m[1].replace('-','−')+m[2]);return `<b class="tpt ${cl||''}" dir="ltr">${v}</b>`},
  cd(h,cl){return `<i class="tcd ${cl||''}">${h}</i>`},
  dot(i){return `<i class="tdot" style="--c:${TU.c[i]}"></i>`},
  bt(i){return `<i class="tbt" style="--c:${TU.c[i]}">⛵</i>`}};
@@ -1396,7 +1414,7 @@ const TUS={
   {k:'tu_bot2',s:()=>TU.e(150,30,'🍾',0,'a big')+TU.e(150,78,TU.cd('🗼 💤'),.5,'p')+[0,1,2].map(i=>TU.e(60+90*i,150,TU.av(i))+TU.e(60+90*i,112,'❓',1.1+.15*i,'p')).join('')},
   {k:'tu_bot3',s:()=>TU.e(150,30,TU.cd('🗼 💤'))+[0,1,2].map(i=>TU.e(60+90*i,150,TU.av(i))).join('')+TU.mv(60,150,140,108,TU.dot(0),.4)+TU.mv(240,150,160,108,TU.dot(2),.8)+TU.e(150,78,'✅',1.5,'p')+TU.e(60,104,TU.pt('+2'),1.9,'p')+TU.e(240,104,TU.pt('+2'),2,'p')},
   {k:'tu_bot4',x:'n',s:()=>TU.e(80,40,TU.cd('🔍 ❌❌❌'),.2,'p')+TU.e(80,95,TU.av(1,false),.2)+TU.e(80,140,TU.pt('+3'),.9,'p')+TU.e(220,40,TU.cd('🔍 ✅❌❌'),1.3,'p')+TU.e(220,95,TU.av(1,false),1.3)+TU.e(220,140,TU.pt('+1'),1.9,'p')},
-  {k:'tu_bot5',x:'2',s:()=>[0,1].map(i=>TU.e(80+140*i,150,TU.av(i))+[0,1,2].map(j=>TU.e(48+140*i+32*j,104,TU.cd(j==2?'🎭':'✅'),.3+.2*j+.6*i,'p')).join('')).join('')+TU.e(80,62,TU.pt('+2'),2,'p')+TU.e(220,62,TU.pt('+2'),2.3,'p')}],
+  {k:'tu_bot5',x:'2',s:()=>[0,1].map(i=>TU.e(80+140*i,150,TU.av(i))+[0,1,2].map(j=>TU.e(44+140*i+36*j,104,TU.cd(j==2?'🎭':'✅'),.3+.2*j+.6*i,'p')).join('')).join('')+TU.e(80,62,TU.pt('+2'),2,'p')+TU.e(220,62,TU.pt('+2'),2.3,'p')}],
  pha:[
   {k:'tu_pha1',s:()=>TU.e(40,95,'🗼',0,'a big')+TU.e(55,95,'<i class="tbeam"></i>',.3)+TU.e(205,95,TU.cd('❓🏝️'),.7,'p')},
   {k:'tu_pha2',x:'n',s:()=>[0,1,2,3].map(i=>TU.e(45+70*i,150,TU.av(i))).join('')+TU.mv(45,150,185,98,TU.dot(0),.3)+TU.mv(115,150,45,98,TU.dot(1),.5)+TU.mv(185,150,185,84,TU.dot(2),.7)+TU.mv(255,150,185,70,TU.dot(3),.9)},
@@ -1413,7 +1431,7 @@ const TUS={
   {k:'tu_rad3',x:'n',s:()=>TU.e(150,24,TU.cd('🐬 3 – 1 🕊️'),0,'p')+[0,1,2,3].map(i=>TU.e(45+70*i,150,TU.av(i))+TU.e(45+70*i,104,TU.cd(i<3?'🐬':'🕊️'),.3)+TU.e(45+70*i,64,TU.pt(i<3?'+1':'+2'),1+.2*i,'p')).join('')},
   {k:'tu_rad4',x:'2',s:()=>TU.e(90,150,TU.av(0))+TU.e(210,150,TU.av(1))+TU.e(90,104,TU.cd('🐬'),.2,'p')+TU.e(90,60,TU.cd('🔮 🕊️'),.7,'p')+TU.e(210,104,TU.cd('🕊️'),1.4,'p')+TU.e(150,60,TU.pt('+1'),2,'p')}],
  pec:[
-  {k:'tu_pec1',d:6,s:()=>`<i class="tsea"></i>`+TU.e(150,40,'👜',0,'p big')+['🦪','🦪','🦪','🦪','🦪','🪼','🪼','🦈','🦈','🦈','🦈','🦈'].map((x,i)=>TU.e(40+20*i,92,x,.5+.12*i,'p')).join('')+[0,1,2].map(i=>TU.mv(75+75*i,0,75+75*i,150,TU.av(i,false),2+.2*i)).join('')},
+  {k:'tu_pec1',d:6,s:()=>`<i class="tsea"></i>`+TU.e(150,40,'👜',0,'p big')+['🦪','🦪','🦪','🦪','🦪','🪼','🪼','🦈','🦈','🦈','🦈','🦈'].map((x,i)=>TU.e(65+34*(i%6),84+28*(i>5),x,.5+.12*i,'p')).join('')+[0,1,2].map(i=>TU.mv(75+75*i,0,75+75*i,150,TU.av(i,false),2+.2*i)).join('')},
   {k:'tu_pec2',s:()=>`<i class="tsea"></i>`+TU.e(30,28,'👜')+TU.mv(30,28,150,48,'🦪<sub>3</sub>',.2)+[0,1,2].map(i=>TU.e(75+75*i,125,TU.av(i,false))+TU.e(75+75*i,160,TU.cd('🕸️ 0'),0,'o','--o:1.2s')+TU.e(75+75*i,160,TU.cd('🕸️ 3','ok'),1.2+.15*i,'p')).join('')},
   {k:'tu_pec3',s:()=>`<i class="tsea"></i>`+TU.e(268,22,'🧰')+[0,2].map(i=>TU.e(75+75*i,125,TU.av(i,false))+TU.e(75+75*i,160,TU.cd('🕸️ 3'))+TU.e(75+75*i,92,'🤿',1.6,'p')).join('')+TU.mv(150,125,150,22,TU.av(1,false),.4)+TU.e(150,160,TU.cd('🕸️ 3'),0,'o','--o:.9s')+TU.mv(150,160,268,48,TU.cd('3','ok'),1,'','--op0:0')},
   {k:'tu_pec4',d:6,s:()=>`<i class="tsea"></i>`+TU.e(150,22,TU.av(1,false))+TU.e(268,22,'🧰')+TU.e(268,48,TU.cd('3','ok'))+TU.e(110,60,'🦈',.2,'p')+TU.e(110,84,TU.pt('1/2','no'),.5,'p')+TU.e(190,60,'🦈',1.8,'p k')+[0,2].map(i=>TU.e(75+75*i,125,TU.av(i,false))+TU.e(75+75*i,160,TU.cd('🕸️ 7'),0,'o','--o:2.4s')+TU.e(75+75*i,160,TU.cd('🕸️ 0','no'),2.5,'p')).join('')},
@@ -1425,16 +1443,16 @@ const TUS={
   {k:'tu_arc1',s:()=>tuHex()+TU.e(105,90,TU.bt(0),.4,'p')+TU.e(195,90,TU.bt(1),.6,'p')+TU.e(105,64,TU.av(0,false),.8,'p sm')+TU.e(195,64,TU.av(1,false),.9,'p sm')},
   {k:'tu_arc2',s:()=>tuHex()+TU.e(105,90,TU.bt(0))+TU.e(195,90,TU.bt(1))+TU.e(40,40,TU.cd('🂠'),.2,'p')+TU.e(260,40,TU.cd('🂠'),.4,'p')+TU.e(40,40,TU.cd('↗️','ok'),1.5,'p')+TU.e(260,40,TU.cd('🏝️','ok'),1.7,'p')+TU.e(150,160,'⏳',.8,'p')},
   {k:'tu_arc3',s:()=>tuHex(0,3)+TU.e(127.5,51,'<i class="tring"></i>',.2,'p')+TU.mv(105,90,127.5,51,TU.bt(0),1)+TU.e(127.5,24,TU.av(0,false),1.6,'p sm')},
-  {k:'tu_arc4',s:()=>tuHex()+TU.e(127.5,56,'🏝️',.8,'p')+TU.e(127.5,44,TU.bt(0))+TU.e(127.5,18,TU.av(0,false),0,'a sm')},
-  {k:'tu_arc5',d:6,s:()=>tuHex()+TU.e(172.5,56,'🏝️',0,'o','--o:2.6s')+TU.e(172.5,56,'🌊',2.7,'p')+TU.e(172.5,44,TU.bt(0))+TU.e(172.5,18,TU.av(0,false),0,'a sm')+TU.e(195,90,TU.bt(1),0,'o','--o:1.6s')+TU.mv(195,90,172.5,129,TU.bt(1),1.6,'','--op0:0')+TU.e(212,70,'🛡️',.4,'p o','--o:1.6s')+TU.e(150,160,TU.pt('💥','no'),2.7,'p')},
-  {k:'tu_arc6',s:()=>tuHex(0,0)+TU.e(105,90,TU.bt(0),0,'a k2')+TU.e(195,90,TU.bt(1),0,'a k2')+TU.mv(115,90,138,90,'➡️',.3)+TU.mv(185,90,162,90,'⬅️',.3)+TU.e(150,90,'💥',1.2,'p big')},
-  {k:'tu_arc7',d:6,s:()=>tuHex(1)+TU.e(150,92,'🏝️')+TU.e(195,92,'🏝️',0,'o','--o:2.4s')+TU.e(150,66,TU.pt('+3'),.4,'p')+TU.e(195,66,TU.pt('+2'),.7,'p')+TU.e(127.5,103,TU.pt('+2'),1,'p')+TU.e(127.5,129,'🏝️',0,'o','--o:2.4s')+TU.e(150,165,'🌊 🌊 🌊',2.2,'p')}],
+  {k:'tu_arc4',s:()=>tuHex()+TU.e(127.5,64,'🏝️',.8,'p')+TU.e(127.5,38,TU.bt(0))+TU.e(127.5,13,TU.av(0,false),0,'a sm')},
+  {k:'tu_arc5',d:6,s:()=>tuHex()+TU.e(172.5,64,'🏝️',0,'o','--o:2.6s')+TU.e(172.5,64,'🌊',2.7,'p')+TU.e(172.5,38,TU.bt(0))+TU.e(172.5,13,TU.av(0,false),0,'a sm')+TU.e(195,90,TU.bt(1),0,'o','--o:1.6s')+TU.mv(195,90,172.5,129,TU.bt(1),1.6,'','--op0:0')+TU.e(218,64,'🛡️',.4,'p o','--o:1.6s')+TU.e(150,160,TU.pt('💥','no'),2.7,'p')},
+  {k:'tu_arc6',s:()=>tuHex(0,0)+TU.e(105,90,TU.bt(0),0,'a k2')+TU.e(195,90,TU.bt(1),0,'a k2')+TU.mv(122,90,135,90,'➡️',.3)+TU.mv(178,90,165,90,'⬅️',.3)+TU.e(150,90,'💥',1.2,'p big')},
+  {k:'tu_arc7',d:6,s:()=>tuHex(1)+TU.e(150,92,'🏝️')+TU.e(195,92,'🏝️',0,'o','--o:2.4s')+TU.e(145,68,TU.pt('+3'),.4,'p')+TU.e(210,68,TU.pt('+2'),.7,'p')+TU.e(84,129,TU.pt('+2'),1,'p')+TU.e(127.5,129,'🏝️',0,'o','--o:2.4s')+TU.e(150,165,'🌊 🌊 🌊',2.2,'p')}],
  msk:[
   {k:'tu_msk1',s:()=>TU.e(150,145,TU.av(0))+TU.e(150,112,'🎭',.3,'p')+TU.e(80,50,'🐙',.8,'p big')+TU.e(220,50,'🦀',1.1,'p big')+TU.e(80,86,'?',1.3,'p')+TU.e(220,86,'?',1.4,'p')},
   {k:'tu_msk2',s:()=>TU.e(150,145,TU.av(0))+TU.e(150,40,'🐙',0,'a big')+TU.mv(150,120,150,78,TU.cd('💬 …'),.3)+TU.e(100,110,TU.cd('🤝🏻'),1.3,'p')+TU.e(200,110,TU.cd('🔒'),1.5,'p')},
   {k:'tu_msk3',s:()=>TU.e(80,80,'🐙',0,'a big')+TU.e(220,80,'🎭',0,'a big')+TU.e(80,130,TU.cd('🤝🏻'),.2,'p')+TU.e(220,130,TU.cd('🤝🏻'),.4,'p')+TU.e(80,40,TU.pt('+4'),1,'p')+TU.e(220,40,TU.pt('+4'),1.1,'p')+TU.e(150,80,'🔗',1.5,'p big')},
-  {k:'tu_msk4',s:()=>TU.e(80,80,'🐙',0,'a big')+TU.e(220,80,'🎭',0,'a big')+TU.e(80,130,TU.cd('🤝🏻'),.2,'p')+TU.e(220,130,TU.cd('🔒'),.4,'p')+TU.e(80,40,TU.pt('+1','no'),1,'p')+TU.e(220,40,TU.pt('+4'),1.1,'p')+TU.e(252,62,'🦈',1.7,'p')},
-  {k:'tu_msk5',s:()=>TU.e(80,80,'🐙',0,'a big')+TU.e(112,62,'🦈')+TU.e(220,80,'🎭',0,'a big')+TU.e(80,130,TU.cd('🔒'),.2,'p')+TU.e(220,130,TU.cd('🔒'),.4,'p')+TU.e(80,40,TU.pt('+2'),1,'p')+TU.e(220,40,TU.pt('+2'),1.1,'p')+TU.e(258,62,'✓',1.7,'p')},
+  {k:'tu_msk4',s:()=>TU.e(80,80,'🐙',0,'a big')+TU.e(220,80,'🎭',0,'a big')+TU.e(80,130,TU.cd('🤝🏻'),.2,'p')+TU.e(220,130,TU.cd('🔒'),.4,'p')+TU.e(80,40,TU.pt('+1','no'),1,'p')+TU.e(220,40,TU.pt('+4'),1.1,'p')+TU.e(264,50,'🦈',1.7,'p')},
+  {k:'tu_msk5',s:()=>TU.e(80,80,'🐙',0,'a big')+TU.e(120,50,'🦈')+TU.e(220,80,'🎭',0,'a big')+TU.e(80,130,TU.cd('🔒'),.2,'p')+TU.e(220,130,TU.cd('🔒'),.4,'p')+TU.e(80,40,TU.pt('+2'),1,'p')+TU.e(220,40,TU.pt('+2'),1.1,'p')+TU.e(258,62,'✓',1.7,'p')},
   {k:'tu_msk6',d:7,s:()=>TU.e(70,140,TU.av(0))+TU.e(230,140,TU.av(1))+TU.e(150,40,TU.cd('16','ok'),0,'p')+
    [['🤝🏻','🤝🏻','+8','+8',.3,1.9],['🗡️','🤝🏻','+16','0',2.1,3.7],['🗡️','🗡️','−8','−8',3.9,0]].map(([a,b,x,y,d,o])=>{const O=o?'p o':'p';return TU.e(70,100,TU.cd(a),d,O,'--o:'+o+'s')+TU.e(230,100,TU.cd(b),d+.1,O,'--o:'+o+'s')+TU.e(70,72,TU.pt(x,x[0]=='−'?'no':''),d+.6,O,'--o:'+o+'s')+TU.e(230,72,TU.pt(y,y[0]=='−'||y=='0'?'no':''),d+.7,O,'--o:'+o+'s')}).join('')}]};
 /* 🧭 tutoriel de La Chaîne des Phares */
@@ -1458,12 +1476,12 @@ const tuP3=()=>[0,1,2].map(i=>TU.e(60+90*i,152,TU.av(i))).join(''),tuCh=(hl,d,o)
  tuRo=d=>TU.e(60,112,'<i class="prp"></i>',d)+TU.e(150,112,'<i class="prp"></i>',d)+TU.e(240,112,'<i class="prbk big"></i>',d);
 TUS.prl=[
  {k:'tu_prl1',d:6,s:()=>tuCh(-1)+tuP3()+tuRo(.6)+TU.e(150,24,TU.cd('💎','ok'),1.6,'p')+TU.mv(60,112,128,52,'👀',2,'','--op0:0')+TU.mv(150,112,172,52,'👀',2.2,'','--op0:0')+TU.e(240,72,'❓',2.6,'p big')},
- {k:'tu_prl2',d:7,s:()=>['🧺','🍉','⛺','🎣'].map((e,i)=>TU.e(75+50*i,40,TU.cd(e),.1*i,'p')).join('')+tuP3()+tuRo(0)+
-  [0,1,2].map(i=>TU.e(60+90*i,82,'🫧',.5+.2*i,'p o','--o:2s')+TU.e(60+90*i,82,TU.cd(i<2?'🧺':'🎣',i<2?'ok':''),2.1,'p')).join('')+TU.e(105,82,'🔗',2.7,'p')+TU.e(60,58,TU.pt('+1'),3.1,'p')+TU.e(150,58,TU.pt('+1'),3.2,'p')},
+ {k:'tu_prl2',d:7,s:()=>['🧺','🍉','⛺','🎣'].map((e,i)=>TU.e(75+50*i,22,TU.cd(e),.1*i,'p')).join('')+tuP3()+tuRo(0)+
+  [0,1,2].map(i=>TU.e(60+90*i,82,'🫧',.5+.2*i,'p o','--o:2s')+TU.e(60+90*i,82,TU.cd(i<2?'🧺':'🎣',i<2?'ok':''),2.1,'p')).join('')+TU.e(105,82,'🔗',2.7,'p')+TU.e(60,54,TU.pt('+1'),3.1,'p')+TU.e(150,54,TU.pt('+1'),3.2,'p')},
  {k:'tu_prl3',d:6,s:()=>tuP3()+tuRo(0)+[0,1].map(i=>TU.e(60+90*i,82,TU.cd('🧺'))).join('')+TU.e(240,82,'🫧',.2,'p o','--o:1s')+TU.e(240,82,TU.cd('🧺'),1.1,'p')+
   TU.mv(240,70,105,82,'✋🏻',1.7,'','--op0:0')+TU.e(60,50,TU.pt('0','no'),2.4,'p')+TU.e(150,50,TU.pt('0','no'),2.5,'p')+TU.e(240,50,TU.pt('+1'),2.6,'p')},
  {k:'tu_prl4',d:7,s:()=>tuCh(-1,0,'a')+TU.e(150,24,TU.cd('💎','ok'),2.2,'p')+TU.e(60,152,TU.av(0))+TU.e(150,152,TU.av(1))+TU.mv(240,152,150,72,TU.av(2,false),.4)+TU.e(150,98,'🤿',.9,'p')+
-  TU.e(205,72,TU.pt('+3'),2.8,'p')+TU.e(240,128,TU.cd('🌊2 +3 · 🌊3 +2'),3.4,'p')},
+  TU.e(205,72,TU.pt('+3'),2.8,'p')+TU.e(232,128,TU.cd(`${GT('prTn',{i:2})} : ${gPs(3)}<br>${GT('prTn',{i:3})} : ${gPs(2)}`,'sm2'),3.4,'p')},
  {k:'tu_prl5',d:6,s:()=>tuCh(-1,0,'a')+TU.e(150,24,TU.cd('💎','ok'),1.8,'p')+TU.e(254,24,TU.cd('✗','no'),1.2,'p')+TU.mv(240,152,254,74,TU.av(2,false),.3)+TU.e(254,100,'🤿',.7,'p')+
   TU.e(60,152,TU.av(0))+TU.e(150,152,TU.av(1))+TU.e(60,112,TU.pt('+2'),2.4,'p')+TU.e(150,112,TU.pt('+2'),2.6,'p')},
  {k:'tu_prl6',d:6,s:()=>tuP3()+[0,1,2].map(i=>TU.e(60+90*i,104,'<i class="prbk big"></i>',.3+1.3*i,i<2?'p o':'p',i<2?'--o:'+(1.5+1.3*i)+'s':'')+TU.e(60+90*i,72,TU.pt('#'+(i+1)),.4+1.3*i,'p')).join('')}];
@@ -1490,22 +1508,33 @@ TUS.coq=[
  {k:'tu_coq7',x:'2',s:()=>TU.e(80,150,TU.av(0))+TU.e(220,150,TU.av(1))+TU.e(80,100,TU.cd('🔍 '+tuQ(0)+' '+tuQ(2)),.3,'p')+TU.e(220,100,TU.cd('🔍 '+tuQ(3)+' '+tuQ(4)),.6,'p')+TU.e(150,40,'⚔️',1.4,'p big')}];
 for(const id in TUS)if(GAMES[id])GAMES[id].tut=TUS[id];
 const GTU={id:null,i:0,t:null};
+/* scène dessinée sur 300×180 et mise à l'échelle d'un bloc (transform) : mêmes proportions partout, rien ne déborde à 375 px */
+function gTuFit(){const b=$('.gtu .tus'),c=b&&b.firstElementChild;if(c)c.style.setProperty('--k',(b.clientWidth/300).toFixed(4))}W.GTuFit=gTuFit;
+if(typeof window!='undefined'&&window.addEventListener)window.addEventListener('resize',()=>{if($('.gtu'))gTuFit()});
 W.GTut=function(id){const G=GAMES[id];if(!G||!G.tut||typeof document=='undefined')return false;
  const nOn=(()=>{try{return st&&st.phase=='game'&&st.order?st.order.length:st.players.filter(p=>p.online).length}catch(e){return 3}})();
  const L=G.tut.filter(x=>!x.x||(x.x=='2'?nOn==2:nOn!=2));GTU.id=id;GTU.i=0;
  const box=$('#modal');if(!box)return false;
- box.innerHTML=`<div class="modal gtu" role="dialog" aria-modal="true" aria-label="${esc(GT('n_'+id))}"><div class="card"><div class="tuh"><span>${G.icon}</span><b>${GT('n_'+id)}</b></div>
-  <div class="tus" aria-hidden="true"></div><p class="tucap" aria-live="polite"></p><div class="steps">${L.map((_,j)=>`<i data-s="${j}"></i>`).join('')}</div>
-  <div class="row"><button class="ghost" id="tuag"></button><button class="pri" id="tunx"></button></div></div></div>`;
+ box.innerHTML=`<div class="modal gtu" role="dialog" aria-modal="true" aria-label="${esc(GT('n_'+id))}"><div class="card"><div class="tuh"><span>${G.icon}</span><b>${GT('n_'+id)}</b><button class="tux" id="tux" aria-label="${esc(GT('tuClose'))}" data-tip="${esc(GT('tuClose'))}">✕</button></div>
+  <div class="tuw"><div class="tus" aria-hidden="true"></div><button class="turp" id="tuag" aria-label="${esc(GT('tuAgain'))}" data-tip="${esc(GT('tuAgain'))}">↺</button></div>
+  <p class="tucap" aria-live="polite"></p><div class="steps">${L.map((_,j)=>`<button class="tud" data-s="${j}" aria-label="${j+1} / ${L.length}"></button>`).join('')}</div>
+  <div class="row"><button class="ghost" id="tupv">${document.dir=='rtl'?'▶':'◀'} ${GT('tuPrev')}</button><button class="pri" id="tunx"></button></div></div></div>`;
  const nm=TU.n(),tw=TU.w(),V={a:nm[0],b:nm[1],c:nm[2],d:nm[3],w0:tw[0],w1:tw[1],w2:tw[2],w3:tw[3]};
  const show=j=>{clearTimeout(GTU.t);GTU.i=j;const S=L[j],stg=$('.gtu .tus');if(!stg)return;
-  stg.innerHTML=`<div class="tusc">${S.s()}</div>`;$('.gtu .tucap').innerHTML=esc(GT(S.k,V));
-  $$('.gtu .steps i').forEach((el,k)=>el.className=k==j?'on':k<j?'done':'');
-  const last=j==L.length-1;$('#tunx').textContent=last?GT('tuOk'):T('next');$('#tuag').textContent=last&&L.length>1?'↺ '+GT('tuAll'):'↺ '+GT('tuAgain');
+  stg.textContent='';void stg.offsetWidth;/* nouveau nœud : la scène repart de zéro (Revoir, boucle) */
+  stg.innerHTML=`<div class="tusc">${S.s()}</div>`;gTuFit();$('.gtu .tucap').innerHTML=esc(GT(S.k,V));
+  $$('.gtu .steps .tud').forEach((el,k)=>{el.className='tud'+(k==j?' on':k<j?' done':'');el.setAttribute('aria-current',k==j?'step':'false')});
+  const last=j==L.length-1;$('#tunx').textContent=last?GT('tuOk'):T('next')+(document.dir=='rtl'?' ◀':' ▶');$('#tupv').disabled=!j;
   if(!RM())GTU.t=setTimeout(()=>{if($('.gtu')&&GTU.i==j)show(j)},(S.d||5)*1000)};/* la scène rejoue en boucle */
- const close=()=>{clearTimeout(GTU.t);const m=$('.gtu');if(!m)return;m.classList.add('closing');setTimeout(()=>{if($('.gtu'))$('#modal').textContent=''},240)};
- $$('.gtu .steps i').forEach(el=>el.onclick=()=>show(+el.dataset.s));
- $('#tuag').onclick=()=>show(GTU.i==L.length-1&&L.length>1?0:GTU.i);
+ const close=()=>{clearTimeout(GTU.t);document.removeEventListener('keydown',key,true);const m=$('.gtu');if(!m)return;m.classList.add('closing');setTimeout(()=>{if($('.gtu'))$('#modal').textContent=''},240)};
+ const key=e=>{if(!$('.gtu')){document.removeEventListener('keydown',key,true);return}
+  if(e.key=='Escape'){e.preventDefault();close()}else if(e.key=='ArrowRight'||e.key=='ArrowLeft'){const rtl=document.dir=='rtl'||document.documentElement.dir=='rtl',fw=(e.key=='ArrowRight')!=rtl;
+   if(fw&&GTU.i<L.length-1)show(GTU.i+1);else if(!fw&&GTU.i>0)show(GTU.i-1)}};
+ document.addEventListener('keydown',key,true);
+ $$('.gtu .steps .tud').forEach(el=>el.onclick=()=>show(+el.dataset.s));
+ $('#tuag').onclick=()=>{const b=$('#tuag');b.classList.remove('spin');void b.offsetWidth;b.classList.add('spin');show(GTU.i)};
+ $('#tupv').onclick=()=>{if(GTU.i>0)show(GTU.i-1)};
+ $('#tux').onclick=close;$('.gtu').onclick=e=>{if(e.target.classList.contains('gtu'))close()};
  $('#tunx').onclick=()=>GTU.i<L.length-1?show(GTU.i+1):close();
  show(0);return true};
 /* @games : « ? » contextuel — dans un jeu (ou un jeu choisi au salon) il ouvre la démo de ce jeu, sinon le tutoriel de l'Expédition */
@@ -1587,6 +1616,9 @@ if(typeof document!='undefined'){const c=document.createElement('style');c.id='g
 .gcamp.maj{border-color:var(--gold)}
 .gopt2{font:600 16px/1.3 Fredoka,Nunito;margin:0 0 4px;overflow-wrap:anywhere}
 .gsc{display:flex;flex-direction:column;gap:6px}
+.gsc+*{margin-top:18px}.cqendl:empty{display:none}.cqendl>.cqres{margin:0}
+.mkadd{display:inline-block;margin-top:4px;color:var(--ok,#2fa894)}.mkadd.neg{color:var(--bad)}
+.tcd.sm2{font-size:12px;line-height:1.35;text-align:center;padding:4px 8px}
 .grow{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:14px;background:var(--paper2)}
 .grow.me{outline:2px solid var(--acc)}.grow .gmd{width:1.6em;text-align:center}.grow .gnm{flex:1;min-width:0;overflow-wrap:anywhere}.grow .gpt{font-size:18px}
 .gbtns{display:flex;flex-direction:column;gap:10px;margin:6px 0}
@@ -1675,10 +1707,22 @@ section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) b
 [data-theme=dark] .mkc.p{border-color:#2c7a62}[data-theme=dark] .mkc.g{border-color:#7a4a2a}
 /* 📖 tutoriels animés */
 .gtu .tuh{display:flex;align-items:center;justify-content:center;gap:8px;font-size:18px;margin-bottom:10px}.gtu .tuh span{font-size:26px}
-.gtu .tus{position:relative;width:min(300px,100%);aspect-ratio:300/180;margin:0 auto;border-radius:18px;overflow:hidden;background:var(--paper2);box-shadow:inset 0 0 0 2px var(--edge)}
-.gtu .tusc{position:absolute;inset:0}
+.gtu .tuh{position:relative;padding:0 36px}
+.gtu .tux{position:absolute;inset-inline-end:-4px;top:50%;transform:translateY(-50%);width:34px;height:34px;padding:0;border-radius:50%;border:0;background:transparent;color:var(--mut);font-size:16px;line-height:1;cursor:pointer;box-shadow:none}
+.gtu .tux:hover{background:color-mix(in srgb,var(--mut) 14%,transparent);color:var(--txt)}
+.gtu .tuw{position:relative;width:min(300px,100%);margin:0 auto}
+.gtu .tus{position:relative;width:100%;aspect-ratio:300/180;border-radius:18px;overflow:hidden;background:var(--paper2);box-shadow:inset 0 0 0 2px var(--edge)}
+.gtu .tusc{position:absolute;left:0;top:0;width:300px;height:180px;transform-origin:0 0;transform:scale(var(--k,1))}
+[dir=rtl] .gtu .tusc{left:auto;right:0;transform-origin:100% 0}
+.gtu .turp{position:absolute;top:6px;inset-inline-end:6px;width:30px;height:30px;padding:0;border-radius:50%;border:0;background:color-mix(in srgb,var(--paper) 82%,transparent);color:var(--txt);font-size:15px;line-height:1;cursor:pointer;box-shadow:0 1px 3px #0002}
+.gtu .turp.spin{animation:tuSpin .45s var(--gease,ease)}@keyframes tuSpin{from{transform:rotate(-300deg)}}
+.gtu .steps{display:flex;justify-content:center;gap:4px;margin:10px 0 12px}
+.gtu .tud{width:22px;height:22px;padding:0;border:0;background:none;box-shadow:none;cursor:pointer;display:grid;place-items:center}
+.gtu .tud::before{content:'';width:8px;height:8px;border-radius:99px;background:var(--edge);transition:width .2s,background .2s}
+.gtu .tud.done::before{background:#ffc999}.gtu .tud.on::before{width:22px;background:linear-gradient(90deg,var(--acc2),var(--acc))}[data-theme=dark] .gtu .tud.done::before{background:#9a6a45}
+.gtu .row button:disabled{opacity:.4}
 .gtu .tucap{min-height:3.2em;margin:12px 4px 0;font-size:15px;line-height:1.4}
-.gtu .row{display:flex;gap:10px;justify-content:center}.gtu .row button{flex:1}
+.gtu .row{display:flex;gap:10px;justify-content:center}.gtu .row button{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-inline:10px}
 .te{position:absolute;width:0;height:0}.te>span{position:absolute;left:0;top:0;transform:translate(-50%,-50%);display:inline-flex;flex-direction:column;align-items:center;gap:1px;font-size:22px;line-height:1;white-space:nowrap}
 .te.big>span{font-size:36px}.te.sm>span{font-size:15px}
 .tav{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--c);color:#fff;font-size:15px;box-shadow:0 2px 0 #0002}
@@ -1705,7 +1749,7 @@ section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) b
 @keyframes tuOut{to{opacity:0;transform:scale(.8)}}
 @keyframes tuShake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
 @keyframes tuDead{to{opacity:.25}}
-[data-theme=dark] .gtu .tus{background:#0b1c2d;box-shadow:inset 0 0 0 2px #26475f}[data-theme=dark] .tcd{background:#16324a;box-shadow:0 0 0 1.5px #2c5574,0 3px 0 #06121f}[data-theme=dark] .tub polygon{fill:#2d6a8a55;stroke:#2c5574}[data-theme=dark] .tub .c0{fill:#2d6a8aaa}
+[data-theme=dark] .gtu .tus{background:#0b1c2d;box-shadow:inset 0 0 0 2px #26475f}[data-theme=dark] .gtu .turp{background:#16324acc;color:#e8f1f6}[data-theme=dark] .tcd{background:#16324a;box-shadow:0 0 0 1.5px #2c5574,0 3px 0 #06121f}[data-theme=dark] .tub polygon{fill:#2d6a8a55;stroke:#2c5574}[data-theme=dark] .tub .c0{fill:#2d6a8aaa}
 .gtutb{margin-top:10px}
 @media (prefers-reduced-motion:reduce){.te,.te>span,.tub .tdead{animation:none!important}.te.o{display:none}.te.m{transform:none}}
 
@@ -1837,13 +1881,20 @@ button.prch{cursor:pointer;width:auto}button.prch:hover{border-color:var(--edge2
 .tpbar{display:flex;align-items:center;gap:10px;justify-content:space-between;margin-bottom:6px}
 .tplf{letter-spacing:1px;font-size:15px}.tpcl{font-size:13px;font-weight:700;padding:2px 9px;border-radius:99px;border:1.5px solid var(--edge)}.tpcl.z{opacity:.45}.tplv{font-size:13px;color:var(--mut)}
 .tpst{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700;margin:4px 0 6px}.tpst>span:first-child{flex:none;min-width:70px;text-align:start}
-.tpsb{flex:1;height:8px;border-radius:99px;background:var(--paper2);border:1px solid var(--edge);overflow:hidden}.tpsb i{display:block;height:100%;background:linear-gradient(90deg,#7b8fd8,#5ad8ae);transition:width .6s ease}
-[dir=rtl] .tpsb i{margin-inline-start:auto}
-.tpsea{position:relative;height:46px;margin:12px 12px 4px}.tpln{position:absolute;inset-inline:0;top:25px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--ink),var(--acc));opacity:.5}
-.tp0,.tp1{position:absolute;top:32px;font-size:10px;color:var(--mut)}.tp0{inset-inline-start:-6px}.tp1{inset-inline-end:-10px}
+.tpsb{flex:1;height:8px;border-radius:99px;background:var(--paper2);border:1px solid var(--edge);overflow:hidden}.tpsb i{display:block;width:100%;height:100%;background:linear-gradient(90deg,#7b8fd8,#5ad8ae);transform-origin:left center;animation:tpG linear both}
+[dir=rtl] .tpsb i{transform-origin:right center}
+@keyframes tpG{from{transform:scaleX(var(--a))}to{transform:scaleX(var(--b))}}
+.tpw span.dn{bottom:auto;top:15px}
+.tpe{display:inline-flex;align-items:center;gap:4px}
+.tplg{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 12px;margin:10px 0 0;font-size:11.5px;color:var(--mut);line-height:1.3}
+.tplg>span{display:inline-flex;align-items:center;gap:5px}
+.tpw0{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--c,var(--ink));box-shadow:0 0 0 1px var(--edge)}.tpw0.bad{background:var(--bad)}.tpw0.ec{background:transparent;border:1.5px dashed var(--mut);box-shadow:none;width:8px;height:8px}
+.tpfoc{margin:8px 0 6px}.tpfoc .tpv{font-size:26px;min-width:58px;padding:12px}
+.tpsea{position:relative;height:58px;margin:14px 12px 4px}.tpln{position:absolute;inset-inline:0;top:25px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--ink),var(--acc));opacity:.5}
+.tp0,.tp1{position:absolute;top:44px;font-size:10px;color:var(--mut)}.tp0{inset-inline-start:-6px}.tp1{inset-inline-end:-10px}
 .tpw{position:absolute;top:20px;width:13px;height:13px;margin-inline-start:-6px;border-radius:50%;background:var(--c,var(--ink));border:2px solid var(--paper);box-shadow:0 0 0 1px var(--edge)}
 .tpw span{position:absolute;bottom:15px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;color:var(--mut);opacity:0}
-.tpw.nw span{opacity:1}.tpw.ec span{bottom:auto;top:12px}.tpw.nw{animation:tpIn .6s cubic-bezier(.3,1.6,.5,1) both}.tpw.nw span{color:var(--txt);font-size:12px}
+.tpw.nw span{opacity:1}.tpw.ec span{bottom:13px}.tpw.ec span.dn{bottom:auto;top:13px}.tpw.nw{animation:tpIn .6s cubic-bezier(.3,1.6,.5,1) both}.tpw.nw span{color:var(--txt);font-size:12px}
 .tpw.bad{background:var(--bad)}.tpw.ec{background:transparent;border:2px dashed var(--mut);box-shadow:none;top:21px;width:11px;height:11px}
 @keyframes tpIn{from{transform:translateY(-16px) scale(.4);opacity:0}}
 .tpev{min-height:26px;font-size:15px;margin:2px 0 0;display:flex;gap:6px 12px;justify-content:center;align-items:center;flex-wrap:wrap}.tpev b{font-size:19px}
@@ -1863,7 +1914,7 @@ button.prch{cursor:pointer;width:auto}button.prch:hover{border-color:var(--edge2
 .tpend{display:grid;gap:5px;margin-top:8px}.tpend>div{display:flex;gap:10px;justify-content:space-between;padding:6px 10px;border:1.5px solid var(--edge);border-radius:10px;font-size:14px}
 .tpseq{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-top:10px}.tpseq b{font-size:13px;padding:2px 7px;border-radius:8px;border:1.5px solid var(--c,var(--edge))}.tpseq b.bad{border-color:var(--bad);color:var(--bad)}.tpseq b.ec{border:1.5px dashed var(--mut);color:var(--mut);text-decoration:line-through}
 .tutrk{display:block;width:250px;height:3px;border-radius:3px;background:linear-gradient(90deg,#2fa894,#ef8354);opacity:.6}
-@media (prefers-reduced-motion:reduce){.tpw.nw,.tprx{animation:none}.tpsb i{transition:none}}
+@media (prefers-reduced-motion:reduce){.tpw.nw,.tprx{animation:none}.tpsb i{animation:none!important;transform:scaleX(var(--a))}}
 @media (max-width:420px){.tpcrew{grid-template-columns:1fr 1fr}.tpv{min-width:40px;font-size:18px;padding:7px 8px}}
 .cqs{width:22px;height:22px;display:inline-block;vertical-align:middle;flex:none;filter:drop-shadow(0 1px 1px #0002)}
 .cqs.xs{width:14px;height:14px}.cqlot.xs .cqs{width:17px;height:17px}.cqlot.sm .cqs{width:18px;height:18px}.cqs.big{width:46px;height:46px}
@@ -3285,6 +3336,26 @@ Object.assign(GI18N.ru.ui,{bIdea:`Нужна идея?`,bIdeaD:`Пиши что 
 Object.assign(GI18N.zh.ui,{bIdea:`需要灵感吗？`,bIdeaD:`想写什么都行：这些只是灵感，喜欢再点。`});
 Object.assign(GI18N.he.ui,{bIdea:`צריכים רעיון?`,bIdeaD:`כתבו מה שבא לכם: אלה רק רעיונות, הקישו על אחד רק אם הוא נותן השראה.`});
 Object.assign(GI18N.pt.ui,{bIdea:`Precisa de uma ideia?`,bIdeaD:`Escreva o que quiser: são só ideias, toque numa apenas se ela te inspirar.`});
+/* 📖 guides : navigation */
+Object.assign(GI18N.fr.ui,{tuPrev:`Précédent`,tuClose:`Fermer`});
+Object.assign(GI18N.en.ui,{tuPrev:`Back`,tuClose:`Close`});
+Object.assign(GI18N.es.ui,{tuPrev:`Anterior`,tuClose:`Cerrar`});
+Object.assign(GI18N.it.ui,{tuPrev:`Indietro`,tuClose:`Chiudi`});
+Object.assign(GI18N.de.ui,{tuPrev:`Zurück`,tuClose:`Schließen`});
+Object.assign(GI18N.ru.ui,{tuPrev:`Назад`,tuClose:`Закрыть`});
+Object.assign(GI18N.zh.ui,{tuPrev:`上一步`,tuClose:`关闭`});
+Object.assign(GI18N.he.ui,{tuPrev:`הקודם`,tuClose:`סגירה`});
+Object.assign(GI18N.pt.ui,{tuPrev:`Anterior`,tuClose:`Fechar`});
+/* 🔢 nombres lisibles (points, marées, coups) et Tempête : textes */
+Object.assign(GI18N.fr.ui,{pts:`{v} point|{v} points`,ptsS:`{v} pt|{v} pts`,prTn:`Marée {i}`,cqPay:`paie {v} 🪙`,chSkL:`{v}/{n} coulés`,chOkN:`{v} arrivé|{v} arrivés`,tpLeftN:`Tempête dans {v} coup|Tempête dans {v} coups`,tpBeatN:`{v} coup|{v} coups`,tpErrN:`{v} faute|{v} fautes`,tpFocus:`Tes vagues pour ce niveau`,tpFocusS:`Nouveau niveau : chacun découvre ses vagues`,tpFocusD:`Retiens-les bien : {v} de houle avant la tempête.`,tpLgW:`vague lâchée (couleur de qui l'a lâchée)`,tpLgB:`lâchée trop tôt`,tpLgE:`emportée par l'écume`,tpLgL:`coques restantes`,tpLgC:`vagues calmes en réserve`,mGain:`gagne {v}`,mLose:`perd {v}`,pLostN:`{v} perdues`});
+Object.assign(GI18N.en.ui,{pts:`{v} point|{v} points`,ptsS:`{v} pt|{v} pts`,prTn:`Tide {i}`,cqPay:`pays {v} 🪙`,chSkL:`{v}/{n} sunk`,chOkN:`{v} arrived|{v} arrived`,tpLeftN:`Storm in {v} beat|Storm in {v} beats`,tpBeatN:`{v} beat|{v} beats`,tpErrN:`{v} mistake|{v} mistakes`,tpFocus:`Your waves for this level`,tpFocusS:`New level: everyone looks at their waves`,tpFocusD:`Remember them: {v} of swell before the storm.`,tpLgW:`played wave (colour of who played it)`,tpLgB:`played too early`,tpLgE:`swept into the foam`,tpLgL:`hulls left`,tpLgC:`calm waves in reserve`,mGain:`gains {v}`,mLose:`loses {v}`,pLostN:`{v} lost`});
+Object.assign(GI18N.es.ui,{pts:`{v} punto|{v} puntos`,ptsS:`{v} pt|{v} pts`,prTn:`Marea {i}`,cqPay:`paga {v} 🪙`,chSkL:`{v}/{n} hundidos`,chOkN:`{v} llegó|{v} llegaron`,tpLeftN:`Tormenta en {v} golpe|Tormenta en {v} golpes`,tpBeatN:`{v} golpe|{v} golpes`,tpErrN:`{v} fallo|{v} fallos`,tpFocus:`Tus olas para este nivel`,tpFocusS:`Nuevo nivel: cada uno descubre sus olas`,tpFocusD:`Memorízalas: {v} de oleaje antes de la tormenta.`,tpLgW:`ola soltada (color de quien la soltó)`,tpLgB:`soltada demasiado pronto`,tpLgE:`se la llevó la espuma`,tpLgL:`cascos restantes`,tpLgC:`olas calmas en reserva`,mGain:`gana {v}`,mLose:`pierde {v}`,pLostN:`{v} perdidas`});
+Object.assign(GI18N.it.ui,{pts:`{v} punto|{v} punti`,ptsS:`{v} pt|{v} pt`,prTn:`Marea {i}`,cqPay:`paga {v} 🪙`,chSkL:`{v}/{n} affondate`,chOkN:`{v} arrivata|{v} arrivate`,tpLeftN:`Tempesta tra {v} colpo|Tempesta tra {v} colpi`,tpBeatN:`{v} colpo|{v} colpi`,tpErrN:`{v} errore|{v} errori`,tpFocus:`Le tue onde per questo livello`,tpFocusS:`Nuovo livello: ognuno scopre le sue onde`,tpFocusD:`Ricordale bene: {v} di mare prima della tempesta.`,tpLgW:`onda lasciata (colore di chi l'ha lasciata)`,tpLgB:`lasciata troppo presto`,tpLgE:`portata via dalla schiuma`,tpLgL:`scafi rimasti`,tpLgC:`onde calme di riserva`,mGain:`guadagna {v}`,mLose:`perde {v}`,pLostN:`{v} perse`});
+Object.assign(GI18N.de.ui,{pts:`{v} Punkt|{v} Punkte`,ptsS:`{v} Pkt.|{v} Pkt.`,prTn:`Gezeit {i}`,cqPay:`zahlt {v} 🪙`,chSkL:`{v}/{n} gesunken`,chOkN:`{v} angekommen|{v} angekommen`,tpLeftN:`Sturm in {v} Wellenschlag|Sturm in {v} Wellenschlägen`,tpBeatN:`{v} Wellenschlag|{v} Wellenschläge`,tpErrN:`{v} Fehler|{v} Fehler`,tpFocus:`Deine Wellen für dieses Level`,tpFocusS:`Neues Level: Alle sehen sich ihre Wellen an`,tpFocusD:`Merk sie dir: {v} bis zum Sturm.`,tpLgW:`losgelassene Welle (Farbe der Person)`,tpLgB:`zu früh losgelassen`,tpLgE:`vom Schaum verschluckt`,tpLgL:`übrige Rümpfe`,tpLgC:`ruhige Wellen in Reserve`,mGain:`gewinnt {v}`,mLose:`verliert {v}`,pLostN:`{v} verloren`});
+Object.assign(GI18N.ru.ui,{pts:`{v} очко|{v} очка|{v} очков`,ptsS:`{v} очк.`,prTn:`Прилив {i}`,cqPay:`платит {v} 🪙`,chSkL:`{v}/{n} затонуло`,chOkN:`{v} доплыл|{v} доплыли|{v} доплыли`,tpLeftN:`Буря через {v} удар|Буря через {v} удара|Буря через {v} ударов`,tpBeatN:`{v} удар|{v} удара|{v} ударов`,tpErrN:`{v} ошибка|{v} ошибки|{v} ошибок`,tpFocus:`Твои волны на этом уровне`,tpFocusS:`Новый уровень: каждый смотрит на свои волны`,tpFocusD:`Запомни их: до бури {v} волн.`,tpLgW:`отпущенная волна (цвет того, кто отпустил)`,tpLgB:`отпущена слишком рано`,tpLgE:`унесена пеной`,tpLgL:`оставшиеся корпуса`,tpLgC:`спокойные волны в запасе`,mGain:`получает {v}`,mLose:`теряет {v}`,pLostN:`потеряно {v}`});
+Object.assign(GI18N.zh.ui,{pts:`{v} 分`,ptsS:`{v} 分`,prTn:`第 {i} 潮`,cqPay:`支付 {v} 🪙`,chSkL:`已沉 {v}/{n}`,chOkN:`到港 {v}`,tpLeftN:`风暴还有 {v} 拍`,tpBeatN:`{v} 拍`,tpErrN:`{v} 次失误`,tpFocus:`本关你的浪`,tpFocusS:`新关卡：大家各自看自己的浪`,tpFocusD:`记住它们：离风暴还有 {v}。`,tpLgW:`已放出的浪（颜色＝放出的人）`,tpLgB:`放得太早`,tpLgE:`被泡沫卷走`,tpLgL:`剩余船体`,tpLgC:`储备的平静浪`,mGain:`获得 {v}`,mLose:`失去 {v}`,pLostN:`失去 {v}`});
+Object.assign(GI18N.he.ui,{pts:`{v} נקודה|{v} נקודות`,ptsS:`{v} נק׳`,prTn:`גאות {i}`,cqPay:`משלם/ת {v} 🪙`,chSkL:`{v}/{n} טבעו`,chOkN:`{v} הגיעה|{v} הגיעו`,tpLeftN:`סערה בעוד מכה {v}|סערה בעוד {v} מכות`,tpBeatN:`מכה {v}|{v} מכות`,tpErrN:`טעות {v}|{v} טעויות`,tpFocus:`הגלים שלך לשלב הזה`,tpFocusS:`שלב חדש: כל אחד מגלה את הגלים שלו`,tpFocusD:`{g:זכור|זכרי} אותם: {v} עד הסערה.`,tpLgW:`גל ששוחרר (בצבע של מי ששחרר)`,tpLgB:`שוחרר מוקדם מדי`,tpLgE:`נסחף בקצף`,tpLgL:`ספינות שנותרו`,tpLgC:`גלים שקטים במלאי`,mGain:`מרוויח/ה {v}`,mLose:`מפסיד/ה {v}`,pLostN:`{v} אבדו`});
+Object.assign(GI18N.pt.ui,{pts:`{v} ponto|{v} pontos`,ptsS:`{v} pt|{v} pts`,prTn:`Maré {i}`,cqPay:`paga {v} 🪙`,chSkL:`{v}/{n} afundados`,chOkN:`{v} chegou|{v} chegaram`,tpLeftN:`Tempestade em {v} golpe|Tempestade em {v} golpes`,tpBeatN:`{v} golpe|{v} golpes`,tpErrN:`{v} erro|{v} erros`,tpFocus:`Suas ondas neste nível`,tpFocusS:`Novo nível: cada um descobre suas ondas`,tpFocusD:`Guarde-as bem: {v} de ondulação antes da tempestade.`,tpLgW:`onda solta (cor de quem soltou)`,tpLgB:`solta cedo demais`,tpLgE:`levada pela espuma`,tpLgL:`cascos restantes`,tpLgC:`ondas calmas de reserva`,mGain:`ganha {v}`,mLose:`perde {v}`,pLostN:`{v} perdidas`});
 /* 👀 Spectateurs : textes */
 Object.assign(GI18N.fr.ui,{specB:`Je regarde`,specD:`Tu suis la partie sans jouer : tu vois ce qui est public, tu peux réagir et discuter.`,specL:`Regardent : {n}`,specT:`Partie en cours : tu regardes, tu joueras à la prochaine.`,specT2:`Tu regardes cette partie.`,specH:`Tu regardes · réactions et chat ouverts`});
 Object.assign(GI18N.en.ui,{specB:`I'm watching`,specD:`Follow the game without playing: you see what's public, and you can react and chat.`,specL:`Watching: {n}`,specT:`Game in progress: you're watching, you'll play the next one.`,specT2:`You're watching this game.`,specH:`You're watching · reactions and chat are open`});
@@ -3662,9 +3733,9 @@ GAMES.aby={icon:'🫧',min:2,max:8,dur:8,tags:['skill'],ABY,gen:abGen,score:abSc
 const tuAb3=()=>[0,1,2].map(i=>TU.e(60+90*i,152,TU.av(i))).join('');
 GAMES.aby.tut=[
  {k:'tu_aby1',d:6,s:()=>'<i class="tcave"></i>'+['🐙','🦀','🪼'].map((x,i)=>TU.e(150,66,x,.3+1.1*i,'p big o','--o:'+(1.2+1.1*i).toFixed(1)+'s')).join('')+[0,1,2].map(i=>TU.e(130+20*i,128,'<i class="tudt"></i>',.3+1.1*i,'p')).join('')},
- {k:'tu_aby2',d:6,s:()=>tuAb3()+[0,1,2].map(i=>['🐙','🦀','🪼'].map((x,j)=>TU.e(60+90*i+(j-1)*25,108,x,.4+.5*j+.15*i,'p')).join('')).join('')+TU.e(150,36,'👆🏻',.2,'p big')},
+ {k:'tu_aby2',d:6,s:()=>tuAb3()+[0,1,2].map(i=>['🐙','🦀','🪼'].map((x,j)=>TU.e(60+90*i+(j-1)*28,108,x,.4+.5*j+.15*i,'p')).join('')).join('')+TU.e(150,36,'👆🏻',.2,'p big')},
  {k:'tu_aby3',d:6,s:()=>TU.e(150,26,TU.cd('🐙 🦀 🪼 🐡','ok'),0,'p')+TU.e(80,150,TU.av(0))+TU.e(220,150,TU.av(1))+TU.e(80,98,TU.cd('🐙 🦀 🪼 🐡'),.4,'p')+TU.e(220,98,TU.cd('🐙 <s>🐠</s> 🪼 🐡'),.7,'p')+TU.e(80,62,TU.pt('+5'),1.5,'p')+TU.e(220,62,TU.pt('+3'),1.8,'p')},
- {k:'tu_aby4',d:6,s:()=>[['↩️','🪼 🦀 🐙'],['✨','💡💡'],['🔍','🐙 › 🦈'],['👀','🐢 ?']].map(([a,b],i)=>TU.e(42+72*i,70,'<span class="tuab">'+a+'</span>',.2+.4*i,'p big')+TU.e(42+72*i,124,TU.cd(b),.5+.4*i,'p')).join('')},
+ {k:'tu_aby4',d:6,s:()=>[['↩️','🪼 🦀 🐙'],['✨','💡💡'],['🔍','🐙 › 🦈'],['👀','🐢 ?']].map(([a,b],i)=>TU.e(45+70*i,70,'<span class="tuab">'+a+'</span>',.2+.4*i,'p big')+TU.e(45+70*i,124,TU.cd(b,'sm2'),.5+.4*i,'p')).join('')},
  {k:'tu_aby5',d:7,s:()=>TU.e(80,150,TU.av(0))+TU.e(80,104,'🤿',.3,'p big')+TU.e(150,40,TU.cd('🐙 🦀 🪼 <b>🐡 🦈</b>'),.8,'p')+TU.e(220,96,TU.pt('×1½'),1.8,'p')+TU.e(220,132,TU.pt('&lt;½ → 0','no'),3,'p')},
  {k:'tu_aby6',x:'2',s:()=>TU.e(80,150,TU.av(0))+TU.e(220,150,TU.av(1))+TU.e(80,104,'🥇',.3,'p')+TU.e(220,104,'🤿',.8,'p big')+TU.e(220,62,TU.cd('🫧🫧🫧'),1.3,'p')}];
 if(typeof document!='undefined'){const c=document.createElement('style');c.id='aby-css';c.textContent=`
