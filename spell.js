@@ -3,7 +3,9 @@
    (ligne « # » = palier suivant, du plus courant au plus rare), triés et codés en préfixe partagé
    (1er caractère = longueur du préfixe commun avec le mot précédent, code 48+n ; puis la fin du mot).
    Mots : FrequencyWords (Hermit Dave, d'après OpenSubtitles 2018), licence CC BY-SA 4.0.
-   Messages : {lang,v} charge/remplace le dictionnaire ; {id,words:[…]} → {id,lang,res:{mot:suggestion|null}} */
+   Messages : {lang,v} charge/remplace le dictionnaire ;
+   {id,words:[…]} → {id,lang,res:{mot:suggestion|null}}  (mode « Discret » : une suggestion, mots finis fautifs)
+   {id,q:[{w,cur}],n} → {id,lang,out:[{k:connu?,s:[…]}]}  (mode « Suggestions » : n propositions classées, complétion si cur) */
 (function(root){
 'use strict';
 /* terminaisons flexionnelles (forme pliée) : un mot inconnu qui ne diffère d'un mot connu que dans sa terminaison
@@ -36,9 +38,10 @@ function decode(text){const words=[],tiers=[];let p='';
   const w=p.slice(0,ln.charCodeAt(0)-48)+ln.slice(1);words.push(w);p=w}
  return {words,tiers}}
 function Speller(lang,text){
- const fold=mkFold(lang),{words,tiers}=decode(text),exact=new Set(words),best=new Map(),cache=new Map(),tierOf=new Uint8Array(words.length);
+ const fold=mkFold(lang),{words,tiers}=decode(text),exact=new Map(),best=new Map(),multi=new Map(),cache=new Map(),tierOf=new Uint8Array(words.length),F=new Array(words.length);
  for(let t=0;t<tiers.length;t++)tierOf.fill(t,tiers[t],tiers[t+1]==null?words.length:tiers[t+1]);
- for(let i=0;i<words.length;i++){const f=fold(words[i]);if(!best.has(f))best.set(f,i)}
+ for(let i=0;i<words.length;i++){const w=words[i],f=F[i]=fold(w);if(!exact.has(w))exact.set(w,i);
+  if(!best.has(f))best.set(f,i);else{let l=multi.get(f);if(!l)multi.set(f,l=[best.get(f)]);if(l.length<5)l.push(i)}}
  const norm=lang=='ru'?s=>s.toLowerCase().replace(/ё/g,'е'):lang=='he'?s=>s.replace(/[\u0591-\u05C7]/g,''):s=>s.toLowerCase();
  const alpha=ALPHA[lang]||LATA,adj=adjOf(lang),known=w=>exact.has(w),VOW=lang=='ru'?'аеиоуыэюя':lang=='he'?'וי':'aeiouy';
  /* formes valides absentes de la liste : préfixes hébreux collés, mots composés allemands */
@@ -78,15 +81,45 @@ function Speller(lang,text){
   const w=norm(raw);if(cache.has(w))return cache.get(w);
   let s=null;if(!known(w)&&!validish(w)){s=suggest(w);if(s&&(norm(s)===w||inflect(w,s)))s=null}
   if(cache.size>2000)cache.clear();cache.set(w,s);return s}
- return {check,size:words.length,words}}
+ /* ---- mode « Suggestions » : plusieurs propositions classées (coût de frappe pondéré + fréquence), complétion du mot en cours ---- */
+ let sorted=null;/* index des mots triés par forme pliée, construit à la première complétion */
+ function prefixRange(p){if(!sorted){sorted=Uint32Array.from(words.keys()).sort((a,b)=>F[a]<F[b]?-1:F[a]>F[b]?1:a-b)}
+  let lo=0,hi=sorted.length;while(lo<hi){const m=(lo+hi)>>1;if(F[sorted[m]]<p)lo=m+1;else hi=m}return lo}
+ const rcache=new Map(),TW=.35;
+ function cap(raw,s){if(raw.length>1&&raw===raw.toLocaleUpperCase(lang)&&raw!==raw.toLocaleLowerCase(lang))return s.toLocaleUpperCase(lang);
+  return /^\p{Lu}/u.test(raw)?s[0].toLocaleUpperCase(lang)+s.slice(1):s}
+ function rank(raw,cur,n){n=n||3;const key=(cur?'1':'0')+raw;if(rcache.has(key))return rcache.get(key);
+  const w=norm(raw),f=fold(w),isK=known(w)||validish(w),C=new Map(),t0=Date.now();
+  const add=(i,cost)=>{if(i==null)return;const s=words[i];if(s===w||(s.length<2&&f.length>1))return;const t=tierOf[i],sc=cost+TW*t+(t>=5?.6:0);/* mots très rares : seulement s'ils collent vraiment */if(sc>3.2)return;const o=C.get(i);if(o==null||sc<o)C.set(i,sc)};
+  const addF=(k,cost)=>{const l=multi.get(k);if(l)for(const i of l)add(i,cost);else add(best.get(k),cost)};
+  if(lang=='he'){const fx=w.replace(/[ךםןףץ](?=.)/g,c=>'כמנפצ'['ךםןףץ'.indexOf(c)]).replace(/[כמנצ]$/,c=>'ךםןףץ'['כמנפצ'.indexOf(c)]);if(fx!==w)add(exact.get(fx),.1)}
+  addF(f,.15);/* accent / ё / ß oublié : presque gratuit */
+  const e1=[];edits(f,(c,k)=>{e1.push([c,k]);addF(c,k)});
+  /* complétion du mot en cours : mots plus longs qui commencent pareil (accents ignorés) */
+  const comp=(p,extra,lim)=>{if(p.length<2)return;let j=prefixRange(p),seen=0;
+   for(;j<sorted.length&&seen<6000;j++,seen++){const i=sorted[j],g=F[i];if(g.slice(0,p.length)!==p)break;if(i>=lim||g.length===p.length)continue;
+    add(i,.3+extra+.08*Math.min(g.length-p.length,8))}};
+  if(cur){comp(f,0,words.length);
+   if(f.length>=3&&!isK)for(const [c,k] of e1)if(c.length===f.length&&k<=.8&&Date.now()-t0<25)comp(c,k,tiers[4]||words.length)}/* préfixe avec une faute de frappe */
+  /* deux fautes : vers un mot courant seulement, et si l'on manque encore de bonnes pistes */
+  let good=0;for(const v of C.values())if(v<2.2)good++;
+  if(good<n&&f.length>=5&&f.length<=14){const lim=tiers[4]||words.length;
+   for(const [a,k1] of e1){if(a.length<f.length-1)continue;if(Date.now()-t0>40)break;edits(a,(c,k2)=>{const i=best.get(c);if(i!=null&&i<lim&&words[i].length>3)add(i,k1+k2+.2)})}}
+  const out=[],seen=new Set([w]),sf=new Set();
+  for(const [i] of [...C].sort((a,b)=>a[1]-b[1]||words[a[0]].length-words[b[0]].length)){const s=words[i];const l=norm(s);if(seen.has(l))continue;
+   if(sf.has(F[i])&&tierOf[i]>=3)continue;/* variante d'accent rare d'un mot déjà proposé (« merçi ») */seen.add(l);sf.add(F[i]);
+   const c=cap(raw,s);if(c===raw)continue;out.push(c);if(out.length>=n)break}
+  const r={k:isK,s:out};if(rcache.size>1500)rcache.clear();rcache.set(key,r);return r}
+ return {check,rank,size:words.length,words}}
 root.TerraSpeller=Speller;
 /* --- côté Worker --- */
 if(typeof WorkerGlobalScope!='undefined'&&root instanceof WorkerGlobalScope){
  let cur=null,want=null,pend=null;
- const run=m=>{const res={};for(const w of m.words)res[w]=cur.sp.check(w);postMessage({id:m.id,lang:cur.lang,res})};
+ const run=m=>{if(m.q){postMessage({id:m.id,lang:cur.lang,out:m.q.map(x=>cur.sp.rank(x.w,x.cur,m.n))});return}
+  const res={};for(const w of m.words)res[w]=cur.sp.check(w);postMessage({id:m.id,lang:cur.lang,res})};
  onmessage=e=>{const m=e.data;
   if(m.lang!=null){if(want===m.lang)return;want=m.lang;cur=null;pend=null;
    fetch('spell/'+m.lang+'.txt?v='+(m.v||1)).then(r=>{if(!r.ok)throw 0;return r.text()}).then(t=>{if(want!==m.lang)return;
     cur={lang:m.lang,sp:Speller(m.lang,t)};postMessage({ready:m.lang});if(pend){run(pend);pend=null}},()=>{if(want===m.lang){want=null;postMessage({fail:m.lang})}});return}
-  if(m.words){if(!cur)pend=m;else run(m)}}}
+  if(m.words||m.q){if(!cur)pend=m;else run(m)}}}
 })(typeof self!='undefined'?self:globalThis);
