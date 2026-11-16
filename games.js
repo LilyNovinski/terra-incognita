@@ -160,6 +160,14 @@ if(typeof document!='undefined')setInterval(()=>{try{if(typeof st=='undefined'||
  const b=document.getElementById('gsend')||document.getElementById('gok');if(!b||b.disabled||!b.offsetParent)return;
  const f=[...document.querySelectorAll('textarea[data-d],input[data-d]')].filter(x=>x.offsetParent&&x.type!='range');if(!f.length||!f.some(x=>x.value.trim()))return;
  GV.as=id;b.click()}catch(e){}},300);
+/* 🏅 médaillons de classement dessinés (or, argent, bronze ; ensuite une perle numérotée) — nets à toute taille, 2 thèmes */
+const GMC=[['#fff3b0','#f5c542','#b8860b','#7a5200'],['#ffffff','#d7dee6','#8d99a6','#4a5561'],['#ffe0c2','#e39a5b','#9c5a22','#5c3110']];
+function gMedal(r){const n=r+1;if(r>2)return`<svg class="gmdl gmdp" viewBox="0 0 32 32" aria-label="${n}"><circle cx="16" cy="16" r="11" fill="var(--gmdp,#d9eef0)" stroke="var(--gmdps,#8fbfc4)" stroke-width="1.5"/><text x="16" y="20.5" text-anchor="middle" font-size="12" font-weight="800" font-family="Nunito,sans-serif" fill="var(--gmdpt,#2b5d63)">${n}</text></svg>`;
+ const [a,b,c,d]=GMC[r],id='gmd'+r;
+ return`<svg class="gmdl" viewBox="0 0 32 32" aria-label="${n}"><defs><radialGradient id="${id}" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="${a}"/><stop offset=".55" stop-color="${b}"/><stop offset="1" stop-color="${c}"/></radialGradient></defs>
+  <path d="M10 2h5l3 9h-5z" fill="#3b82c4"/><path d="M22 2h-5l-3 9h5z" fill="#e2603e"/>
+  <circle cx="16" cy="19.5" r="10.5" fill="url(#${id})" stroke="${d}" stroke-width="1.3"/><circle cx="16" cy="19.5" r="7.6" fill="none" stroke="${a}" stroke-opacity=".75" stroke-width="1"/>
+  <text x="16" y="23.6" text-anchor="middle" font-size="11.5" font-weight="900" font-family="Nunito,sans-serif" fill="${d}">${n}</text><path d="M11.5 14.5a6 6 0 0 1 4-2.4" stroke="#fff" stroke-opacity=".8" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>`}
 const hideOwn=(o,n)=>{const r={};for(const k in o||{})r[k]=k==n?o[k]:null;return r};
 
 /* animations d'entrée : une seule fois par étape (clé jeu + g.k). Un nouveau rendu dans la même étape (offre, réaction,
@@ -204,7 +212,7 @@ W.GView=function(){const s=isHost?GHide(meN(),st):st,g=s.game;if(!g||!GAMES[g.id
 
 function gEndView(s){const g=s.game,G=GAMES[g.id],R=s.gres||{pts:{}},host=meN()==s.host,two=s.order.length==2;
  const rows=Object.entries(R.pts).sort((a,b)=>b[1]-a[1]);let rank=0,prev=null;
- const list=R.coop?'':`<div class="gsc">${rows.map(([n,p],i)=>{if(p!==prev){rank=i;prev=p}return `<div class="grow ga ${n==meN()?'me':''}" ${dl(i,.1)}><span class="gmd">${['🥇','🥈','🥉'][rank]||rank+1}</span>${DT(n)}<span class="gnm">${NM(n)}</span><b class="gpt">${p}</b></div>`}).join('')}</div>`;
+ const list=R.coop?'':`<div class="gsc">${rows.map(([n,p],i)=>{if(p!==prev){rank=i;prev=p}return `<div class="grow ga ${n==meN()?'me':''}" ${dl(i,.1)}><span class="gmd">${gMedal(rank)}</span>${DT(n)}<span class="gnm">${NM(n)}</span><b class="gpt">${p}</b></div>`}).join('')}</div>`;
  const html=`<div class="gw g-${g.id}"><div class="ghd"><span class="gic">${G.icon}</span><b>${GT('n_'+g.id)}</b></div>
  <div class="card"><h3>${GT(R.coop?(GI18N.fr.ui['coop_'+g.id]?'coop_'+g.id:'coopT'):'scores')}</h3>${list}${G.endView?G.endView(s):''}</div>
  ${host?`<div class="gbtns"><button class="pri wide" data-gend="again">${GT('again')}</button><button class="ghost wide" data-gend="lobby">${GT('lobby')}</button></div>`:''}${gRxBar()}</div>`;
@@ -1709,7 +1717,8 @@ div.gtile{cursor:default}
 .mkadd{display:inline-block;margin-top:4px;color:var(--ok,#2fa894)}.mkadd.neg{color:var(--bad)}
 .tcd.sm2{font-size:12px;line-height:1.35;text-align:center;padding:4px 8px}
 .grow{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:14px;background:var(--paper2)}
-.grow.me{outline:2px solid var(--acc)}.grow .gmd{width:1.6em;text-align:center}.grow .gnm{flex:1;min-width:0;overflow-wrap:anywhere}.grow .gpt{font-size:18px}
+.grow.me{outline:2px solid var(--acc)}.grow .gmd{width:1.9em;display:grid;place-items:center}.gmdl{width:28px;height:28px;display:block;filter:drop-shadow(0 2px 2px #0003)}.gmdp{width:24px;height:24px}
+[data-theme=dark] .gmdp{--gmdp:#173a4f;--gmdps:#2f6488;--gmdpt:#cfe8f0}.grow .gnm{flex:1;min-width:0;overflow-wrap:anywhere}.grow .gpt{font-size:18px}
 .gbtns{display:flex;flex-direction:column;gap:10px;margin:6px 0}
 .gtiles .ggt .gtags{display:flex;gap:4px;margin-top:4px;flex-wrap:wrap}
 .gtags i{font:800 11px Nunito;font-style:normal;padding:1px 8px;border-radius:99px;background:#e3f6f4;color:var(--deep)}
