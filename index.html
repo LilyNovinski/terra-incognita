@@ -1866,13 +1866,20 @@ function react(e,btn,o){if(btn){btn.classList.remove('pp');void btn.offsetWidth;
  if(o.k){fxSend(e,1,o);return}
  FX.pend[e]=(FX.pend[e]||0)+1;if(!FX.flT)FX.flT=setTimeout(fxFlush,Math.max(0,250-(Date.now()-FX.sendT)))}
 /* appui long = super emoji ; clic / Entrée = réaction normale */
-function fxBind(b){const e=b.dataset.e;let t1=0,t2=0,down=false,rdy=false;
- const clr=()=>{clearTimeout(t1);clearTimeout(t2);down=rdy=false;b.classList.remove('chg','rdy')};
- b.onpointerdown=ev=>{if(ev.button>0)return;down=true;rdy=false;t1=setTimeout(()=>down&&b.classList.add('chg'),160);
-  t2=setTimeout(()=>{if(!b.isConnected||!down)return;rdy=true;b.classList.add('rdy');ftone([[740,0,.07]])},600)};
- b.onpointerup=()=>{if(!down)return;const big=rdy;clr();big?react(e,b,{k:'big'}):react(e,b)};
- b.onpointercancel=b.onpointerleave=clr;b.oncontextmenu=ev=>ev.preventDefault();
- b.onclick=ev=>{if(ev.detail===0)react(e,b)}}
+/* écoute au niveau du document : si l'écran se redessine pendant l'appui (un autre joueur répond, la carte des autres se met à jour),
+   la réaction n'est plus perdue — on retrouve le bouton sous le doigt au relâchement */
+const FXP={e:null,t1:0,t2:0,rdy:false};
+const fxAt=(x,y)=>{const el=document.elementFromPoint(x,y);return el&&el.closest&&el.closest('.reacts [data-e]')};
+const fxClr=()=>{clearTimeout(FXP.t1);clearTimeout(FXP.t2);FXP.e=null;FXP.rdy=false;$$('.reacts .chg,.reacts .rdy').forEach(x=>x.classList.remove('chg','rdy'))};
+document.addEventListener('pointerdown',ev=>{const b=ev.target.closest&&ev.target.closest('.reacts [data-e]');if(!b||ev.button>0)return;
+ fxClr();FXP.e=b.dataset.e;FXP.x=ev.clientX;FXP.y=ev.clientY;const cur=()=>{const c=fxAt(FXP.x,FXP.y);return c&&c.dataset.e==FXP.e?c:null};
+ FXP.t1=setTimeout(()=>{const c=FXP.e&&cur();c&&c.classList.add('chg')},160);
+ FXP.t2=setTimeout(()=>{if(!FXP.e)return;FXP.rdy=true;const c=cur();c&&c.classList.add('rdy');ftone([[740,0,.07]])},600)});
+document.addEventListener('pointerup',ev=>{if(!FXP.e)return;const e=FXP.e,big=FXP.rdy,b=fxAt(ev.clientX,ev.clientY);fxClr();
+ if(b&&b.dataset.e==e)big?react(e,b,{k:'big'}):react(e,b)});
+document.addEventListener('pointercancel',()=>FXP.e&&fxClr());
+document.addEventListener('contextmenu',ev=>{if(ev.target.closest&&ev.target.closest('.reacts [data-e]'))ev.preventDefault()});
+document.addEventListener('click',ev=>{const b=ev.detail===0&&ev.target.closest&&ev.target.closest('.reacts [data-e]');if(b)react(b.dataset.e,b)});
 /* double-tap sur une carte : ❤️ à l'endroit du tap, visible par tout le monde */
 /* sur PC : le vrai double-clic du système (délai réglé par Windows/macOS) et pas de sélection de texte au 2e clic */
 const dtOk=tg=>tg&&tg.closest&&tg.closest('.card,.guess,.banner')&&!tg.closest('button,input,textarea,a,.reacts,.dd,[contenteditable],select,label,canvas,.gw svg')&&$('.reacts');
@@ -2621,7 +2628,6 @@ function render(){
  let h=$('.hint');if(!h){h=document.createElement('div');h.className='hint';document.body.appendChild(h)}
  const same=h._t===(v.hint||'');h._t=v.hint||'';h.className='hint'+(mine?' mine':'')+(same?' same':'');h.innerHTML=`<div><span class="pulse"></span><span style="flex:1;font-size:14px">${v.hint||''}</span>${v.hintBtn||''}</div>`;chatHint(h);
  bindDrafts();gauges();restoreFocus(f);
- $$('.reacts [data-e]').forEach(fxBind);
  $('#help')&&($('#help').onclick=()=>{if(!(window.GHelp&&GHelp()))tutorial()});/* @games : « ? » contextuel */
  $('#mute')&&($('#mute').onclick=()=>{muted=!muted;LS.set('terra:mute',muted);render()});
  $('#codebtn')&&($('#codebtn').onclick=copyInvite);
