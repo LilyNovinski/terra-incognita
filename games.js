@@ -40,7 +40,7 @@ function gSeenAdd(ids){try{const S=new Set(ids),a=gSeen().filter(x=>!S.has(x)).c
 /* pioche n contenus [réserve,index] selon le ton (0 : tout public seulement) — jamais deux fois dans une partie ;
    d'abord les inédits, puis les plus anciennement vus */
 function gPool(s,k,n){const t=+s.tone||0,w=t==2?[.3,.3,.4]:t==1?[.55,.45,0]:[1,0,0],SI=new Map(gSeen().map((x,i)=>[x,i])),id=(p,i)=>k+(p||'')+':'+i;
- const P3=[0,1,2].map(p=>{if(!w[p])return[];const a=shuf([...Array(GL(k+(p||''),'fr').length).keys()].map(i=>[p,i]));
+ const P3=[0,1,2].map(p=>{if(!w[p])return[];const a=shuf(GL(k+(p||''),'fr').map((v,i)=>v.trim()?[p,i]:null).filter(Boolean));/* réserve absente pour ce ton = rien à piocher (on retombe sur un autre ton) */
   return a.filter(x=>SI.has(id(...x))).sort((x,y)=>SI.get(id(...y))-SI.get(id(...x))).concat(a.filter(x=>!SI.has(id(...x))))}),out=[];
  for(let j=0;j<n;j++){let r=Math.random(),p=0;while(p<2&&(r-=w[p])>0)p++;if(!P3[p].length)p=P3.findIndex(x=>x.length);if(p<0)break;out.push(P3[p].pop())}
  gSeenAdd(out.map(x=>id(...x)));return shuf(out)}
@@ -49,6 +49,13 @@ function gPool(s,k,n){const t=+s.tone||0,w=t==2?[.3,.3,.4]:t==1?[.55,.45,0]:[1,0
    plus de 2 ex æquo) + 1 temps fort propre au jeu (GAMES[id].log(s) → candidats, un seul tiré au sort).
    On ne montre que les lignes dont TOUTES les personnes citées sont là. Trois clins d'œil, pas plus :
    salon (st.clog, 5 lignes repliées), 1re étape d'un jeu (son dernier temps fort), Le Phare (≤ 1 question « souvenir »). */
+/* 🎲 parties jouées par jeu ('exp' = l'Expédition) : sur l'appareil de l'hôte, copié dans st.gplay pour tout le monde */
+const GPLK='terra:playsG';
+function gPlays(){try{const o=JSON.parse(localStorage.getItem(GPLK)||'{}');return o&&typeof o=='object'?o:{}}catch(e){return{}}}
+function gPlayAdd(s,id){const k=id||'exp',L=gPlays(),m={...L,...(s.gplay||{})};for(const x in L)m[x]=Math.max(+L[x]||0,+(s.gplay||{})[x]||0);m[k]=(+m[k]||0)+1;s.gplay=m;
+ try{localStorage.setItem(GPLK,JSON.stringify(m))}catch(e){}}
+/* jeux jouables au nombre actuel (spectateurs exclus) */
+function gFit(s){const on=gPl(s).length;return['exp',...Object.keys(GAMES)].filter(k=>k=='exp'?on>=2:on>=GAMES[k].min&&on<=GAMES[k].max)}
 const GLOGK='terra:logG';
 function gLog(){try{const a=JSON.parse(localStorage.getItem(GLOGK)||'[]');return Array.isArray(a)?a.filter(e=>e&&GAMES[e.g]&&e.k&&Array.isArray(e.n)&&e.n.length):[]}catch(e){return[]}}
 function gLogAdd(L){if(!L.length)return;try{localStorage.setItem(GLOGK,JSON.stringify(gLog().concat(L).slice(-150)))}catch(e){}}
@@ -84,12 +91,17 @@ const gAll=s=>gNeed(s).every(n=>s.game.done[n]);
 function gFin(s){const g=s.game;gScl(s);const r=GAMES[g.id].fin(s)||{},rp=r.pts||g.sc,pts={};s.order.forEach(n=>pts[n]=gNum(rp[n]));s.gres={pts,coop:r.coop?{...r.coop,v:gNum(r.coop.v),max:gNum(r.coop.max)}:null};g.dl=0;s.phase='gend';if(g.over)try{gLogGame(s,r)}catch(e){}}
 function gCheck(s){const g=s.game;let i=0;
  while(s.phase=='game'&&g.dl&&(gAll(s)||gLate(g))&&i++<6){g.dl=0;GAMES[g.id].next(s);gScl(s);if(g.over){gFin(s);break}}}
-function gStart(s){const id=s.gsel;s.game={id,k:0,r:0,n:0,sc:{},done:{},rx:{}};s.order.forEach(n=>s.game.sc[n]=0);s.gres=null;s.phase='game';s.gid=Date.now().toString(36);GAMES[id].init(s);
+function gStart(s){const id=s.gsel;gPlayAdd(s,id);s.game={id,k:0,r:0,n:0,sc:{},done:{},rx:{}};s.order.forEach(n=>s.game.sc[n]=0);s.gres=null;s.phase='game';s.gid=Date.now().toString(36);GAMES[id].init(s);
  /* 📜 clin d'œil : le dernier temps fort de CE jeu entre ces personnes, en tête de la 1re étape (sauf si Le Phare en pose déjà un) */
  try{const g=s.game,e=!g.lq&&typeof localStorage!='undefined'&&gLogFor(s.order).find(e=>e.g==id);if(e)g.nod={k:e.k,n:e.n}}catch(e){}gCheck(s)}
 /* @games : appelé en tête de act() ; true = géré ici */
 W.GAct=function(s,from,a){const t=a&&a.t;
  if(t=='gsel'){if(from==s.host&&s.phase=='lobby'&&(!a.v||GAMES[a.v])){s.gsel=a.v||null;bump()}return true}
+ if(t=='groll'){if(from==s.host&&s.phase=='lobby'){const L=gFit(s),pl=s.gplay||{};if(L.length>1){
+   const w=L.map(k=>1/(1+(+pl[k]||0))**1.3),cur=s.gsel||'exp';let r=Math.random()*w.reduce((a,b)=>a+b,0),i=0;while(i<L.length-1&&(r-=w[i])>0)i++;
+   if(L[i]==cur&&L.length>2&&Math.random()<.7)i=(i+1+Math.floor(Math.random()*(L.length-1)))%L.length;/* éviter de retomber sur la même */
+   s.gsel=L[i]=='exp'?null:L[i];s.groll={L,c:L[i],n:((s.groll&&s.groll.n)||0)+1,at:Date.now()};bump()}}return true}
+ if(t=='start'&&!s.gsel&&s.phase=='lobby'&&from==s.host&&gPl(s).length>=2)gPlayAdd(s,'');/* l'Expédition elle-même démarre dans index.html */
  if(t=='start'&&s.gsel&&s.phase=='lobby'){const G=GAMES[s.gsel],on=gPl(s);
   if(from==s.host&&G&&on.length>=G.min&&on.length<=G.max){s.order=on;gStart(s);bump()}return true}
  if(t=='gspec'){if(s.phase=='lobby'&&P(from)){const L=(s.gspec||[]).filter(n=>n!=from&&P(n));s.gspec=a.v?[...L,from]:L;bump()}return true}
@@ -197,9 +209,16 @@ function gEndView(s){const g=s.game,G=GAMES[g.id],R=s.gres||{pts:{}},host=meN()=
 
 /* @games : carte « Salle de jeux » du salon */
 W.GLobby=function(host,on,E){const sel=st.gsel&&GAMES[st.gsel]?st.gsel:'',on0=on;on=gPl(st).length;/* 👀 les spectateurs ne comptent pas */
+ if(host&&!st.gplay&&typeof localStorage!='undefined'){const p=gPlays();if(Object.keys(p).length){st.gplay=p;setTimeout(()=>{try{bump()}catch(e){}},0)}}
+ const PL=st.gplay||{},fit=gFit(st),pv=fit.map(k=>+PL[k]||0),pmax=Math.max(0,...pv),pmed=pv.slice().sort((a,b)=>a-b)[pv.length>>1]||0;
+ const freq=id=>{const k=id||'exp',n=+PL[k]||0;if(!pmax)return'';
+  if(!n)return`<span class="gfq gfq0">✨ ${GT('pl0')}</span>`;
+  if(n==pmax&&n>=3&&n>=2*Math.max(1,pmed))return`<span class="gfq gfqh">🔥 ${GT('plH')}</span>`;
+  return`<span class="gfq">${GT('plN',{n})}</span>`};
+ gRollShow();
  const tile=id=>{const G=GAMES[id],ok=!id||on<=G.max,miss=id?Math.max(0,G.min-on):Math.max(0,2-on),tag=host?'button':'div';
-  return `<${tag} class="gtile ggt ${id?'grw':'ghero'} ${sel==id?'sel':''} ${miss||!ok?'gfew':''}" ${host?`data-gsel="${id}" ${ok?'':'disabled'}`:''}>${id?'':`<span class="gmain">★ ${GT('gmain')}</span>`}<span class="gi">${id?G.icon:'⛵'}</span><span class="gt"><b>${id?GT('n_'+id):GT('exp')}</b><span class="mut">${id?GT('d_'+id):GT('expD')}</span></span><span class="gmin">≈ ${id?G.dur:(E||'?')} min · ${id?G.min:2}–${id?G.max:8} 👤</span>${miss?`<span class="gmiss">${GT(miss>1?'missN':'miss1',{n:miss})}</span>`:!ok?`<span class="gmiss">${GT('needP',{a:G.min,b:G.max})}</span>`:''}</${tag}>`};
- let h=`<div class="card"><h3>🎲 ${GT('room')}</h3>${tile('')}${(()=>{const C=[['d',['bot','pha','rad','vag']],['s',['arc','msk','coq']],['h',['chn','mim','prl']],['c',['tmp','sau','aby','pec']]],seen=new Set(C.flatMap(c=>c[1]));
+  return `<${tag} class="gtile ggt ${id?'grw':'ghero'} ${sel==id?'sel':''} ${miss||!ok?'gfew':''}" ${host?`data-gsel="${id}" ${ok?'':'disabled'}`:''}>${id?'':`<span class="gmain">★ ${GT('gmain')}</span>`}<span class="gi">${id?G.icon:'⛵'}</span><span class="gt"><b>${id?GT('n_'+id):GT('exp')}</b><span class="mut">${id?GT('d_'+id):GT('expD')}</span></span><span class="gmeta"><span class="gmin">≈ ${id?G.dur:(E||'?')} min · ${id?G.min:2}–${id?G.max:8} 👤</span>${freq(id)}</span>${miss?`<span class="gmiss">${GT(miss>1?'missN':'miss1',{n:miss})}</span>`:!ok?`<span class="gmiss">${GT('needP',{a:G.min,b:G.max})}</span>`:''}</${tag}>`};
+ let h=`<div class="card"><div class="grh"><h3>🎲 ${GT('room')}</h3>${host&&fit.length>1?`<button class="ghost groll" id="groll" title="${esc(GT('rollD'))}"><span class="grd6" aria-hidden="true">🗼</span>${GT('rollB')}</button>`:''}</div>${tile('')}${(()=>{const C=[['d',['bot','pha','rad','vag']],['s',['arc','msk','coq']],['h',['chn','mim','prl']],['c',['tmp','sau','aby','pec']]],seen=new Set(C.flatMap(c=>c[1]));
   const sec=(k,ids)=>{ids=ids.filter(i=>GAMES[i]);return ids.length?`<h4 class="gsec">${GT('gcat_'+k)}</h4><div class="glist">${ids.map(tile).join('')}</div>`:''};
   return C.map(([k,ids])=>sec(k,ids)).join('')+sec('o',Object.keys(GAMES).filter(i=>!seen.has(i)))})()}${host?'':`<p class="gby">${T('chosenBy',{n:B(st.host)})}</p>`}</div>`;
  /* 📜 livre de bord : l'hôte le recalcule pour les personnes présentes (envoyé au prochain bump) */
@@ -216,9 +235,28 @@ W.GLobby=function(host,on,E){const sel=st.gsel&&GAMES[st.gsel]?st.gsel:'',on0=on
   h+=(G.tone?g2ToneCard(host):'')+`<div class="card"><p class="grule">${GT(rk)}</p>${G.tut?`<button class="ghost gtutb" data-gtut="${sel}">📖 ${GT('tuB')}</button>`:''}${ok?'':`<p class="err">${GT('needP',{a:G.min,b:G.max})}</p>`}${tm}${ti}${spc}
   ${host?`<button class="pri wide" id="start" ${ok?'':'disabled'}>${GT('play',{g:GT('n_'+sel)})}</button>`:`<p class="gby">${GT('waitHost')}</p>`}</div>`}
  return h};
+/* 🗼 tirage au sort : rejoué une seule fois par tirage, seulement s'il vient d'avoir lieu (pas pour qui arrive après) */
+function gRollShow(){const r=st.groll;if(!r||!Array.isArray(r.L)||GV.roll==r.n)return;const first=GV.roll===undefined;GV.roll=r.n;
+ if(first&&!(st.updatedAt-r.at<2500))return;if(Date.now()-(isHost?r.at:RCV)>3000)return;
+ if(typeof document=='undefined')return;const old=document.getElementById('grollx');old&&old.remove();
+ const N=r.L.length,ci=Math.max(0,r.L.indexOf(r.c)),nm=k=>k=='exp'?GT('exp'):GT('n_'+k),ic=k=>k=='exp'?'⛵':GAMES[k].icon,PL=st.gplay||{};
+ const o=document.createElement('div');o.id='grollx';o.className='grollx';o.setAttribute('role','dialog');o.setAttribute('aria-live','polite');
+ o.innerHTML=`<div class="grw0"><div class="grring" style="--n:${N}"><div class="grbeam"></div>${r.L.map((k,i)=>`<span class="grisl" style="--a:${i*360/N}deg"><b>${ic(k)}</b></span>`).join('')}<div class="grtower">🗼</div></div>
+  <p class="grres"><span class="mut">${GT('rollT')}</span><b></b></p></div>`;
+ document.body.appendChild(o);const beam=o.querySelector('.grbeam'),isl=[...o.querySelectorAll('.grisl')],res=o.querySelector('.grres b');
+ const fin=360*4+ci*360/N,D=RM()?0:4200,t0=performance.now();let last=-1;
+ const close=()=>{o.classList.add('out');setTimeout(()=>o.remove(),380)};o.onclick=close;
+ const done=()=>{beam.style.transform=`rotate(${fin}deg)`;isl.forEach((e,i)=>e.classList.toggle('on',i==ci));isl[ci].classList.add('win');res.textContent=nm(r.c);o.classList.add('fin');
+  try{typeof ftone=='function'&&ftone([[523,0,.09],[659,.09,.09],[784,.18,.16]])}catch(e){}setTimeout(close,2600)};
+ if(!D){done();return}
+ const step=now=>{if(!o.isConnected)return;const t=Math.min(1,(now-t0)/D),e=1-Math.pow(1-t,3.2),a=fin*e;beam.style.transform=`rotate(${a}deg)`;
+  const k=Math.round((a%360)/(360/N))%N;if(k!=last){last=k;isl.forEach((x,i)=>x.classList.toggle('on',i==k));try{typeof ftone=='function'&&t<.97&&ftone([[880,0,.03]])}catch(x){}}
+  t<1?requestAnimationFrame(step):done()};
+ requestAnimationFrame(step);setTimeout(()=>{if(!o.classList.contains('fin')&&o.isConnected)done()},D+400)/* onglet masqué : rAF figé */}
 /* liens connus : clics délégués (le salon est rendu par index.html) */
 if(typeof document!='undefined')document.addEventListener('click',e=>{const lg=e.target.closest&&e.target.closest('.glog>summary');if(lg){GV.lgo=!lg.parentNode.open;return}
  if(e.target.closest&&e.target.closest('#gspec')){send({t:'gspec',v:!(st.gspec||[]).includes(meN())});return}
+ if(e.target.closest&&e.target.closest('#groll')){send({t:'groll'});return}
  const t=e.target.closest&&e.target.closest('[data-gtp],[data-gtie]');if(!t)return;
  if(t.dataset.gtie!=null){send({t:'gtie',v:t.dataset.gtie.split('|')});return}
  const p=t.dataset.gtp;if(!GV.tie||GV.tie==p){GV.tie=GV.tie==p?null:p;render();return}const a=GV.tie;GV.tie=null;send({t:'gtie',v:[a,p]});render()});
@@ -1570,9 +1608,32 @@ div.gtile{cursor:default}
 .gtile.grw{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;column-gap:12px;row-gap:3px;align-items:center;padding:10px 12px;border-radius:16px;box-shadow:0 3px 0 var(--edge2)}
 .gtile.grw .gi{grid-row:1/3;font-size:26px}
 .gtile.grw .gt b{font-size:16px}.gtile.grw .gt .mut{font-size:12.5px;line-height:1.25}
-.gtile.grw .gmin,.gtile.grw .gmiss{grid-column:2;justify-self:start;margin-top:0}
+.gtile.grw .gmeta,.gtile.grw .gmiss{grid-column:2;justify-self:start;margin-top:0}
 .gtile.grw .gmiss{grid-column:2}
 [data-theme=dark] .gtile.ghero .gmain{background:#3a2a1c;color:#ffc48a}
+
+.grh{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.grh h3{margin:0}
+.groll{display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border-radius:99px;font-weight:700}
+.groll .grd6{display:inline-block;transition:transform .4s cubic-bezier(.3,1.6,.5,1)}.groll:hover .grd6{transform:rotate(-12deg) scale(1.15)}
+.gmeta{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin-top:4px}.gmeta .gmin{margin-top:0}
+.gfq{font:700 11.5px Nunito,sans-serif;color:var(--mut);white-space:nowrap}
+.gfq0{color:#0f8a7e}.gfqh{color:#c2410c}
+[data-theme=dark] .gfq0{color:#5fd6c6}[data-theme=dark] .gfqh{color:#ffad6b}
+.grollx{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:radial-gradient(circle at 50% 45%,#0b2236cc,#04101cee);backdrop-filter:blur(3px);animation:grIn .35s ease both;cursor:pointer}
+.grollx.out{animation:grOut .38s ease both}
+@keyframes grIn{from{opacity:0}}@keyframes grOut{to{opacity:0}}
+.grw0{display:grid;justify-items:center;gap:22px;padding:16px}
+.grring{--R:min(38vw,150px);position:relative;width:calc(var(--R)*2 + 64px);height:calc(var(--R)*2 + 64px);border-radius:50%;background:radial-gradient(circle,#123a5a 0 34%,#0d2c47 35% 100%);box-shadow:inset 0 0 0 2px #2c5c80,0 0 60px #1d6fa533}
+.grbeam{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from -16deg,#ffe9a8d9 0deg,#ffe9a833 32deg,transparent 33deg);transform-origin:50% 50%;will-change:transform;filter:blur(1px)}
+.grisl{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;transform:rotate(var(--a)) translateY(calc(var(--R)*-1)) rotate(calc(var(--a)*-1))}
+.grisl b{display:grid;place-items:center;width:100%;height:100%;border-radius:50%;font-size:24px;background:#1a4565;box-shadow:0 0 0 2px #2f6488;transition:transform .18s,background .18s,box-shadow .18s;filter:saturate(.7) brightness(.85)}
+.grisl.on b{background:#f6d77e;box-shadow:0 0 0 3px #fff4cf,0 0 22px #ffd96b;transform:scale(1.14);filter:none}
+.grisl.win b{animation:grWin .9s cubic-bezier(.3,1.6,.5,1) both}
+@keyframes grWin{0%{transform:scale(1.14)}40%{transform:scale(1.55)}100%{transform:scale(1.35)}}
+.grtower{position:absolute;left:50%;top:50%;transform:translate(-50%,-55%);font-size:44px;filter:drop-shadow(0 0 14px #ffd96b88)}
+.grres{margin:0;display:grid;justify-items:center;gap:4px;color:#fff3df;min-height:56px;text-align:center}
+.grres .mut{color:#b9d3e6;font-size:14px;opacity:0;transition:opacity .3s}.grres b{font:800 26px Nunito,sans-serif;opacity:0;transform:translateY(8px);transition:opacity .35s,transform .35s}
+.grollx.fin .grres .mut,.grollx.fin .grres b{opacity:1;transform:none}
 @keyframes gsab{from{transform:scaleX(1)}to{transform:scaleX(0)}}
 .grule{font-size:14px;color:var(--txt);margin:0 0 10px;line-height:1.45;background:var(--paper);border:2px solid var(--edge);border-radius:16px;padding:9px 12px;opacity:.95}.card .grule{border:0;padding:0;background:none;color:var(--mut)}
 .gw .card{margin-top:0}
@@ -2003,7 +2064,7 @@ button.prch{cursor:pointer;width:auto}button.prch:hover{border-color:var(--edge2
    (listes '|' alignées par index ; dilemmes « A~B » ; réserve 1 = coquin, 2 = trash, 18+ entre adultes)
    ===================================================================== */
 const GI18N=W.GI18N={};
-GI18N.fr={ui:{gmain:`Le jeu principal`,gcat_d:`Se découvrir`,gcat_s:`Stratégie et bluff`,gcat_h:`Rôles cachés`,gcat_c:`Ensemble et adresse`,gcat_o:`Autres jeux`,miss1:`Il manque {n} joueur`,missN:`Il manque {n} joueurs`,mtieA:`Tout le monde peut déclarer un lien ; seuls les autres peuvent le retirer.`,edit:`Modifier`,stopAsk:`Arrêter ce jeu et voir les scores ?`,stop:`Arrêter`,room:`Salle de jeux`,exp:`Expédition`,expD:`Le voyage d'île en île`,play:`Jouer à {g}`,waitHost:`L'hôte lance la partie`,needP:`De {a} à {b} joueurs`,
+GI18N.fr={ui:{rollB:`Au hasard`,rollD:`Le phare choisit parmi les jeux possibles, en préférant ceux qu'on a peu joués.`,rollT:`Le phare a choisi`,pl0:`jamais joué`,plH:`souvent joué`,plN:`joué {n}×`,gmain:`Le jeu principal`,gcat_d:`Se découvrir`,gcat_s:`Stratégie et bluff`,gcat_h:`Rôles cachés`,gcat_c:`Ensemble et adresse`,gcat_o:`Autres jeux`,miss1:`Il manque {n} joueur`,missN:`Il manque {n} joueurs`,mtieA:`Tout le monde peut déclarer un lien ; seuls les autres peuvent le retirer.`,edit:`Modifier`,stopAsk:`Arrêter ce jeu et voir les scores ?`,stop:`Arrêter`,room:`Salle de jeux`,exp:`Expédition`,expD:`Le voyage d'île en île`,play:`Jouer à {g}`,waitHost:`L'hôte lance la partie`,needP:`De {a} à {b} joueurs`,
 t_skill:`skill`,t_chance:`chance`,t_social:`social`,send:`Envoyer`,ok:`Continuer`,me:`moi`,or:`ou`,waitN:`On attend {n}`,yourMove:`À toi !`,watch:`Regarde les autres jouer`,ready:`{g:Prêt|Prête} ? On continue quand tout le monde l'est`,
 scores:`Scores`,coopT:`Score de connexion`,again:`Rejouer`,lobby:`Retour au salon`,hostNext:`Rejouer, ou retour au salon ?`,waitHostN:`{n} choisit la suite`,
 n_bot:`Bouteilles à la mer`,d_bot:`Des anecdotes vraies et anonymes : qui les a écrites ?`,
@@ -2033,7 +2094,7 @@ rad:`Vivre sur un bateau~Vivre dans une cabane perchée|Respirer sous l'eau~Vole
 rad1:`Un premier baiser sous la pluie~Un premier baiser au coucher du soleil|Un massage~Un bain à deux|De la lingerie~Rien du tout|Draguer~Te faire draguer|Un rendez-vous à l'aveugle~Un rendez-vous avec ton ex|Des mots doux~Des regards brûlants|Une nuit à la belle étoile à deux~Une nuit dans un hôtel de luxe à deux|De longs préliminaires~Aller droit au but|Lumière allumée~Lumière éteinte|Le matin~Le soir|Un slow collé-serré~Une danse endiablée|Un texto coquin~Un appel à minuit|Un tatouage caché~Un piercing caché|Un partenaire qui cuisine~Un partenaire qui masse|Un baiser dans le cou~Un murmure à l'oreille`,
 rad2:`Le sexe dans la mer~Le sexe sur la plage|Ta sextape publiée~Ton historique internet publié|Un plan à trois~Un club échangiste|Des menottes~Un bandeau sur les yeux|Coucher avec ton ex~Coucher avec quelqu'un du boulot|Un an sans sexe~Un an sans internet|Faire l'amour en silence à vie~Faire l'amour bruyamment à vie|Tes parents lisent tes fantasmes~Tu lis ceux de tes parents|Toujours dessus~Toujours dessous|Le sexe dans un avion~Le sexe dans un ascenseur|Ne plus jamais jouir~Jouir à chaque éternuement|Un nude qui fuite~Un vocal gênant qui fuite|Coucher le premier soir~Attendre trois mois|Une nuit avec une star~Une nuit avec ton crush secret|Des jouets~Que les mains`};
 
-GI18N.en={ui:{gmain:`The main game`,gcat_d:`Get to know each other`,gcat_s:`Strategy & bluff`,gcat_h:`Hidden roles`,gcat_c:`Together & skill`,gcat_o:`More games`,miss1:`{n} more player needed`,missN:`{n} more players needed`,mtieA:`Anyone can declare a bond; only the others can remove it.`,edit:`Edit`,stopAsk:`Stop this game and see the scores?`,stop:`Stop`,room:`Game room`,exp:`Expedition`,expD:`The island-hopping voyage`,play:`Play {g}`,waitHost:`The host starts the game`,needP:`{a} to {b} players`,
+GI18N.en={ui:{rollB:`Surprise me`,rollD:`The lighthouse picks among the playable games, favouring the ones you've played least.`,rollT:`The lighthouse chose`,pl0:`never played`,plH:`played a lot`,plN:`played {n}×`,gmain:`The main game`,gcat_d:`Get to know each other`,gcat_s:`Strategy & bluff`,gcat_h:`Hidden roles`,gcat_c:`Together & skill`,gcat_o:`More games`,miss1:`{n} more player needed`,missN:`{n} more players needed`,mtieA:`Anyone can declare a bond; only the others can remove it.`,edit:`Edit`,stopAsk:`Stop this game and see the scores?`,stop:`Stop`,room:`Game room`,exp:`Expedition`,expD:`The island-hopping voyage`,play:`Play {g}`,waitHost:`The host starts the game`,needP:`{a} to {b} players`,
 t_skill:`skill`,t_chance:`luck`,t_social:`social`,send:`Send`,ok:`Continue`,me:`me`,or:`or`,waitN:`Waiting for {n}`,yourMove:`Your move!`,watch:`Watch the others play`,ready:`Ready? We go on when everyone is`,
 scores:`Scores`,coopT:`Connection score`,again:`Play again`,lobby:`Back to lobby`,hostNext:`Play again, or back to the lobby?`,waitHostN:`{n} picks what's next`,
 n_bot:`Messages in a Bottle`,d_bot:`True, anonymous stories: who wrote them?`,r_bot:`Write 2 or 3 true things about you. They arrive anonymously: find the author (+2). Nobody finds you? +3. Only some? +1.`,
@@ -2061,7 +2122,7 @@ rad:`Live on a boat~Live in a treehouse|Breathe underwater~Fly|Read minds~Become
 rad1:`A first kiss in the rain~A first kiss at sunset|A massage~A bath for two|Lingerie~Nothing at all|Flirt~Be flirted with|A blind date~A date with your ex|Sweet words~Burning looks|A night under the stars for two~A night in a luxury hotel for two|Long foreplay~Straight to the point|Lights on~Lights off|Mornings~Evenings|A close slow dance~A wild dance|A naughty text~A midnight call|A hidden tattoo~A hidden piercing|A partner who cooks~A partner who massages|A kiss on the neck~A whisper in the ear`,
 rad2:`Sex in the sea~Sex on the beach|Your sex tape leaked~Your browser history leaked|A threesome~A swingers' club|Handcuffs~A blindfold|Sleep with your ex~Sleep with a coworker|A year without sex~A year without internet|Silent sex for life~Loud sex for life|Your parents read your fantasies~You read your parents'|Always on top~Always on the bottom|Sex on a plane~Sex in an elevator|Never climax again~Climax at every sneeze|A leaked nude~A leaked awkward voice note|Sleep together the first night~Wait three months|A night with a celebrity~A night with your secret crush|Toys~Hands only`};
 
-GI18N.es={ui:{gmain:`El juego principal`,gcat_d:`Conocerse`,gcat_s:`Estrategia y farol`,gcat_h:`Roles ocultos`,gcat_c:`Juntos y habilidad`,gcat_o:`Más juegos`,miss1:`Falta {n} jugador`,missN:`Faltan {n} jugadores`,mtieA:`Cualquiera puede declarar un vínculo; solo los demás pueden quitarlo.`,edit:`Cambiar`,stopAsk:`¿Parar este juego y ver los puntos?`,stop:`Parar`,room:`Sala de juegos`,exp:`Expedición`,expD:`El viaje de isla en isla`,play:`Jugar a {g}`,waitHost:`El anfitrión inicia la partida`,needP:`De {a} a {b} jugadores`,
+GI18N.es={ui:{rollB:`Al azar`,rollD:`El faro elige entre los juegos posibles, prefiriendo los menos jugados.`,rollT:`El faro ha elegido`,pl0:`nunca jugado`,plH:`muy jugado`,plN:`jugado {n}×`,gmain:`El juego principal`,gcat_d:`Conocerse`,gcat_s:`Estrategia y farol`,gcat_h:`Roles ocultos`,gcat_c:`Juntos y habilidad`,gcat_o:`Más juegos`,miss1:`Falta {n} jugador`,missN:`Faltan {n} jugadores`,mtieA:`Cualquiera puede declarar un vínculo; solo los demás pueden quitarlo.`,edit:`Cambiar`,stopAsk:`¿Parar este juego y ver los puntos?`,stop:`Parar`,room:`Sala de juegos`,exp:`Expedición`,expD:`El viaje de isla en isla`,play:`Jugar a {g}`,waitHost:`El anfitrión inicia la partida`,needP:`De {a} a {b} jugadores`,
 t_skill:`habilidad`,t_chance:`azar`,t_social:`social`,send:`Enviar`,ok:`Continuar`,me:`yo`,or:`o`,waitN:`Esperando a {n}`,yourMove:`¡Te toca!`,watch:`Mira jugar a los demás`,ready:`¿{g:Listo|Lista}? Seguimos cuando todos lo estén`,
 scores:`Puntos`,coopT:`Puntuación de conexión`,again:`Otra vez`,lobby:`Volver a la sala`,hostNext:`¿Otra vez, o volver a la sala?`,waitHostN:`{n} elige qué sigue`,
 n_bot:`Mensajes en botellas`,d_bot:`Anécdotas verdaderas y anónimas: ¿quién las escribió?`,r_bot:`Escribe 2 o 3 cosas verdaderas sobre ti. Llegan anónimas: adivina quién las escribió (+2). ¿Nadie te descubre? +3. ¿Solo algunos? +1.`,
@@ -2089,7 +2150,7 @@ rad:`Vivir en un barco~Vivir en una casa del árbol|Respirar bajo el agua~Volar|
 rad1:`Un primer beso bajo la lluvia~Un primer beso al atardecer|Un masaje~Un baño para dos|Lencería~Nada de nada|Ligar~Que te liguen|Una cita a ciegas~Una cita con tu ex|Palabras dulces~Miradas ardientes|Una noche bajo las estrellas en pareja~Una noche en un hotel de lujo en pareja|Preliminares largos~Ir al grano|Luz encendida~Luz apagada|Por la mañana~Por la noche|Un lento bien pegados~Un baile desenfrenado|Un mensaje picante~Una llamada a medianoche|Un tatuaje escondido~Un piercing escondido|Pareja que cocina~Pareja que da masajes|Un beso en el cuello~Un susurro al oído`,
 rad2:`Sexo en el mar~Sexo en la playa|Tu vídeo porno publicado~Tu historial de internet publicado|Un trío~Un club de intercambio|Esposas~Una venda en los ojos|Acostarte con tu ex~Acostarte con alguien del trabajo|Un año sin sexo~Un año sin internet|Sexo en silencio de por vida~Sexo ruidoso de por vida|Tus padres leen tus fantasías~Tú lees las de tus padres|Siempre arriba~Siempre abajo|Sexo en un avión~Sexo en un ascensor|No volver a tener un orgasmo~Tener uno con cada estornudo|Un desnudo filtrado~Un audio vergonzoso filtrado|Acostarse la primera noche~Esperar tres meses|Una noche con una estrella~Una noche con tu crush secreto|Juguetes~Solo manos`};
 
-GI18N.it={ui:{gmain:`Il gioco principale`,gcat_d:`Conoscersi`,gcat_s:`Strategia e bluff`,gcat_h:`Ruoli nascosti`,gcat_c:`Insieme e abilità`,gcat_o:`Altri giochi`,miss1:`Manca {n} giocatore`,missN:`Mancano {n} giocatori`,mtieA:`Chiunque può dichiarare un legame; solo gli altri possono toglierlo.`,edit:`Modifica`,stopAsk:`Fermare il gioco e vedere i punteggi?`,stop:`Ferma`,room:`Sala giochi`,exp:`Spedizione`,expD:`Il viaggio di isola in isola`,play:`Gioca a {g}`,waitHost:`L'host avvia la partita`,needP:`Da {a} a {b} giocatori`,
+GI18N.it={ui:{rollB:`A caso`,rollD:`Il faro sceglie tra i giochi possibili, preferendo quelli meno giocati.`,rollT:`Il faro ha scelto`,pl0:`mai giocato`,plH:`giocato spesso`,plN:`giocato {n}×`,gmain:`Il gioco principale`,gcat_d:`Conoscersi`,gcat_s:`Strategia e bluff`,gcat_h:`Ruoli nascosti`,gcat_c:`Insieme e abilità`,gcat_o:`Altri giochi`,miss1:`Manca {n} giocatore`,missN:`Mancano {n} giocatori`,mtieA:`Chiunque può dichiarare un legame; solo gli altri possono toglierlo.`,edit:`Modifica`,stopAsk:`Fermare il gioco e vedere i punteggi?`,stop:`Ferma`,room:`Sala giochi`,exp:`Spedizione`,expD:`Il viaggio di isola in isola`,play:`Gioca a {g}`,waitHost:`L'host avvia la partita`,needP:`Da {a} a {b} giocatori`,
 t_skill:`abilità`,t_chance:`fortuna`,t_social:`social`,send:`Invia`,ok:`Continua`,me:`io`,or:`o`,waitN:`Si aspetta {n}`,yourMove:`Tocca a te!`,watch:`Guarda gli altri giocare`,ready:`{g:Pronto|Pronta}? Si continua quando lo sono tutti`,
 scores:`Punteggi`,coopT:`Punteggio di connessione`,again:`Rigioca`,lobby:`Torna alla sala`,hostNext:`Rigiocare, o tornare alla sala?`,waitHostN:`{n} sceglie cosa fare`,
 n_bot:`Messaggi in bottiglia`,d_bot:`Aneddoti veri e anonimi: chi li ha scritti?`,r_bot:`Scrivi 2 o 3 cose vere su di te. Arrivano anonime: indovina chi le ha scritte (+2). Nessuno ti scopre? +3. Solo alcuni? +1.`,
@@ -2117,7 +2178,7 @@ rad:`Vivere su una barca~Vivere in una casa sull'albero|Respirare sott'acqua~Vol
 rad1:`Un primo bacio sotto la pioggia~Un primo bacio al tramonto|Un massaggio~Un bagno in due|Lingerie~Niente di niente|Corteggiare~Farti corteggiare|Un appuntamento al buio~Un appuntamento con il tuo ex|Parole dolci~Sguardi infuocati|Una notte sotto le stelle in due~Una notte in un hotel di lusso in due|Preliminari lunghi~Dritti al punto|Luce accesa~Luce spenta|Il mattino~La sera|Un lento stretti stretti~Un ballo scatenato|Un messaggio piccante~Una chiamata a mezzanotte|Un tatuaggio nascosto~Un piercing nascosto|Un partner che cucina~Un partner che fa massaggi|Un bacio sul collo~Un sussurro all'orecchio`,
 rad2:`Sesso in mare~Sesso in spiaggia|Il tuo sex tape pubblicato~La tua cronologia internet pubblicata|Una cosa a tre~Un club di scambisti|Manette~Una benda sugli occhi|Andare a letto con il tuo ex~Andare a letto con un collega|Un anno senza sesso~Un anno senza internet|Sesso in silenzio a vita~Sesso rumoroso a vita|I tuoi genitori leggono le tue fantasie~Tu leggi le loro|Sempre sopra~Sempre sotto|Sesso in aereo~Sesso in ascensore|Mai più un orgasmo~Un orgasmo a ogni starnuto|Una foto nuda trapelata~Un vocale imbarazzante trapelato|Farlo la prima sera~Aspettare tre mesi|Una notte con una star~Una notte con la tua cotta segreta|Giocattoli~Solo mani`};
 
-GI18N.de={ui:{gmain:`Das Hauptspiel`,gcat_d:`Sich kennenlernen`,gcat_s:`Strategie & Bluff`,gcat_h:`Versteckte Rollen`,gcat_c:`Gemeinsam & Geschick`,gcat_o:`Weitere Spiele`,miss1:`Es fehlt {n} Person`,missN:`Es fehlen {n} Personen`,mtieA:`Alle können eine Verbindung angeben; nur die anderen können sie entfernen.`,edit:`Ändern`,stopAsk:`Spiel beenden und Punkte zeigen?`,stop:`Beenden`,room:`Spielesaal`,exp:`Expedition`,expD:`Die Reise von Insel zu Insel`,play:`{g} spielen`,waitHost:`Der Host startet das Spiel`,needP:`{a} bis {b} Spieler`,
+GI18N.de={ui:{rollB:`Zufall`,rollD:`Der Leuchtturm wählt unter den möglichen Spielen, am liebsten die wenig gespielten.`,rollT:`Der Leuchtturm hat gewählt`,pl0:`noch nie gespielt`,plH:`oft gespielt`,plN:`{n}× gespielt`,gmain:`Das Hauptspiel`,gcat_d:`Sich kennenlernen`,gcat_s:`Strategie & Bluff`,gcat_h:`Versteckte Rollen`,gcat_c:`Gemeinsam & Geschick`,gcat_o:`Weitere Spiele`,miss1:`Es fehlt {n} Person`,missN:`Es fehlen {n} Personen`,mtieA:`Alle können eine Verbindung angeben; nur die anderen können sie entfernen.`,edit:`Ändern`,stopAsk:`Spiel beenden und Punkte zeigen?`,stop:`Beenden`,room:`Spielesaal`,exp:`Expedition`,expD:`Die Reise von Insel zu Insel`,play:`{g} spielen`,waitHost:`Der Host startet das Spiel`,needP:`{a} bis {b} Spieler`,
 t_skill:`Können`,t_chance:`Glück`,t_social:`sozial`,send:`Senden`,ok:`Weiter`,me:`ich`,or:`oder`,waitN:`Warten auf {n}`,yourMove:`Du bist dran!`,watch:`Schau den anderen zu`,ready:`Bereit? Weiter, sobald alle bereit sind`,
 scores:`Punkte`,coopT:`Verbindungswert`,again:`Nochmal`,lobby:`Zurück zur Lobby`,hostNext:`Nochmal, oder zurück zur Lobby?`,waitHostN:`{n} wählt, wie es weitergeht`,
 n_bot:`Flaschenpost`,d_bot:`Wahre, anonyme Anekdoten: Wer hat sie geschrieben?`,r_bot:`Schreib 2 oder 3 wahre Dinge über dich. Sie kommen anonym an: Errate, wer sie schrieb (+2). Niemand errät dich? +3. Nur manche? +1.`,
@@ -2145,7 +2206,7 @@ rad:`Auf einem Boot leben~In einem Baumhaus leben|Unter Wasser atmen~Fliegen|Ged
 rad1:`Ein erster Kuss im Regen~Ein erster Kuss bei Sonnenuntergang|Eine Massage~Ein Bad zu zweit|Dessous~Gar nichts|Flirten~Angeflirtet werden|Ein Blind Date~Ein Date mit dem Ex|Süße Worte~Glühende Blicke|Eine Nacht unter den Sternen zu zweit~Eine Nacht im Luxushotel zu zweit|Langes Vorspiel~Direkt zur Sache|Licht an~Licht aus|Morgens~Abends|Ein enger Stehblues~Ein wilder Tanz|Eine freche Nachricht~Ein Anruf um Mitternacht|Ein verstecktes Tattoo~Ein verstecktes Piercing|Wer kocht~Wer massiert|Ein Kuss auf den Hals~Ein Flüstern ins Ohr`,
 rad2:`Sex im Meer~Sex am Strand|Dein Sextape veröffentlicht~Dein Browserverlauf veröffentlicht|Ein Dreier~Ein Swingerclub|Handschellen~Eine Augenbinde|Mit dem Ex schlafen~Mit jemandem von der Arbeit schlafen|Ein Jahr ohne Sex~Ein Jahr ohne Internet|Lebenslang leiser Sex~Lebenslang lauter Sex|Deine Eltern lesen deine Fantasien~Du liest die deiner Eltern|Immer oben~Immer unten|Sex im Flugzeug~Sex im Aufzug|Nie wieder kommen~Bei jedem Niesen kommen|Ein geleaktes Nacktfoto~Eine geleakte peinliche Sprachnachricht|In der ersten Nacht~Drei Monate warten|Eine Nacht mit einem Star~Eine Nacht mit deinem heimlichen Schwarm|Spielzeug~Nur Hände`};
 
-GI18N.ru={ui:{gmain:`Главная игра`,gcat_d:`Узнать друг друга`,gcat_s:`Стратегия и блеф`,gcat_h:`Тайные роли`,gcat_c:`Вместе и ловкость`,gcat_o:`Другие игры`,miss1:`Не хватает игроков: {n}`,missN:`Не хватает игроков: {n}`,mtieA:`Любой может отметить связь; убрать её могут только остальные.`,edit:`Изменить`,stopAsk:`Остановить игру и показать очки?`,stop:`Остановить`,room:`Игровой зал`,exp:`Экспедиция`,expD:`Путешествие с острова на остров`,play:`Играть: {g}`,waitHost:`Хост запускает игру`,needP:`От {a} до {b} игроков`,
+GI18N.ru={ui:{rollB:`Наугад`,rollD:`Маяк выбирает среди доступных игр, чаще те, в которые играли меньше.`,rollT:`Маяк выбрал`,pl0:`ещё не играли`,plH:`играли часто`,plN:`сыграно: {n}`,gmain:`Главная игра`,gcat_d:`Узнать друг друга`,gcat_s:`Стратегия и блеф`,gcat_h:`Тайные роли`,gcat_c:`Вместе и ловкость`,gcat_o:`Другие игры`,miss1:`Не хватает игроков: {n}`,missN:`Не хватает игроков: {n}`,mtieA:`Любой может отметить связь; убрать её могут только остальные.`,edit:`Изменить`,stopAsk:`Остановить игру и показать очки?`,stop:`Остановить`,room:`Игровой зал`,exp:`Экспедиция`,expD:`Путешествие с острова на остров`,play:`Играть: {g}`,waitHost:`Хост запускает игру`,needP:`От {a} до {b} игроков`,
 t_skill:`навык`,t_chance:`удача`,t_social:`общение`,send:`Отправить`,ok:`Дальше`,me:`я`,or:`или`,waitN:`Ждём: {n}`,yourMove:`Твой ход!`,watch:`Смотри, как играют другие`,ready:`{g:Готов|Готова}? Продолжим, когда все будут готовы`,
 scores:`Очки`,coopT:`Счёт связи`,again:`Ещё раз`,lobby:`В лобби`,hostNext:`Ещё раз или в лобби?`,waitHostN:`{n} выбирает, что дальше`,
 n_bot:`Письма в бутылках`,d_bot:`Правдивые анонимные истории: кто их написал?`,r_bot:`Напиши 2–3 правдивых факта о себе. Они приходят анонимно: угадай автора (+2). Тебя никто не угадал? +3. Только некоторые? +1.`,
@@ -2173,7 +2234,7 @@ rad:`Жить на лодке~Жить в домике на дереве|Дыш�
 rad1:`Первый поцелуй под дождём~Первый поцелуй на закате|Массаж~Ванна на двоих|Кружевное бельё~Совсем ничего|Флиртовать~Чтобы флиртовали с тобой|Свидание вслепую~Свидание с бывшим|Нежные слова~Жгучие взгляды|Ночь под звёздами вдвоём~Ночь в роскошном отеле вдвоём|Долгие ласки~Сразу к делу|Свет включён~Свет выключен|Утром~Вечером|Тесный медляк~Зажигательный танец|Игривое сообщение~Звонок в полночь|Скрытая татуировка~Скрытый пирсинг|Партнёр, который готовит~Партнёр, который делает массаж|Поцелуй в шею~Шёпот на ухо`,
 rad2:`Секс в море~Секс на пляже|Твоё секс-видео в сети~Твоя история браузера в сети|Секс втроём~Свинг-клуб|Наручники~Повязка на глаза|Переспать с бывшим~Переспать с коллегой|Год без секса~Год без интернета|Всю жизнь тихий секс~Всю жизнь громкий секс|Родители читают твои фантазии~Ты читаешь их фантазии|Всегда сверху~Всегда снизу|Секс в самолёте~Секс в лифте|Больше никогда не кончать~Кончать от каждого чиха|Утёкшее интимное фото~Утёкшее неловкое голосовое|Переспать в первую ночь~Ждать три месяца|Ночь со звездой~Ночь с тайной симпатией|Игрушки~Только руки`};
 
-GI18N.zh={ui:{gmain:`主游戏`,gcat_d:`彼此了解`,gcat_s:`策略与诈唬`,gcat_h:`隐藏身份`,gcat_c:`合作与技巧`,gcat_o:`更多游戏`,miss1:`还差 {n} 名玩家`,missN:`还差 {n} 名玩家`,mtieA:`任何人都可以标记关系；只有其他人才能取消。`,edit:`修改`,stopAsk:`结束本局并查看得分？`,stop:`结束`,room:`游戏厅`,exp:`远征`,expD:`一岛接一岛的旅程`,play:`开始：{g}`,waitHost:`房主开始游戏`,needP:`{a}–{b} 名玩家`,
+GI18N.zh={ui:{rollB:`随机`,rollD:`灯塔会在可玩的游戏中挑选，优先玩得少的。`,rollT:`灯塔选中了`,pl0:`从未玩过`,plH:`常玩`,plN:`玩过 {n} 次`,gmain:`主游戏`,gcat_d:`彼此了解`,gcat_s:`策略与诈唬`,gcat_h:`隐藏身份`,gcat_c:`合作与技巧`,gcat_o:`更多游戏`,miss1:`还差 {n} 名玩家`,missN:`还差 {n} 名玩家`,mtieA:`任何人都可以标记关系；只有其他人才能取消。`,edit:`修改`,stopAsk:`结束本局并查看得分？`,stop:`结束`,room:`游戏厅`,exp:`远征`,expD:`一岛接一岛的旅程`,play:`开始：{g}`,waitHost:`房主开始游戏`,needP:`{a}–{b} 名玩家`,
 t_skill:`技巧`,t_chance:`运气`,t_social:`社交`,send:`发送`,ok:`继续`,me:`我`,or:`还是`,waitN:`等待 {n}`,yourMove:`轮到你了！`,watch:`看看大家怎么玩`,ready:`准备好了吗？大家都准备好就继续`,
 scores:`得分`,coopT:`默契分`,again:`再来一局`,lobby:`回到大厅`,hostNext:`再来一局，还是回大厅？`,waitHostN:`{n} 正在决定下一步`,
 n_bot:`漂流瓶`,d_bot:`真实又匿名的小故事：是谁写的？`,r_bot:`写下 2–3 件关于你的真事。它们会匿名出现：猜出作者 +2。没人猜中你？+3。只有部分人猜中？+1。`,
@@ -2201,7 +2262,7 @@ rad:`住在船上~住在树屋里|在水下呼吸~在天上飞|读心术~隐身�
 rad1:`雨中的初吻~日落时的初吻|按摩~双人浴|性感内衣~什么都不穿|主动撩人~被人撩|盲约~和前任约会|甜言蜜语~炙热的眼神|两人星空下过夜~两人豪华酒店过夜|长长的前戏~直奔主题|开着灯~关着灯|早上~晚上|贴身慢舞~狂野热舞|一条撩人的短信~一通午夜来电|隐藏的纹身~隐藏的穿孔|会做饭的伴侣~会按摩的伴侣|吻脖子~耳边低语`,
 rad2:`在海里做爱~在沙滩上做爱|你的性爱视频曝光~你的浏览记录曝光|3P~换妻俱乐部|手铐~蒙眼布|和前任上床~和同事上床|一年没有性~一年没有网络|一辈子安静地做爱~一辈子大声地做爱|父母读你的性幻想~你读父母的|永远在上面~永远在下面|在飞机上做爱~在电梯里做爱|再也不能高潮~每打一个喷嚏就高潮|裸照外泄~尴尬语音外泄|第一晚就上床~等三个月|和明星共度一夜~和暗恋对象共度一夜|用玩具~只用手`};
 
-GI18N.he={ui:{gmain:`המשחק הראשי`,gcat_d:`להכיר זה את זה`,gcat_s:`אסטרטגיה ובלוף`,gcat_h:`תפקידים סודיים`,gcat_c:`ביחד ומיומנות`,gcat_o:`עוד משחקים`,miss1:`חסר שחקן אחד`,missN:`חסרים {n} שחקנים`,mtieA:`כל אחד יכול לסמן קשר; רק האחרים יכולים להסיר אותו.`,edit:`לשנות`,stopAsk:`לעצור את המשחק ולראות ניקוד?`,stop:`לעצור`,room:`חדר משחקים`,exp:`מסע`,expD:`המסע מאי לאי`,play:`לשחק: {g}`,waitHost:`המארח מתחיל את המשחק`,needP:`{a} עד {b} שחקנים`,
+GI18N.he={ui:{rollB:`אקראי`,rollD:`המגדלור בוחר מבין המשחקים האפשריים, ומעדיף את אלה ששיחקנו פחות.`,rollT:`המגדלור בחר`,pl0:`עוד לא שיחקנו`,plH:`שיחקנו הרבה`,plN:`שיחקנו {n}×`,gmain:`המשחק הראשי`,gcat_d:`להכיר זה את זה`,gcat_s:`אסטרטגיה ובלוף`,gcat_h:`תפקידים סודיים`,gcat_c:`ביחד ומיומנות`,gcat_o:`עוד משחקים`,miss1:`חסר שחקן אחד`,missN:`חסרים {n} שחקנים`,mtieA:`כל אחד יכול לסמן קשר; רק האחרים יכולים להסיר אותו.`,edit:`לשנות`,stopAsk:`לעצור את המשחק ולראות ניקוד?`,stop:`לעצור`,room:`חדר משחקים`,exp:`מסע`,expD:`המסע מאי לאי`,play:`לשחק: {g}`,waitHost:`המארח מתחיל את המשחק`,needP:`{a} עד {b} שחקנים`,
 t_skill:`מיומנות`,t_chance:`מזל`,t_social:`חברתי`,send:`שליחה`,ok:`המשך`,me:`אני`,or:`או`,waitN:`מחכים ל{n}`,yourMove:`תורך!`,watch:`צפו באחרים משחקים`,ready:`{g:מוכן|מוכנה}? ממשיכים כשכולם מוכנים`,
 scores:`ניקוד`,coopT:`ניקוד חיבור`,again:`שוב`,lobby:`חזרה ללובי`,hostNext:`עוד סיבוב, או חזרה ללובי?`,waitHostN:`{n} בוחר מה הלאה`,
 n_bot:`מכתבים בבקבוק`,d_bot:`סיפורים אמיתיים ואנונימיים: מי כתב אותם?`,r_bot:`כתבו 2 או 3 דברים אמיתיים על עצמכם. הם מגיעים בעילום שם: נחשו מי כתב (+2). אף אחד לא זיהה אתכם? +3. רק חלק? +1.`,
@@ -2229,7 +2290,7 @@ rad:`לגור על סירה~לגור בבית עץ|לנשום מתחת למים~
 rad1:`נשיקה ראשונה בגשם~נשיקה ראשונה בשקיעה|עיסוי~אמבטיה זוגית|הלבשה תחתונה~כלום בכלל|לפלרטט~שיפלרטטו איתך|דייט עיוור~דייט עם האקס|מילים מתוקות~מבטים לוהטים|לילה זוגי תחת הכוכבים~לילה זוגי במלון יוקרה|משחק מקדים ארוך~ישר לעניין|אור דולק~אור כבוי|בבוקר~בערב|סלואו צמוד~ריקוד פרוע|הודעה שובבה~שיחה בחצות|קעקוע נסתר~פירסינג נסתר|בן זוג שמבשל~בן זוג שמעסה|נשיקה בצוואר~לחישה באוזן`,
 rad2:`סקס בים~סקס על החוף|סרטון הסקס שלך דלף~היסטוריית הגלישה שלך דלפה|שלישייה~מועדון חילופי זוגות|אזיקים~כיסוי עיניים|לשכב עם האקס~לשכב עם מישהו מהעבודה|שנה בלי סקס~שנה בלי אינטרנט|סקס שקט כל החיים~סקס רועש כל החיים|ההורים קוראים את הפנטזיות שלך~את קורא את שלהם|תמיד למעלה~תמיד למטה|סקס במטוס~סקס במעלית|לא לגמור לעולם~לגמור בכל עיטוש|תמונת עירום שדלפה~הודעה קולית מביכה שדלפה|כבר בלילה הראשון~לחכות שלושה חודשים|לילה עם כוכב~לילה עם הקראש הסודי|צעצועים~רק ידיים`};
 
-GI18N.pt={ui:{gmain:`O jogo principal`,gcat_d:`Conhecer-se`,gcat_s:`Estratégia e blefe`,gcat_h:`Papéis ocultos`,gcat_c:`Juntos e habilidade`,gcat_o:`Mais jogos`,miss1:`Falta {n} jogador`,missN:`Faltam {n} jogadores`,mtieA:`Qualquer pessoa pode declarar um laço; só os outros podem removê-lo.`,edit:`Alterar`,stopAsk:`Parar o jogo e ver os pontos?`,stop:`Parar`,room:`Sala de jogos`,exp:`Expedição`,expD:`A viagem de ilha em ilha`,play:`Jogar {g}`,waitHost:`O anfitrião inicia a partida`,needP:`De {a} a {b} jogadores`,
+GI18N.pt={ui:{rollB:`Ao acaso`,rollD:`O farol escolhe entre os jogos possíveis, preferindo os menos jogados.`,rollT:`O farol escolheu`,pl0:`nunca jogado`,plH:`muito jogado`,plN:`jogado {n}×`,gmain:`O jogo principal`,gcat_d:`Conhecer-se`,gcat_s:`Estratégia e blefe`,gcat_h:`Papéis ocultos`,gcat_c:`Juntos e habilidade`,gcat_o:`Mais jogos`,miss1:`Falta {n} jogador`,missN:`Faltam {n} jogadores`,mtieA:`Qualquer pessoa pode declarar um laço; só os outros podem removê-lo.`,edit:`Alterar`,stopAsk:`Parar o jogo e ver os pontos?`,stop:`Parar`,room:`Sala de jogos`,exp:`Expedição`,expD:`A viagem de ilha em ilha`,play:`Jogar {g}`,waitHost:`O anfitrião inicia a partida`,needP:`De {a} a {b} jogadores`,
 t_skill:`habilidade`,t_chance:`sorte`,t_social:`social`,send:`Enviar`,ok:`Continuar`,me:`eu`,or:`ou`,waitN:`Esperando {n}`,yourMove:`Sua vez!`,watch:`Veja os outros jogarem`,ready:`{g:Pronto|Pronta}? Seguimos quando todos estiverem`,
 scores:`Pontos`,coopT:`Pontuação de conexão`,again:`Jogar de novo`,lobby:`Voltar ao salão`,hostNext:`Jogar de novo, ou voltar ao salão?`,waitHostN:`{n} escolhe o que vem agora`,
 n_bot:`Mensagens na garrafa`,d_bot:`Histórias verdadeiras e anônimas: quem escreveu?`,r_bot:`Escreva 2 ou 3 coisas verdadeiras sobre você. Elas chegam anônimas: descubra quem escreveu (+2). Ninguém te descobriu? +3. Só alguns? +1.`,
