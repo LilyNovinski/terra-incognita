@@ -52,7 +52,7 @@
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="i18n.js?v=20261116s"></script>
 <script src="decks.js?v=5"></script>
-<script src="games.js?v=27"></script><!-- @games -->
+<script src="games.js?v=28"></script><!-- @games -->
 <script src="games-pools.js?v=2"></script><!-- @games -->
 <style>
 :root{--sea1:#bdeef0;--sea2:#69c9d3;--deep:#0e5866;--deep2:#0a4652;--paper:#fffaf0;--paper2:#fbf0d9;--edge:#ead6ae;--edge2:#d8bd88;--txt:#3b2a1b;--mut:#8a7660;--acc:#ff8a3d;--acc-d:#d9661f;--acc2:#ffb15c;--ink:#1d8e6c;--sur:#d9661f;--ear:#5869b5;--bad:#d64b3c;--gold:#f2b84b}
@@ -1672,6 +1672,7 @@ function spShow(el,t){let c=SP.chip;
   const keep=e=>e.preventDefault();let t0=null;c.addEventListener('pointerdown',keep);c.addEventListener('mousedown',keep);
   c.addEventListener('touchstart',e=>{const p=e.touches[0];t0=[p.clientX,p.clientY]},{passive:true});
   c.addEventListener('touchend',e=>{const p=e.changedTouches[0];if(!t0||Math.hypot(p.clientX-t0[0],p.clientY-t0[1])>12)return;t0=null;e.preventDefault();spApply()});c.addEventListener('click',spApply)}
+ if(!SP.cur||SP.cur.sug!==t.sug||SP.cur.s!==t.s)SP.at=Date.now();/* garde-fou : une suggestion qui vient d'apparaître ne prend pas un toucher destiné à autre chose */
  SP.el=el;SP.cur=t;c.lang=LANG;c.dir='auto';c.innerHTML=`<span>${esc(t.sug)}</span>`;c.setAttribute('aria-label',T('spFix',{w:t.sug}));
  if(!spPlace())return spHide();c.classList.add('on');clearInterval(SP.iv);SP.iv=setInterval(spPlace,500)}
 function spPlace(){const c=SP.chip,el=SP.el,t=SP.cur;if(!c||!t)return false;
@@ -1684,12 +1685,12 @@ function spPlace(){const c=SP.chip,el=SP.el,t=SP.cur;if(!c||!t)return false;
  const y=Math.round(up?r.top-8-ch:r.bottom+7);
  c.classList.toggle('up',up);c.style.transform='';c.style.left=x+'px';c.style.top=y+'px';c.style.setProperty('--ax',Math.max(12,Math.min(cw-12,wx-x))+'px');return true}
 function spHide(){clearInterval(SP.iv);SP.cur=null;if(SP.chip)SP.chip.classList.remove('on')}
-function spApply(){const el=SP.el,t=SP.cur;if(!el||!t||el.value.slice(t.s,t.e)!==t.raw)return spHide();spHide();
+function spApply(){const el=SP.el,t=SP.cur;if(!el||!t||el.value.slice(t.s,t.e)!==t.raw)return spHide();if(Date.now()-(SP.at||0)<700)return;spHide();
  const a=el.selectionStart,b=el.selectionEnd,d=t.sug.length-t.raw.length,fix=p=>p>=t.e?p+d:p>t.s?t.s+t.sug.length:p;
  let ok=false;if(document.activeElement===el){try{el.setSelectionRange(t.s,t.e);ok=document.execCommand('insertText',false,t.sug)&&el.value.slice(t.s,t.s+t.sug.length)===t.sug}catch(e){}}
  if(!ok){el.setRangeText(t.sug,t.s,t.e);el.dispatchEvent(new Event('input',{bubbles:true}))}
  try{el.setSelectionRange(fix(a),fix(b))}catch(e){}}
-document.addEventListener('focusin',e=>{const el=e.target;if(!spField(el))return;if(spellOn&&spLangOk())spWorker();spNative(el);spSoon(el,250)});
+document.addEventListener('focusin',e=>{const el=e.target;if(el&&el.matches&&el.matches('textarea,input[type=text],input:not([type])')&&!el.hasAttribute('autocomplete'))el.setAttribute('autocomplete','off');/* pas de remplissage auto du navigateur avec d'anciennes saisies */if(!spField(el))return;if(spellOn&&spLangOk())spWorker();spNative(el);spSoon(el,250)});
 document.addEventListener('focusout',e=>{if(e.target===SP.el)setTimeout(()=>{if(document.activeElement!==SP.el)spHide()},120)});
 document.addEventListener('input',e=>{const el=e.target;if(!spField(el))return;if(SP.cur&&SP.el===el&&el.value.slice(SP.cur.s,SP.cur.e)!==SP.cur.raw)spHide();spSoon(el)},true);
 document.addEventListener('keyup',e=>{if(spField(e.target)&&/^(Arrow|Home|End|Page)/.test(e.key))spSoon(e.target,300)});
@@ -2087,7 +2088,7 @@ function connectTo(id,onFail,ms=25000){
   else if(d.t=='chatslow')toast(T('chSlow'))
   else if(d.t=='g2wait')g2Waiting(d.host)
   else if(d.t=='moved'){done=true;hostConn=null;try{c.close()}catch(e){}connectTo(hid(joinCode,d.e),onFail)}
-  else if(d.t=='handoff'){st=d.st;migrate(d.to)}
+  else if(d.t=='handoff'){st=d.st;RCV=Date.now();RCVV=st.v;migrate(d.to)}
   else if(d.t=='closed'){st=null;toast(T('closed'));leave()}
   else if(d.t=='err'){toast(d.k?T(d.k):d.m);leave()}});
  c.on('close',()=>{if(hostConn!==c)return;if(!got)return fail();hostConn=null;if(st&&!migrating)migrate()})}
@@ -2142,6 +2143,9 @@ function becomeHost(p,e){
  if(st.phase=='question'&&st.cur)checkAll();
  if(st.phase=='end'){/* @qa2 : drapeaux anonymes perdus avec l'ancien hôte : à replanter */if(st.anon&&SECF.gid!==st.gid)for(const n in st.flags)if(st.flags[n]===true)st.flags[n]=false;if(MYFL.gid===st.gid&&!st.flags[me.name])gRestore(me.name,{fl:MYFL.v});gFlagsCheck(st)}
  /* @qa2 : marques de la vue filtrée (notes scellées, votes masqués) : perdues */(st.hist||[]).forEach(h=>{if(h.nt)for(const k in h.nt)if(h.nt[k]===1)delete h.nt[k];if(h.wo&&h.wo.v)for(const k in h.wo.v)if(h.wo.v[k]==='')delete h.wo.v[k]});if(st.cur&&st.cur.wo&&st.cur.wo.v)for(const k in st.cur.wo.v)if(st.cur.wo.v[k]==='')delete st.cur.wo.v[k];
+ /* horloges : les échéances viennent de l'horloge de l'ancien hôte → recalées sur la mienne (sinon le minuteur saute) */
+ {const sh=(RCV||Date.now())-(st.updatedAt||RCV||Date.now()),ok=v=>typeof v=='number'&&v>1.5e12&&v<2.6e12;
+  if(sh&&Math.abs(sh)<36e5){if(ok(st.dl))st.dl+=sh;const g=st.game;if(g)for(const k in g)if(ok(g[k]))g[k]+=sh}}
  toast(T('newHost',{n:me.name}));
  bump();window.armTimer&&armTimer();
  /* ceux qui ne sont pas revenus en 12 s passent hors ligne */

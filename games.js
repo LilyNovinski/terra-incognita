@@ -154,6 +154,12 @@ const GTn=W.GTn=(k,v,x)=>{const f=GT(k,{v,...(x||{})}).split('|');return f[Math.
 const gSg=v=>v>0?'+'+v:v<0?'−'+Math.abs(v):'0';
 const gP=v=>GTn('pts',gSg(+v||0)).replace(/^(\S+)/,'$1'),gPs=v=>GTn('ptsS',gSg(+v||0));
 const gRem=s=>{const g=s.game;return g&&g.dl>0?Math.max(0,(g.dl-((s.updatedAt||Date.now())+(Date.now()-(typeof RCV!='undefined'&&RCV||Date.now()))))/1000):0};
+/* ⏳ fin du temps : ce qui est écrit mais pas encore envoyé part quand même (une fois par étape, jamais un champ vide) */
+if(typeof document!='undefined')setInterval(()=>{try{if(typeof st=='undefined'||!st||st.phase!='game'||!st.game||document.hidden&&!isHost)return;const g=st.game,id=g.id+':'+g.k+':'+g.r;
+ if(GV.as===id)return;const r=gRem(isHost?GHide(meN(),st):st);if(!(g.dl>0)||r>1.6||r<=0)return;
+ const b=document.getElementById('gsend')||document.getElementById('gok');if(!b||b.disabled||!b.offsetParent)return;
+ const f=[...document.querySelectorAll('textarea[data-d],input[data-d]')].filter(x=>x.offsetParent&&x.type!='range');if(!f.length||!f.some(x=>x.value.trim()))return;
+ GV.as=id;b.click()}catch(e){}},300);
 const hideOwn=(o,n)=>{const r={};for(const k in o||{})r[k]=k==n?o[k]:null;return r};
 
 /* animations d'entrée : une seule fois par étape (clé jeu + g.k). Un nouveau rendu dans la même étape (offre, réaction,
