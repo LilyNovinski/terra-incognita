@@ -813,5 +813,16 @@ zh:{kwT:"用几个词概括你的回答",kwD:"免得大家忘记：这些词会�
 he:{kwT:"התשובה בכמה מילים",kwD:"כדי שאף אחד לא ישכח: המילים יישארו על המפה ויחזרו בסיכום הסופי. לא חובה.",kwPh2:"למשל: המרק של סבתא, ליסבון"},
 pt:{kwT:"Sua resposta em poucas palavras",kwD:"Para ninguém esquecer: as palavras ficam no mapa e voltam no resumo final. Opcional.",kwPh2:"ex.: a sopa da vó, Lisboa"}};
 for(const l in EXT_KW)if(I18N[l])Object.assign(I18N[l].ui,EXT_KW[l]);
+/* @i18n-spell : correcteur orthographique */
+const EXT_SPELL={fr:{spOn:"Correcteur orthographique activé",spOff:"Correcteur orthographique désactivé",spFix:"Remplacer par « {w} »"},
+en:{spOn:"Spell check on",spOff:"Spell check off",spFix:"Replace with “{w}”"},
+es:{spOn:"Corrector ortográfico activado",spOff:"Corrector ortográfico desactivado",spFix:"Sustituir por «{w}»"},
+it:{spOn:"Correttore ortografico attivo",spOff:"Correttore ortografico disattivato",spFix:"Sostituisci con «{w}»"},
+de:{spOn:"Rechtschreibprüfung an",spOff:"Rechtschreibprüfung aus",spFix:"Ersetzen durch „{w}“"},
+ru:{spOn:"Проверка орфографии включена",spOff:"Проверка орфографии выключена",spFix:"Заменить на «{w}»"},
+zh:{spOn:"拼写检查已开启",spOff:"拼写检查已关闭",spFix:"替换为「{w}」"},
+he:{spOn:"בדיקת איות פעילה",spOff:"בדיקת איות כבויה",spFix:"להחליף ב־״{w}״"},
+pt:{spOn:"Corretor ortográfico ativado",spOff:"Corretor ortográfico desativado",spFix:"Substituir por “{w}”"}};
+for(const l in EXT_SPELL)if(I18N[l])Object.assign(I18N[l].ui,EXT_SPELL[l]);
 
 /* fin */

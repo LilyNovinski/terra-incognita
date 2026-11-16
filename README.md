@@ -74,6 +74,10 @@ python -m http.server 8000
 
 Then open http://localhost:8000.
 
+## Credits
+
+The built-in spell checker (`spell.js`, word lists in `spell/`) uses word frequency lists from [FrequencyWords](https://github.com/hermitdave/FrequencyWords) by Hermit Dave, built from OpenSubtitles 2018, licensed [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). The lists in `spell/` are filtered and re-encoded versions of them, under the same licence.
+
 ---
 
 <p align="center">Made with care by Lily ♥ · free, for anyone who wants a good game</p>
