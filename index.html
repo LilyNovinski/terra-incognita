@@ -50,7 +50,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Rubik:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sacramento&text=by&display=swap">
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="i18n.js?v=20261116s"></script>
+<script src="i18n.js?v=20261116sp"></script>
 <script src="decks.js?v=5"></script>
 <script src="games.js?v=32"></script><!-- @games -->
 <script src="games-pools.js?v=3"></script><!-- @games -->
@@ -397,8 +397,8 @@ button:focus-visible,.reg:focus-visible,select:focus-visible{outline:3px solid #
 .dd.open .dd-l{opacity:1;visibility:visible;transform:none;transition:opacity .18s,transform .25s cubic-bezier(.3,1.4,.5,1)}
 .dd-l li{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 14px;border-radius:12px;cursor:pointer;font:600 15px Nunito,Rubik,system-ui,"Microsoft YaHei",sans-serif;color:var(--txt);transition:background .15s}
 .dd-l li:hover,.dd-l li:focus{background:#fff1db;outline:none}
-.dd-l li[aria-selected=true]{color:var(--acc-d);font-weight:800}
-.dd-l li[aria-selected=true]::after{content:"";width:16px;height:16px;flex:none;background:var(--acc);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='black' stroke-width='3.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='black' stroke-width='3.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
+.dd-l li[aria-selected=true],.dd-l li[aria-checked=true]{color:var(--acc-d);font-weight:800}
+.dd-l li[aria-selected=true]::after,.dd-l li[aria-checked=true]::after{content:"";width:16px;height:16px;flex:none;background:var(--acc);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='black' stroke-width='3.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='black' stroke-width='3.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
 /* bulles d'aide sur mesure */
 @media (hover:hover){
  [data-tip]{position:relative}
@@ -743,27 +743,35 @@ body::before{display:none}
 [data-theme=dark] .thm .i-sun{opacity:1;transform:none}
 .langbar .thm{width:36px;height:36px;margin-inline-end:auto;color:var(--acc-d);background:linear-gradient(180deg,#fffdf7,#fff1db);border:2px solid var(--edge);box-shadow:0 3px 0 var(--edge2)}
 .langbar .thm:hover{border-color:var(--edge2)}
-/* --- correcteur orthographique : bouton (à côté du jour/nuit) et suggestion unique sous le mot --- */
+/* --- correcteur orthographique : bouton (à côté du jour/nuit) → menu des modes ; barre de suggestions posée dans une zone libre --- */
 .spk-t{position:relative;color:#ffe2a6}
 .spk-t svg{width:24px;height:24px;overflow:visible}
-.spk-t .spk-x{opacity:0;transition:opacity .25s}
-.spk-t .spk-v{transition:opacity .25s}
-.spk-t[aria-pressed=false] svg{opacity:.55}.spk-t[aria-pressed=false] .spk-x{opacity:1}.spk-t[aria-pressed=false] .spk-v{opacity:0}
+.spk-t[data-mode=off] svg{opacity:.55}
+.spk-t[aria-expanded=true]::after{display:none}
 .langbar .thm:has(+.spk-t){margin-inline-end:0}
 .langbar .spk-t{width:36px;height:36px;margin-inline-end:auto;color:var(--acc-d);background:linear-gradient(180deg,#fffdf7,#fff1db);border:2px solid var(--edge);box-shadow:0 3px 0 var(--edge2)}
 .langbar .spk-t:hover{border-color:var(--edge2)}
-#spk{position:fixed;left:0;top:0;z-index:62;display:flex;align-items:center;gap:6px;min-height:30px;max-width:min(70vw,320px);padding:3px 12px 4px;border-radius:999px;
- font:700 14.5px Nunito,Rubik,system-ui,"Microsoft YaHei",sans-serif;color:var(--acc-d);background:var(--paper);border:1.5px solid var(--edge);
- box-shadow:0 2px 0 var(--edge2),0 6px 16px #0e58661f;cursor:pointer;white-space:nowrap;touch-action:manipulation;-webkit-tap-highlight-color:transparent;
- opacity:0;transform:translateY(-3px);transition:opacity .16s,transform .16s;pointer-events:none}
+#spm{position:fixed;top:0;left:0;inset-inline-end:auto;z-index:70;min-width:230px;max-width:calc(100vw - 16px);transform-origin:top left}
+#spm.on{opacity:1;visibility:visible;transform:none;transition:opacity .18s,transform .25s cubic-bezier(.3,1.4,.5,1)}
+#spm li{justify-content:flex-start;gap:12px;padding:9px 12px}
+#spm .spm-i{flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:10px;background:var(--paper2);color:var(--acc-d)}
+#spm .spm-i svg{width:22px;height:22px;overflow:visible}
+#spm .spm-t{flex:1;display:flex;flex-direction:column;line-height:1.2}
+#spm .spm-t small{font:600 12.5px Nunito,Rubik,system-ui,"Microsoft YaHei",sans-serif;color:var(--mut);margin-top:2px}
+#spk{position:fixed;left:0;top:0;z-index:62;display:flex;align-items:stretch;min-height:38px;padding:3px;border-radius:14px;box-sizing:border-box;
+ font:700 15px Nunito,Rubik,system-ui,"Microsoft YaHei",sans-serif;color:var(--txt);background:var(--paper);border:1.5px solid var(--edge);
+ box-shadow:0 2px 0 var(--edge2),0 8px 20px #0e586626;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;
+ opacity:0;transform:translateY(-3px);transition:opacity .14s,transform .14s;pointer-events:none}
 #spk.on{opacity:1;transform:none;pointer-events:auto}
-#spk.up{transform:translateY(3px)}#spk.up.on{transform:none}
-#spk span{overflow:hidden;text-overflow:ellipsis}
-#spk svg{flex:none;width:13px;height:13px;opacity:.7}
-#spk::before{content:"";position:absolute;left:var(--ax,16px);top:-5px;width:8px;height:8px;margin-left:-4px;background:inherit;border:inherit;border-right:0;border-bottom:0;border-radius:2px 0 0;transform:rotate(45deg)}
-#spk.up::before{top:auto;bottom:-5px;transform:rotate(225deg)}
-#spk:hover{border-color:var(--acc2)}
-@media (prefers-reduced-motion:reduce){#spk{transition:none}}
+#spk button{all:unset;box-sizing:border-box;position:relative;flex:1 1 auto;min-width:0;padding:6px 10px;border-radius:10px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;transition:background .12s,opacity .12s}
+#spk button+button::before{content:"";position:absolute;inset-inline-start:0;top:24%;bottom:24%;width:1.5px;background:var(--edge);border-radius:1px}
+#spk button:hover,#spk button:active{background:var(--paper2)}
+#spk button:focus-visible{outline:3px solid #ff8a3d88;outline-offset:-2px}
+#spk .best{color:var(--acc-d)}
+#spk .keep{color:var(--mut);font-weight:600}
+#spk.one{border-radius:999px;min-height:34px}#spk.one button{flex:none;max-width:min(70vw,300px);border-radius:999px;padding:5px 14px}
+#spk.stale button{opacity:.4}
+@media (prefers-reduced-motion:reduce){#spk,#spm{transition:none}}
 ::view-transition-old(root),::view-transition-new(root){animation-duration:.45s}
 /* ===== mode nuit sous l'eau ===== */
 [data-theme=dark]{color-scheme:dark;--sea1:#1d4f6e;--sea2:#0a213d;--deep:#8fd6dc;--deep2:#030b17;--paper:#132a3e;--paper2:#0f2335;--edge:#26475f;--edge2:#06121f;--txt:#ece3cf;--mut:#93a8b6;--acc:#ff8a3d;--acc-d:#d9661f;--acc2:#ffad5c;--ink:#5ad8ae;--sur:#ffa066;--ear:#a6b3ff;--bad:#ff7d6c;--gold:#f5c76c}
@@ -786,7 +794,7 @@ body::before{display:none}
 [data-theme=dark] ::selection{background:#8a4b22;color:#fff}
 [data-theme=dark] *{scrollbar-color:#2c4c66 transparent}
 [data-theme=dark] ::-webkit-scrollbar-thumb{background:#2c4c66;background-clip:padding-box}
-[data-theme=dark] .who,[data-theme=dark] .sel,[data-theme=dark] .dd-l li[aria-selected=true],[data-theme=dark] .gauge span,[data-theme=dark] #gprog.last b,[data-theme=dark] .tmr.low b{color:#ffab6e}
+[data-theme=dark] .who,[data-theme=dark] .sel,[data-theme=dark] .dd-l li[aria-selected=true],[data-theme=dark] .dd-l li[aria-checked=true],[data-theme=dark] .gauge span,[data-theme=dark] #gprog.last b,[data-theme=dark] .tmr.low b{color:#ffab6e}
 [data-theme=dark] .sel{background:#3a2a20!important}
 [data-theme=dark] .t-ink{background:#11443a;color:#72e2bd}[data-theme=dark] .t-sur{background:#4a2b18;color:#ffb37f}[data-theme=dark] .t-ear{background:#252f5e;color:#b3beff}[data-theme=dark] .t-door{background:#2b3541;color:#b8ae9f}
 [data-theme=dark] .dot{box-shadow:0 0 0 2px var(--paper),inset 0 -2px 3px #0003}
@@ -802,7 +810,7 @@ body::before{display:none}
 [data-theme=dark] .langbar select,[data-theme=dark] .dd-b,[data-theme=dark] .langbar .thm{background:linear-gradient(180deg,#1a344d,#142b41)}
 [data-theme=dark] .langbar .thm{color:#ffd58a}
 [data-theme=dark] .langbar .spk-t{background:linear-gradient(180deg,#1a344d,#142b41);color:#ffd58a}
-[data-theme=dark] #spk{color:#ffab6e;background:#132a3e;box-shadow:0 2px 0 var(--edge2),0 8px 20px #0008}
+[data-theme=dark] #spk{background:#132a3e;box-shadow:0 2px 0 var(--edge2),0 8px 20px #0008}[data-theme=dark] #spk .best,[data-theme=dark] #spm .spm-i{color:#ffab6e}[data-theme=dark] #spk button:hover,[data-theme=dark] #spk button:active{background:#1e3b56}
 [data-theme=dark] .dd-l{background:#13293d;box-shadow:0 14px 34px #000a,0 3px 0 var(--edge2)}
 [data-theme=dark] .dd-l li:hover,[data-theme=dark] .dd-l li:focus{background:#1e3b56}
 [data-theme=dark] input[type=checkbox]{background:linear-gradient(180deg,#10253a,#0b1c2d)}
@@ -1609,96 +1617,185 @@ document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest
 try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',e=>{if(LS.get('terra:theme',null)==null)setTheme(e.matches?'dark':'light')})}catch(e){}
 setTheme(document.documentElement.dataset.theme=='dark'?'dark':'light');
 /* === correcteur orthographique ===
-   léger et discret : au plus une suggestion, posée sous le champ à l'aplomb du mot ; un clic/toucher remplace, sinon on l'ignore.
-   Ne vole jamais le focus, ne touche jamais au texte sans clic. Calcul dans un Web Worker (spell.js) ; dictionnaire
-   de la seule langue courante, chargé à la première saisie (spell/<langue>.txt). Pas de chinois (pas de mots séparés). */
+   Trois modes, choisis par le bouton abc (petit menu) et mémorisés (terra:spell) :
+   « Suggestions » (défaut) : barre de 3 propositions façon iPhone pour le mot en cours de frappe (complétion + correction,
+     le mot tapé au milieu entre guillemets pour le garder), pour un mot sélectionné, ou pour un mot touché/fautif ;
+   « Discret » : au plus une proposition, pour un mot fini fautif ; « Désactivé ».
+   Sûreté (« des mots qu'on n'a pas écrits ») : rien ne touche au texte sans un geste explicite commencé ET fini sur la barre ;
+   la barre se pose dans une zone libre (sous/au-dessus du champ ou au-dessus du clavier, dans la partie visible) et ne recouvre
+   JAMAIS un bouton, un lien, un champ ni rien de cliquable — sinon elle ne s'affiche pas ; elle n'accepte un toucher qu'une fois
+   restée immobile 400 ms ; elle ne remplace que le mot exact qu'elle affiche (sinon elle s'éteint). Ne vole jamais le focus.
+   Calcul dans un Web Worker (spell.js) ; dictionnaire de la seule langue courante, chargé à la première saisie
+   (spell/<langue>.txt). Pas de chinois (pas de mots séparés). */
 const SPV=1;/* version des dictionnaires spell/*.txt */
-let spellOn=LS.get('terra:spell',true)!==false;
-const SP={w:null,lang:null,ready:null,id:0,el:null,cur:null,ign:new Set(),t:0,chip:null,mir:null,iv:0};
+const SPMODES=['sug','soft','off'];
+let spMode=(v=>v===false?'off':SPMODES.includes(v)?v:'sug')(LS.get('terra:spell','sug'));
+if(LS.get('terra:spell',null)!=null&&LS.get('terra:spell',null)!==spMode)LS.set('terra:spell',spMode);/* ancien booléen → mode */
+const SP={w:null,lang:null,ready:null,id:0,cur:null,ign:new Set(),t:0,bar:null,mir:null,iv:0,at:0,pos:'',down:null,q:null,stale:false,typed:false,last:null};
 const spLangOk=()=>LANG!='zh';
+const spActive=()=>spMode!='off'&&spLangOk();
 const spField=el=>!!(el&&el.matches&&el.matches('textarea,input:not([type]),input[type=text],input[type=search]')&&!el.matches('#nm,#code,.codein,.ch-gq,[data-nospell]')&&!el.readOnly&&!el.disabled);
-function spBtn(){if(!spLangOk())return '';const l=esc(T(spellOn?'spOn':'spOff')),a={ru:'абв',he:'אבג'}[LANG]||'abc';
- return `<button class="icon spk-t" type="button" data-spk aria-pressed="${spellOn}" data-tip="${l}" aria-label="${l}"><svg viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="12" text-anchor="middle" font-size="9.5" font-weight="800" font-family="Nunito,Rubik,system-ui,sans-serif" fill="currentColor">${a}</text><path class="spk-v" d="M7.5 16.6l3 2.9 6.3-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path class="spk-x" d="M5 20.5 19 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>`}
-function spSet(on){spellOn=on;LS.set('terra:spell',on);const l=T(on?'spOn':'spOff');
- $$('[data-spk]').forEach(b=>{b.setAttribute('aria-pressed',on);b.dataset.tip=l;b.setAttribute('aria-label',l)});toast(l);
- if(!on)spHide();const a=document.activeElement;if(spField(a)){spNative(a);if(on)spSoon(a,60)}}
-document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-spk]');if(b)spSet(!spellOn)});
+/* --- bouton et menu des modes --- */
+const SPICO={sug:'<path d="M3.5 20h4.6M9.7 20h4.6M15.9 20h4.6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>',
+ soft:'<path d="M7.5 16.6l3 2.9 6.3-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
+ off:'<path d="M5 20.5 19 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'};
+function spIco(m){const a={ru:'абв',he:'אבג'}[LANG]||'abc';
+ return `<svg viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="${m=='sug'?11.5:12}" text-anchor="middle" font-size="9.5" font-weight="800" font-family="Nunito,Rubik,system-ui,sans-serif" fill="currentColor">${a}</text>${SPICO[m]}</svg>`}
+const spTip=()=>T('spTitle')+' · '+T('spM_'+spMode);
+function spBtn(){if(!spLangOk())return '';const l=esc(spTip());
+ return `<button class="icon spk-t" type="button" data-spk data-mode="${spMode}" aria-haspopup="menu" aria-expanded="false" data-tip="${l}" aria-label="${l}">${spIco(spMode)}</button>`}
+function spMenu(btn){let m=$('#spm');if(m&&m.classList.contains('on')&&m._b===btn)return spMenuClose(true);
+ if(!m){m=document.createElement('ul');m.id='spm';m.className='dd-l';m.setAttribute('role','menu');document.body.appendChild(m);
+  m.addEventListener('click',e=>{const li=e.target.closest('li');if(li)spPick(li.dataset.m)});
+  m.addEventListener('keydown',e=>{const it=[...m.querySelectorAll('li')],i=it.indexOf(document.activeElement);
+   if(e.key=='ArrowDown'){e.preventDefault();(it[i+1]||it[0]).focus()}else if(e.key=='ArrowUp'){e.preventDefault();(it[i-1]||it.at(-1)).focus()}
+   else if(e.key=='Home'){e.preventDefault();it[0].focus()}else if(e.key=='End'){e.preventDefault();it.at(-1).focus()}
+   else if(e.key=='Enter'||e.key==' '){e.preventDefault();i>=0&&spPick(it[i].dataset.m)}else if(e.key=='Escape'||e.key=='Tab'){e.preventDefault();spMenuClose(true)}})}
+ if(m._b&&m._b!==btn)m._b.setAttribute('aria-expanded','false');
+ m._b=btn;m.lang=LANG;m.dir=LANG=='he'?'rtl':'ltr';m.setAttribute('aria-label',T('spTitle'));
+ m.innerHTML=SPMODES.map(k=>`<li role="menuitemradio" tabindex="-1" data-m="${k}" aria-checked="${k==spMode}"><span class="spm-i">${spIco(k)}</span><span class="spm-t"><b>${esc(T('spM_'+k))}</b><small>${esc(T('spD_'+k))}</small></span></li>`).join('');
+ const r=btn.getBoundingClientRect(),W=document.documentElement.clientWidth,H=innerHeight,mw=m.offsetWidth,mh=m.offsetHeight,rtl=m.dir=='rtl';
+ let x=rtl?r.right-mw:r.left;x=Math.max(8,Math.min(x,W-8-mw));let y=r.bottom+8;if(y+mh>H-8&&r.top-8-mh>8)y=r.top-8-mh;
+ m.style.left=Math.round(x)+'px';m.style.top=Math.round(Math.max(8,y))+'px';m.style.transformOrigin=(rtl?'right ':'left ')+(y<r.top?'bottom':'top');
+ m.classList.add('on');btn.setAttribute('aria-expanded','true');(m.querySelector('[aria-checked=true]')||m.firstChild).focus({preventScroll:true})}
+function spMenuClose(refocus){const m=$('#spm');if(!m||!m.classList.contains('on'))return;m.classList.remove('on');const b=m._b;
+ if(b){b.setAttribute('aria-expanded','false');if(refocus&&b.isConnected)b.focus({preventScroll:true})}}
+function spPick(k){spMenuClose(true);if(SPMODES.includes(k))spSetMode(k)}
+function spSetMode(k){spMode=k;LS.set('terra:spell',k);const l=spTip();
+ $$('[data-spk]').forEach(b=>{b.dataset.mode=k;b.innerHTML=spIco(k);b.dataset.tip=l;b.setAttribute('aria-label',l)});toast(l);
+ spHide();SP.q=null;const a=SP.last;if(a&&a.isConnected&&spField(a)){spNative(a);if(spActive())spWorker()}}
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-spk]');if(b)spMenu(b)});
+document.addEventListener('pointerdown',e=>{const m=$('#spm');if(m&&m.classList.contains('on')&&!m.contains(e.target)&&!(e.target.closest&&e.target.closest('[data-spk]')))spMenuClose(false)},true);
+addEventListener('resize',()=>spMenuClose(false));
 /* le soulignement natif du navigateur ferait doublon : coupé quand le nôtre veille */
-const spNative=el=>{el.spellcheck=!(spellOn&&spLangOk()&&SP.w)};
-function spWorker(){if(SP.w===null){try{SP.w=new Worker('spell.js?v=1');SP.w.onmessage=spMsg;SP.w.onerror=()=>{SP.w=false;spHide()}}catch(e){SP.w=false}}
+const spNative=el=>{el.spellcheck=!(spActive()&&SP.w)};
+function spWorker(){if(SP.w===null){try{SP.w=new Worker('spell.js?v=2');SP.w.onmessage=spMsg;SP.w.onerror=()=>{SP.w=false;spHide()}}catch(e){SP.w=false}}
  if(SP.w&&SP.lang!==LANG){SP.lang=LANG;SP.ready=null;SP.w.postMessage({lang:LANG,v:SPV})}return SP.w}
-function spMsg(e){const m=e.data;if(m.ready){if(m.ready==SP.lang){SP.ready=m.ready;const a=document.activeElement;if(spField(a))spSoon(a,50)}return}
- if(m.fail){if(m.fail==SP.lang)SP.ready=false;return}
- if(m.id!==SP.id||m.lang!==LANG)return;const q=SP.q;if(!q||document.activeElement!==q.el)return;
- for(const t of q.toks){const s=m.res[t.raw];if(!s||q.el.value.slice(t.s,t.e)!==t.raw)continue;
-  let sug=s;if(/^\p{Lu}/u.test(t.raw))sug=s[0].toLocaleUpperCase(LANG)+s.slice(1);if(sug===t.raw)continue;
-  return spShow(q.el,{...t,sug})}
- spHide()}
+/* --- quels mots regarder --- */
+const spL=c=>!!c&&/[\p{L}\p{M}]/u.test(c);
 const spMin=()=>LANG=='he'||LANG=='ru'?3:4;
 const spScript=()=>LANG=='ru'?/^[\p{Script=Cyrillic}\p{M}]+$/u:LANG=='he'?/^[\p{Script=Hebrew}\p{M}]+$/u:/^[\p{Script=Latin}\p{M}]+$/u;
 function spNames(){const s=new Set();const add=n=>String(n||'').toLowerCase().split(/[^\p{L}\p{M}]+/u).forEach(x=>x&&s.add(x));
  try{add(me&&me.name);(st&&st.players||[]).forEach(p=>add(p.name));Object.keys(GMEM).forEach(add)}catch(e){}return s}
-/* mots à vérifier : les 3 derniers mots finis avant le curseur (+ celui en cours après une vraie pause) */
+/* un mot à laisser tranquille : noms des joueurs, sigles, nombres, liens, @pseudo, e-mails, noms propres en milieu de phrase */
+function spSkip(v,t,names,min){const w=t.raw;
+ if(w.length<min||!spScript().test(w)||SP.ign.has(w.toLowerCase())||names.has(w.toLowerCase()))return true;
+ if(w.length>1&&w===w.toUpperCase()&&w!==w.toLowerCase())return true;/* SIGLES */
+ if(/(.)\1\1/u.test(w))return true;/* « ouiiii » */
+ const L=v.slice(0,t.s),R=v.slice(t.e),chunk=(L.match(/\S*$/)[0]+w+R.match(/^\S*/)[0]).replace(/^[(\[«“"'‘¿¡]+|[.,!?;:…)\]»”"'’]+$/gu,'');
+ if(/[\d@#_/\\=:.]|www|http/iu.test(chunk.replace(/['’\-]/g,'')))return true;/* liens, @pseudo, nombres, e-mails */
+ if(LANG=='he'&&/['׳״"]/.test(chunk))return true;/* sigles et sons étrangers hébreux */
+ if(LANG!='de'&&/^\p{Lu}/u.test(w)&&!/(^|[.!?…:;\n«»"“”(]\s*)$/u.test(L)&&!/^\s*$/.test(L))return true;/* nom propre en milieu de phrase */
+ return false}
+/* les 3 derniers mots finis avant le curseur (+ celui en cours si demandé) */
 function spToks(el,withCur){const v=el.value,c=el.selectionStart==null?v.length:el.selectionStart,re=/[\p{L}\p{M}]+/gu,all=[];let m;
  while((m=re.exec(v))){if(m.index>=c)break;all.push({raw:m[0],s:m.index,e:m.index+m[0].length})}
- const names=spNames(),sc=spScript(),out=[];
- for(let i=all.length-1;i>=0&&out.length<3;i--){const t=all[i],w=t.raw;
-  if(t.e>=c&&!withCur)continue;
-  if(w.length<spMin()||!sc.test(w)||SP.ign.has(w.toLowerCase())||names.has(w.toLowerCase()))continue;
-  if(w.length>1&&w===w.toUpperCase()&&w!==w.toLowerCase())continue;/* SIGLES */
-  if(/(.)\1\1/u.test(w))continue;/* « ouiiii » */
-  const L=v.slice(0,t.s),R=v.slice(t.e),chunk=(L.match(/\S*$/)[0]+w+R.match(/^\S*/)[0]).replace(/^[(\[«“"'‘¿¡]+|[.,!?;:…)\]»”"'’]+$/gu,'');
-  if(/[\d@#_/\\=:.]|www|http/iu.test(chunk.replace(/['’\-]/g,'')))continue;/* liens, @pseudo, nombres, e-mails */
-  if(LANG=='he'&&/['׳״"]/.test(chunk))continue;/* sigles et sons étrangers hébreux */
-  if(LANG!='de'&&/^\p{Lu}/u.test(w)&&!/(^|[.!?…:;\n«»"“”(]\s*)$/u.test(L)&&!/^\s*$/.test(L))continue;/* nom propre en milieu de phrase */
-  out.push(t)}
+ const names=spNames(),out=[];
+ for(let i=all.length-1;i>=0&&out.length<3;i--){const t=all[i];if(t.e>=c&&!withCur)continue;if(!spSkip(v,t,names,spMin()))out.push({...t,kind:'fix'})}
  return out}
-function spSoon(el,ms){clearTimeout(SP.t);if(!spellOn||!spLangOk())return;
- SP.t=setTimeout(()=>{if(document.activeElement!==el)return;spRun(el,false);clearTimeout(SP.t);SP.t=setTimeout(()=>document.activeElement===el&&spRun(el,true),1100)},ms==null?420:ms)}
-function spRun(el,withCur){if(!spellOn||!spLangOk()||!spWorker())return spHide();spNative(el);if(SP.ready!==LANG)return;
- const toks=spToks(el,withCur);if(!toks.length){if(!withCur)spHide();return}
- if(SP.cur&&SP.el===el&&toks.some(t=>t.s===SP.cur.s&&t.raw===SP.cur.raw)&&el.value.slice(SP.cur.s,SP.cur.e)===SP.cur.raw)return;/* déjà affichée */
- SP.q={el,toks};SP.w.postMessage({id:++SP.id,words:toks.map(t=>t.raw)})}
-/* position du mot dans le champ : copie invisible du champ (même police, mêmes marges, même retour à la ligne) */
+/* mode Suggestions : mot sélectionné, mot en cours (curseur collé à sa fin après frappe), mot touché (curseur dedans), sinon derniers mots finis */
+function spTargets(el){const v=el.value,a=el.selectionStart,z=el.selectionEnd;if(a==null)return [];const names=spNames();
+ if(a!==z){const seg=v.slice(a,z),m=seg.match(/^\s*([\p{L}\p{M}]+)\s*$/u);if(!m)return [];const s=a+seg.indexOf(m[1]),t={raw:m[1],s,e:s+m[1].length,kind:'sel'};
+  return spL(v[t.s-1])||spL(v[t.e])||spSkip(v,t,names,2)?[]:[t]}
+ let s=a,e=a;while(s>0&&spL(v[s-1]))s--;while(e<v.length&&spL(v[e]))e++;
+ if(e>s){const t={raw:v.slice(s,e),s,e,kind:a===e&&SP.typed?'cur':'tap'};return spSkip(v,t,names,t.kind=='cur'?2:spMin())?[]:[t]}
+ return spToks(el,false)}
+/* le mot visé est-il encore exactement là ? (sinon une proposition ne doit plus rien remplacer) */
+const spValid=t=>!!t&&t.el.isConnected&&t.el.value.slice(t.s,t.e)===t.raw&&!spL(t.el.value[t.s-1])&&!spL(t.el.value[t.e]);
+function spSoon(el,ms){clearTimeout(SP.t);if(!spActive())return;
+ SP.t=setTimeout(()=>{if(document.activeElement!==el)return;spRun(el,false);
+  if(spMode=='soft'){clearTimeout(SP.t);SP.t=setTimeout(()=>document.activeElement===el&&spRun(el,true),1100)}},ms==null?(spMode=='sug'?110:420):ms)}
+function spRun(el,withCur){if(!spActive()||!spWorker())return spHide();spNative(el);if(SP.ready!==LANG)return;
+ const toks=spMode=='sug'?spTargets(el):spToks(el,withCur);
+ if(!toks.length){if(!withCur)spHide();return}
+ const c=SP.cur;if(c&&c.el===el&&!SP.stale&&spValid(c)&&toks.some(t=>t.s===c.s&&t.raw===c.raw&&t.kind===c.kind))return;/* déjà affichée */
+ toks.forEach(t=>t.el=el);SP.q={toks,mode:spMode};
+ SP.w.postMessage(spMode=='sug'?{id:++SP.id,q:toks.map(t=>({w:t.raw,cur:t.kind=='cur'})),n:3}:{id:++SP.id,words:toks.map(t=>t.raw)})}
+function spMsg(e){const m=e.data;if(m.ready){if(m.ready==SP.lang){SP.ready=m.ready;const a=document.activeElement;if(spField(a))spSoon(a,50)}return}
+ if(m.fail){if(m.fail==SP.lang)SP.ready=false;return}
+ if(m.id!==SP.id||m.lang!==LANG)return;const q=SP.q;if(!q||q.mode!==spMode)return;
+ for(let i=0;i<q.toks.length;i++){const t=q.toks[i];if(document.activeElement!==t.el||!spValid(t))continue;
+  if(m.res){const s=m.res[t.raw];if(!s)continue;let sug=s;if(/^\p{Lu}/u.test(t.raw))sug=s[0].toLocaleUpperCase(LANG)+s.slice(1);if(sug===t.raw)continue;
+   return spShow({...t,sugs:[sug]})}
+  const r=m.out&&m.out[i];if(!r||!r.s.length)continue;
+  if((t.kind=='fix'||t.kind=='tap')&&r.k)continue;/* mot fini ou touché : seulement s'il est fautif */
+  return spShow({...t,sugs:r.s})}
+ spHide()}
+/* --- la barre --- */
+function spBarEl(){let b=SP.bar;if(b)return b;b=SP.bar=document.createElement('div');b.id='spk';b.setAttribute('role','toolbar');document.body.appendChild(b);
+ /* jamais de focus pris au champ (le clavier du téléphone reste ouvert) ; un geste ne compte que s'il commence sur une barre posée depuis 400 ms */
+ b.addEventListener('pointerdown',e=>{e.preventDefault();const k=e.target.closest('button');SP.down=k?{k,ok:b.classList.contains('on')&&!SP.stale&&Date.now()-SP.at>=400,x:e.clientX,y:e.clientY}:null});
+ b.addEventListener('mousedown',e=>e.preventDefault());
+ b.addEventListener('touchend',e=>{const d=SP.down,p=e.changedTouches[0];if(!d)return;e.preventDefault();SP.down=null;
+  const k=document.elementFromPoint(p.clientX,p.clientY);if(d.ok&&k&&k.closest('button')===d.k&&Math.hypot(p.clientX-d.x,p.clientY-d.y)<14)spUse(d.k)});
+ b.addEventListener('click',e=>{const k=e.target.closest('button'),d=SP.down;SP.down=null;if(!k)return;
+  if(e.detail===0||(d&&d.k===k&&d.ok))spUse(k)});
+ return b}
+function spShow(t){const b=spBarEl(),sug=spMode=='sug',ss=t.sugs;let items;
+ if(!sug)items=[{w:ss[0],i:0}];
+ else if(t.kind=='sel')items=ss.slice(0,3).map((w,i)=>({w,i}));
+ else{items=[{w:ss[0],i:0},{keep:1}];if(ss[1])items.push({w:ss[1],i:1})}
+ const html=items.map((x,n)=>x.keep?`<button type="button" tabindex="-1" class="keep" data-keep aria-label="${esc(T('spKeep',{w:t.raw}))}" aria-keyshortcuts="Alt+${n+1}">${esc(T('spQ',{w:t.raw}))}</button>`
+  :`<button type="button" tabindex="-1" class="${x.i==0?'best':''}" data-w="${esc(x.w)}" aria-label="${esc(T('spFix',{w:x.w}))}" aria-keyshortcuts="Alt+${n+1}">${esc(x.w)}</button>`).join('');
+ const same=!!SP.cur&&b.classList.contains('on')&&SP.cur.el===t.el;
+ SP.cur=t;SP.stale=false;b.classList.remove('stale');b.classList.toggle('one',!sug);b.lang=LANG;b.dir=LANG=='he'?'rtl':'ltr';b.setAttribute('aria-label',T('spBar'));
+ if(b._h!==html){b.innerHTML=html;b._h=html;SP.at=Math.max(SP.at,Date.now()-150)}/* contenu changé : 250 ms avant d'accepter un toucher */
+ if(!same)SP.pos='';
+ if(!spPlace())return spHide();b.classList.add('on');clearInterval(SP.iv);SP.iv=setInterval(spPlace,400)}
+/* position du mot dans le champ (mode Discret, pour viser le mot) : copie invisible du champ */
 function spWordBox(el,t){let m=SP.mir;if(!m){m=SP.mir=document.createElement('div');m.setAttribute('aria-hidden','true');document.body.appendChild(m)}
  const cs=getComputedStyle(el),ta=el.tagName=='TEXTAREA';
  m.style.cssText='position:fixed;left:-9999px;top:0;visibility:hidden;overflow:hidden;pointer-events:none;'+['boxSizing','width','paddingTop','paddingRight','paddingBottom','paddingLeft','borderTopWidth','borderRightWidth','borderBottomWidth','borderLeftWidth','borderStyle','fontFamily','fontSize','fontWeight','fontStyle','letterSpacing','lineHeight','textTransform','textIndent','wordSpacing','tabSize','direction','textAlign']
   .map(k=>k.replace(/[A-Z]/g,c=>'-'+c.toLowerCase())+':'+cs[k]).join(';')+';white-space:'+(ta?'pre-wrap':'pre')+';overflow-wrap:'+(ta?'break-word':'normal')+';height:auto';
  const v=el.value,sp=document.createElement('span');sp.textContent=t.raw;m.textContent=v.slice(0,t.s);m.appendChild(sp);m.appendChild(document.createTextNode(v.slice(t.e)||'.'));
  return {x:sp.offsetLeft-el.scrollLeft,y:sp.offsetTop-el.scrollTop,w:sp.offsetWidth,h:sp.offsetHeight}}
-function spShow(el,t){let c=SP.chip;
- if(!c){c=SP.chip=document.createElement('button');c.type='button';c.id='spk';c.tabIndex=-1;document.body.appendChild(c);
-  /* jamais de focus pris au champ (le clavier du téléphone reste ouvert) */
-  const keep=e=>e.preventDefault();let t0=null;c.addEventListener('pointerdown',keep);c.addEventListener('mousedown',keep);
-  c.addEventListener('touchstart',e=>{const p=e.touches[0];t0=[p.clientX,p.clientY]},{passive:true});
-  c.addEventListener('touchend',e=>{const p=e.changedTouches[0];if(!t0||Math.hypot(p.clientX-t0[0],p.clientY-t0[1])>12)return;t0=null;e.preventDefault();spApply()});c.addEventListener('click',spApply)}
- if(!SP.cur||SP.cur.sug!==t.sug||SP.cur.s!==t.s)SP.at=Date.now();/* garde-fou : une suggestion qui vient d'apparaître ne prend pas un toucher destiné à autre chose */
- SP.el=el;SP.cur=t;c.lang=LANG;c.dir='auto';c.innerHTML=`<span>${esc(t.sug)}</span>`;c.setAttribute('aria-label',T('spFix',{w:t.sug}));
- if(!spPlace())return spHide();c.classList.add('on');clearInterval(SP.iv);SP.iv=setInterval(spPlace,500)}
-function spPlace(){const c=SP.chip,el=SP.el,t=SP.cur;if(!c||!t)return false;
- if(!el.isConnected||document.activeElement!==el||el.value.slice(t.s,t.e)!==t.raw||!spellOn||c.lang!==LANG){spHide();return false}
- const r=el.getBoundingClientRect(),b=spWordBox(el,t),vv=window.visualViewport,vt=vv?vv.offsetTop:0,vb=vv?vv.offsetTop+vv.height:innerHeight,W=document.documentElement.clientWidth;
- const bl=parseFloat(getComputedStyle(el).borderLeftWidth)||0,bt=parseFloat(getComputedStyle(el).borderTopWidth)||0;
- const wy=r.top+bt+b.y;if(wy+b.h<r.top-2||wy>r.bottom+2)return false;/* mot sorti de la zone visible du champ */
- const cw=c.offsetWidth||80,ch=c.offsetHeight||30,wx=r.left+bl+b.x+b.w/2;
- let x=Math.round(Math.max(8,Math.min(wx-Math.min(22,cw/2),W-8-cw))),up=r.bottom+8+ch>vb-4&&r.top-8-ch>vt+4;
- const y=Math.round(up?r.top-8-ch:r.bottom+7);
- c.classList.toggle('up',up);c.style.transform='';c.style.left=x+'px';c.style.top=y+'px';c.style.setProperty('--ax',Math.max(12,Math.min(cw-12,wx-x))+'px');return true}
-function spHide(){clearInterval(SP.iv);SP.cur=null;if(SP.chip)SP.chip.classList.remove('on')}
-function spApply(){const el=SP.el,t=SP.cur;if(!el||!t||el.value.slice(t.s,t.e)!==t.raw)return spHide();if(Date.now()-(SP.at||0)<700)return;spHide();
- const a=el.selectionStart,b=el.selectionEnd,d=t.sug.length-t.raw.length,fix=p=>p>=t.e?p+d:p>t.s?t.s+t.sug.length:p;
- let ok=false;if(document.activeElement===el){try{el.setSelectionRange(t.s,t.e);ok=document.execCommand('insertText',false,t.sug)&&el.value.slice(t.s,t.s+t.sug.length)===t.sug}catch(e){}}
- if(!ok){el.setRangeText(t.sug,t.s,t.e);el.dispatchEvent(new Event('input',{bubbles:true}))}
- try{el.setSelectionRange(fix(a),fix(b))}catch(e){}}
-document.addEventListener('focusin',e=>{const el=e.target;if(el&&el.matches&&el.matches('textarea,input[type=text],input:not([type])')&&!el.hasAttribute('autocomplete'))el.setAttribute('autocomplete','off');/* pas de remplissage auto du navigateur avec d'anciennes saisies */if(!spField(el))return;if(spellOn&&spLangOk())spWorker();spNative(el);spSoon(el,250)});
-document.addEventListener('focusout',e=>{if(e.target===SP.el)setTimeout(()=>{if(document.activeElement!==SP.el)spHide()},120)});
-document.addEventListener('input',e=>{const el=e.target;if(!spField(el))return;if(SP.cur&&SP.el===el&&el.value.slice(SP.cur.s,SP.cur.e)!==SP.cur.raw)spHide();spSoon(el)},true);
-document.addEventListener('keyup',e=>{if(spField(e.target)&&/^(Arrow|Home|End|Page)/.test(e.key))spSoon(e.target,300)});
-document.addEventListener('pointerup',e=>{if(spField(e.target))spSoon(e.target,300)});
-/* Échap : on écarte la suggestion (et ce mot pour la session) ; un second Échap garde son rôle habituel */
-document.addEventListener('keydown',e=>{if(e.key=='Escape'&&SP.cur&&e.target===SP.el){e.preventDefault();e.stopPropagation();SP.ign.add(SP.cur.raw.toLowerCase());spHide()}},true);
-addEventListener('scroll',()=>SP.cur&&requestAnimationFrame(spPlace),{passive:true,capture:true});addEventListener('resize',()=>SP.cur&&spPlace());
-window.visualViewport&&visualViewport.addEventListener('resize',()=>SP.cur&&spPlace());
+/* zone libre : rien de cliquable dessous (échantillonnage du rectangle, la barre étant transparente aux clics pendant la mesure) */
+const SPHOT='button,a[href],input,textarea,select,summary,iframe,video,[role=button],[role=link],[role=option],[role=menuitem],[role=menuitemradio],[role=tab],[role=checkbox],[role=radio],[role=switch],[role=slider],[tabindex]:not([tabindex="-1"]),[contenteditable]:not([contenteditable=false]),[draggable=true],[data-tip],[onclick]';
+function spHot(e){if(e.closest(SPHOT))return true;const c=getComputedStyle(e).cursor;return !!c&&c!='auto'&&c!='default'&&c!='text'&&c!='none'}
+function spFree(x,y,w,h){for(let i=0;i<=7;i++)for(let j=0;j<=2;j++){const e=document.elementFromPoint(x+2+(w-4)*i/7,y+2+(h-4)*j/2);if(!e||(e!==document.documentElement&&e!==document.body&&spHot(e)))return false}return true}
+function spPlace(){const b=SP.bar,t=SP.cur;if(!b||!t)return false;const el=t.el;
+ if(document.activeElement!==el||!spValid(t)||!spActive()||b.lang!==LANG){spHide();return false}
+ const r=el.getBoundingClientRect(),vv=window.visualViewport,vt=vv?vv.offsetTop:0,vh=vv?vv.height:innerHeight,vb=vt+vh,vl=vv?vv.offsetLeft:0,W=vv?vv.width:document.documentElement.clientWidth;
+ if(r.bottom<vt+4||r.top>vb-4){if(b.classList.contains('on'))spHide();return false}
+ const sug=spMode=='sug',kb=!!vv&&vh<innerHeight*.8;/* clavier du téléphone ouvert */
+ b.style.maxWidth=(W-16)+'px';b.style.minWidth=sug?Math.round(Math.min(Math.max(r.width,200),440,W-16))+'px':'';
+ const bw=Math.min(b.offsetWidth||200,W-16),bh=b.offsetHeight||38,rtl=getComputedStyle(el).direction=='rtl',cl=x=>Math.round(Math.max(vl+8,Math.min(x,vl+W-8-bw)));
+ let xs;if(sug)xs=[rtl?r.right-bw:r.left,rtl?r.left:r.right-bw];
+ else{const cs=getComputedStyle(el),bl=parseFloat(cs.borderLeftWidth)||0,bt=parseFloat(cs.borderTopWidth)||0,wb=spWordBox(el,t),wy=r.top+bt+wb.y;
+  if(wy+wb.h<r.top-2||wy>r.bottom+2){if(b.classList.contains('on'))spHide();return false}/* mot sorti de la zone visible du champ */
+  xs=[r.left+bl+wb.x+wb.w/2-Math.min(22,bw/2),r.left,r.right-bw]}
+ xs=[...new Set(xs.map(cl))];
+ const ys=(kb?[r.bottom+6,vb-bh-6,r.top-6-bh]:[r.bottom+6,r.top-6-bh]).map(Math.round).filter((y,i,a)=>a.indexOf(y)==i&&y>=vt+4&&y+bh<=vb-4&&(y>=r.bottom||y+bh<=r.top));
+ const pe=b.style.pointerEvents;b.style.pointerEvents='none';let at=null;
+ try{for(const y of ys){for(const x of xs)if(spFree(x,y,bw,bh)){at=[x,y];break}if(at)break}}finally{b.style.pointerEvents=pe}
+ if(!at){if(b.classList.contains('on'))spHide();return false}/* aucune place sûre : on ne montre rien */
+ const k=at.join();if(k!==SP.pos){SP.pos=k;SP.at=Date.now();b.style.left=at[0]+'px';b.style.top=at[1]+'px'}return true}
+function spHide(){clearInterval(SP.iv);SP.cur=null;SP.pos='';SP.down=null;SP.stale=false;if(SP.bar)SP.bar.classList.remove('on','stale')}
+/* remplacement : seulement depuis un bouton de la barre, seulement si le mot affiché est toujours là, tel quel */
+function spUse(k){const t=SP.cur;if(!t||SP.stale||!spValid(t))return spHide();const el=t.el;
+ if(k.hasAttribute('data-keep')){SP.ign.add(t.raw.toLowerCase());return spHide()}
+ const w=k.dataset.w;if(!w||w===t.raw)return spHide();spHide();
+ const v=el.value,a=el.selectionStart,b=el.selectionEnd,ins=w+(t.kind=='cur'&&t.e===v.length?' ':''),d=ins.length-t.raw.length;
+ const fix=p=>p>=t.e?p+d:p>t.s?t.s+ins.length:p,end=t.kind!='fix';
+ let ok=false;if(document.activeElement===el){try{el.setSelectionRange(t.s,t.e);ok=document.execCommand('insertText',false,ins)&&el.value.slice(t.s,t.s+ins.length)===ins}catch(e){}}
+ if(!ok){el.setRangeText(ins,t.s,t.e);el.dispatchEvent(new Event('input',{bubbles:true}))}
+ SP.typed=false;try{if(end)el.setSelectionRange(t.s+ins.length,t.s+ins.length);else el.setSelectionRange(fix(a),fix(b))}catch(e){}}
+document.addEventListener('focusin',e=>{const el=e.target;if(el&&el.matches&&el.matches('textarea,input[type=text],input:not([type])')&&!el.hasAttribute('autocomplete'))el.setAttribute('autocomplete','off');/* pas de remplissage auto du navigateur avec d'anciennes saisies */
+ if(!spField(el))return;SP.last=el;SP.typed=false;if(spActive())spWorker();spNative(el);spSoon(el,250)});
+document.addEventListener('focusout',e=>{const c=SP.cur;if(c&&e.target===c.el)setTimeout(()=>{if(SP.cur===c&&document.activeElement!==c.el)spHide()},120)});
+document.addEventListener('input',e=>{const el=e.target;if(!spField(el))return;SP.typed=true;
+ const c=SP.cur;if(c&&c.el===el){if(!spValid(c))spHide();else if(spMode=='sug'){SP.stale=true;SP.bar.classList.add('stale')}}spSoon(el)},true);
+document.addEventListener('selectionchange',()=>{const el=document.activeElement;if(spField(el)&&spMode=='sug')spSoon(el,160)});
+document.addEventListener('click',()=>{if(SP.cur)setTimeout(()=>SP.cur&&spPlace(),0)});/* un champ vidé par un bouton (Envoyer) : la barre s'éteint aussitôt */
+document.addEventListener('keyup',e=>{if(spField(e.target)&&/^(Arrow|Home|End|Page)/.test(e.key)){SP.typed=false;spSoon(e.target,300)}});
+document.addEventListener('pointerup',e=>{if(spField(e.target)){SP.typed=false;spSoon(e.target,300)}});
+/* clavier : Alt+1/2/3 choisit dans la barre ; Échap l'écarte (et ce mot pour la session), un second Échap garde son rôle habituel */
+document.addEventListener('keydown',e=>{const c=SP.cur;if(!c||e.target!==c.el||!SP.bar.classList.contains('on'))return;
+ if(e.key=='Escape'){e.preventDefault();e.stopPropagation();SP.ign.add(c.raw.toLowerCase());spHide()}
+ else if(e.altKey&&!e.ctrlKey&&!e.metaKey&&/^Digit[1-3]$/.test(e.code)){const k=SP.bar.querySelectorAll('button')[+e.code.slice(5)-1];if(k){e.preventDefault();e.stopPropagation();spUse(k)}}},true);
+addEventListener('scroll',e=>{if(SP.cur)requestAnimationFrame(spPlace);const m=$('#spm');if(m&&m.classList.contains('on')&&!m.contains(e.target))spMenuClose(false)},{passive:true,capture:true});
+addEventListener('resize',()=>SP.cur&&spPlace());
+window.visualViewport&&['resize','scroll'].forEach(k=>visualViewport.addEventListener(k,()=>SP.cur&&spPlace()));
 /* fond sous-marin cartoon : SVG statiques (formes rondes, aplats pastel) construits une seule fois,
    vie 100 % en animations CSS transform/opacity (compositeur) : rien à recalculer au resize ni pendant le défilement */
 (function seaScene(){const s=$('#sky');if(!s)return;

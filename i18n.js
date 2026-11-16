@@ -824,5 +824,16 @@ zh:{spOn:"拼写检查已开启",spOff:"拼写检查已关闭",spFix:"替换为�
 he:{spOn:"בדיקת איות פעילה",spOff:"בדיקת איות כבויה",spFix:"להחליף ב־״{w}״"},
 pt:{spOn:"Corretor ortográfico ativado",spOff:"Corretor ortográfico desativado",spFix:"Substituir por “{w}”"}};
 for(const l in EXT_SPELL)if(I18N[l])Object.assign(I18N[l].ui,EXT_SPELL[l]);
+/* @i18n-spell2 : modes du correcteur (menu du bouton abc) et barre de suggestions */
+const EXT_SPELL2={fr:{spTitle:"Correcteur",spM_sug:"Suggestions",spM_soft:"Discret",spM_off:"Désactivé",spD_sug:"3 propositions pendant la frappe",spD_soft:"Une seule, pour un mot fautif",spD_off:"Aucune correction",spKeep:"Garder « {w} »",spQ:"« {w} »",spBar:"Suggestions de mots"},
+en:{spTitle:"Spell check",spM_sug:"Suggestions",spM_soft:"Subtle",spM_off:"Off",spD_sug:"3 options as you type",spD_soft:"Just one, for a misspelled word",spD_off:"No corrections",spKeep:"Keep “{w}”",spQ:"“{w}”",spBar:"Word suggestions"},
+es:{spTitle:"Corrector",spM_sug:"Sugerencias",spM_soft:"Discreto",spM_off:"Desactivado",spD_sug:"3 opciones mientras escribes",spD_soft:"Solo una, para una palabra mal escrita",spD_off:"Sin correcciones",spKeep:"Mantener «{w}»",spQ:"«{w}»",spBar:"Sugerencias de palabras"},
+it:{spTitle:"Correttore",spM_sug:"Suggerimenti",spM_soft:"Discreto",spM_off:"Disattivato",spD_sug:"3 proposte mentre scrivi",spD_soft:"Una sola, per una parola sbagliata",spD_off:"Nessuna correzione",spKeep:"Mantieni «{w}»",spQ:"«{w}»",spBar:"Suggerimenti di parole"},
+de:{spTitle:"Rechtschreibung",spM_sug:"Vorschläge",spM_soft:"Dezent",spM_off:"Aus",spD_sug:"3 Vorschläge beim Tippen",spD_soft:"Nur einer, bei einem Tippfehler",spD_off:"Keine Korrekturen",spKeep:"„{w}“ behalten",spQ:"„{w}“",spBar:"Wortvorschläge"},
+ru:{spTitle:"Проверка орфографии",spM_sug:"Подсказки",spM_soft:"Ненавязчиво",spM_off:"Выключена",spD_sug:"3 варианта во время набора",spD_soft:"Один, для слова с ошибкой",spD_off:"Без исправлений",spKeep:"Оставить «{w}»",spQ:"«{w}»",spBar:"Подсказки слов"},
+zh:{spTitle:"拼写检查",spM_sug:"建议",spM_soft:"低调",spM_off:"关闭",spD_sug:"输入时给出 3 个建议",spD_soft:"只为拼错的词给一个",spD_off:"不做更正",spKeep:"保留「{w}」",spQ:"「{w}」",spBar:"词语建议"},
+he:{spTitle:"בדיקת איות",spM_sug:"הצעות",spM_soft:"עדין",spM_off:"כבויה",spD_sug:"3 הצעות תוך כדי הקלדה",spD_soft:"הצעה אחת, למילה שגויה",spD_off:"בלי תיקונים",spKeep:"להשאיר ״{w}״",spQ:"״{w}״",spBar:"הצעות מילים"},
+pt:{spTitle:"Corretor",spM_sug:"Sugestões",spM_soft:"Discreto",spM_off:"Desativado",spD_sug:"3 opções enquanto você digita",spD_soft:"Só uma, para uma palavra errada",spD_off:"Sem correções",spKeep:"Manter “{w}”",spQ:"“{w}”",spBar:"Sugestões de palavras"}};
+for(const l in EXT_SPELL2)if(I18N[l])Object.assign(I18N[l].ui,EXT_SPELL2[l]);
 
 /* fin */
