@@ -1185,6 +1185,132 @@ GAMES.tmp={icon:'⛈️',min:2,max:8,dur:8,tags:['skill'],mute:1,TMP,
 W.GMute=s=>!!(s&&s.phase=='game'&&s.game&&GAMES[s.game.id]&&GAMES[s.game.id].mute);
 
 /* =====================================================================
+   🐚 MARCHANDS DE COQUILLAGES — fiche (enchères secrètes et bluff, 2 à 8)
+   5 espèces (Saint-Jacques, Conque, Porcelaine, Turritelle, Ormeau). Chaque espèce a une COTE cachée, tirée au hasard :
+     0, 1, 2, 3, 5 (une valeur par espèce). Chacun connaît en secret la cote d'UNE espèce (deux à 2 joueurs) ; indices tous
+     différents jusqu'à 5 joueurs (dès 6, certaines espèces sont connues de deux personnes).
+   3 marées × 5 lots (2 coquillages jusqu'à 3 joueurs, 2-3 à 4-5, 3 dès 6). L'étal de toute la marée est montré d'avance.
+   Bourse : 10 🪙, +5 au début des marées 2 et 3 (tout le monde pareil, bourses publiques).
+   📣 Annonce (40 s, simultanée, cachée jusqu'à la fin de l'étape) : « 📈 précieuse » ou « 📉 sans valeur » sur une espèce,
+     ou 🤐 rien. Vraie ou fausse, au choix. Vraie = +1 à la fin (📈 : cote ≥ 3, 📉 : cote ≤ 1 ; la cote 2 rend les deux
+     fausses). Une cote sort à la fin des marées 1 et 2 (au hasard) : les annonces sur elle sont vérifiées tout de suite.
+   🪙 Offre (25 s, secrète, modifiable) : 0 à 9 écus (0 = passer, rien au-dessus de sa bourse). La plus haute offre gagne et
+     paie. Offres ÉGALES S'ANNULENT (les ex æquo perdent tous) ; la plus haute offre restée seule l'emporte. Personne seul·e
+     au-dessus de 0 ? Le lot reste et s'ajoute au suivant (dernier lot : il ouvre la marée d'après ; à la fin, la mer le
+     reprend). Aucun départage par siège, jamais. Sans choix au sablier : 0.
+   Fin (grand marché) : coquillages × cote ; collection d'espèces différentes 3 → +2, 4 → +4, 5 → +7 ; +1 par annonce vraie ;
+     ½ point par écu restant (arrondi bas). Égalité : places partagées. À 2 : deux indices chacun, le bluff devient un duel.
+   SIM (.sim/coq.js, 3000 parties/taille ; IA : estime les cotes inconnues = moyenne des valeurs restantes ± annonces × confiance
+     (confiance perdue quand une annonce est démentie), valeur du lot + gain de collection, offre ≈ valeur × k/(k+1) + bruit) :
+     victoire relative à 1/n, table mixte n=2/3/4/5/6/8 : honnête 124/135/131/129/117/119 % · menteur 129/120/115/118/110/102 ·
+     muet 114/110/105/105/112/93 · collectionneur 98/99/93/112/99/106 · avare 116/106/129/89/110/100 · flambeur 83/86/81/99/83/94 ·
+     hasard 38/46/47/50/69/88 % (jouer au hasard perd, aucun style ne domine). Annonces seules (honnête/menteur/muet) :
+     108–118 / 96–100 / 87–93 % : dire vrai rapporte un peu, mentir reste jouable. Sièges (miroir) : 50.1/49.9 · n=4
+     25.2/26.6/23.9/24.2 · n=8 11.5–13.9 (attendu 12.5). Lots reportés 5–26 %.
+     Rejetés : cartes 1–6 « à la Raj » (le hasard gagnait 135–186 % à 6-8), égalité = lot reporté (90 % de reports à 4+),
+     offres 0/1/2/3/5/8 (trop d'égalités), écus restants à 1 pt (l'avare gagnait 150–180 %), le Goéland à 2 (pur hasard).
+   ===================================================================== */
+const COQ={M:3,L:5,BS:[0,1,2,3,4,5,6,7,8,9],P0:10,INC:5,TIE:'next',CV:.5,CO:[0,1,2,3,5],SET:[0,0,0,2,4,7],AT:40,BT:25,MT:16,AN:1,
+ SZ:n=>n<=3?2:n>=6?3:Math.random()<.5?2:3,ok:(d,v)=>d>0?v>=3:v<=1};
+const cqSv=[/* Saint-Jacques */`<path d="M16 28.5 4.2 12.6C5.8 6.3 10.6 3 16 3s10.2 3.3 11.8 9.6Z" fill="var(--q)"/><path d="M16 28.5 8.6 6.4M16 28.5 12.2 3.7M16 28.5V3.2M16 28.5l3.8-24.8M16 28.5l7.4-22.1" stroke="#0003" stroke-width="1.3" fill="none"/><path d="M12.6 27.4h6.8l-1.6 2.6h-3.6Z" fill="var(--q)"/>`,
+ /* Conque */`<path d="M5.5 21.5C4.8 13 10.8 5.4 19.5 5.2c4.6-.1 7.3 2.7 7.2 6.2-.2 5.6-5.7 8.4-9.8 11.6l-6.6 5.5c-2.3 1.4-4.5-.6-4.8-7Z" fill="var(--q)"/><path d="M20.6 9.6c-3.9-.4-7 2.3-7 5.4 0 2.8 3.1 3.8 4.9 1.8" stroke="#0004" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="m25.6 6.3 3.4-3.6M27 11.4l3.6-.8M9 26.5l-3.8 2.6" stroke="var(--q)" stroke-width="2.4" stroke-linecap="round"/>`,
+ /* Porcelaine */`<g transform="rotate(-28 16 16)"><ellipse cx="16" cy="16" rx="9.2" ry="13" fill="var(--q)"/><path d="M16 5.6v20.8" stroke="#0004" stroke-width="2.2" stroke-linecap="round"/><path d="M13.2 9h1.8M13 13h2M13 17h2M13.2 21h1.8M17 11h1.8M17 15h2M17 19h1.8" stroke="#0003" stroke-width="1.3" stroke-linecap="round"/><circle cx="11" cy="11" r="1" fill="#fff8"/><circle cx="21" cy="21" r="1" fill="#fff6"/></g>`,
+ /* Turritelle */`<g transform="rotate(-42 16 16)"><path d="M16 1.5 22.5 27.5c0 2-13 2-13 0Z" fill="var(--q)"/><path d="M10.6 23.6h10.8M11.6 19.6h8.8M12.6 15.6h6.8M13.6 11.6h4.8M14.6 7.6h2.8" stroke="#0003" stroke-width="1.6" stroke-linecap="round"/></g>`,
+ /* Ormeau */`<path d="M3.8 18.4C3.6 9.8 10.4 4 19 4c5.7 0 9.2 3.9 9.2 9 0 8.6-7.8 15-15 15-5.3 0-9.3-3.9-9.4-9.6Z" fill="var(--q)"/><path d="M9.4 21.5c3.6 2.3 9 1.2 12-3.4" stroke="#fff7" stroke-width="2" fill="none" stroke-linecap="round"/><g fill="#0003"><circle cx="7.6" cy="14.2" r="1.4"/><circle cx="10" cy="10.2" r="1.4"/><circle cx="13.8" cy="7.4" r="1.4"/><circle cx="18.2" cy="6" r="1.4"/></g>`];
+const cqC=['#f0845a','#e47fae','#e3b03a','#9b7be8','#2fae9b'];
+const cqS=(x,cl,st)=>`<svg class="cqs ${cl||''}" style="--q:${cqC[x]};${st||''}" viewBox="0 0 32 32" aria-hidden="true">${cqSv[x]}</svg>`;
+GAMES.coq={icon:'🐚',min:2,max:8,dur:10,tags:['social','chance'],COQ,
+ init(s){const g=s.game,n=s.order.length,o=s.order;
+  g.co=shuf(COQ.CO.slice());const sp=shuf([0,1,2,3,4]);g.kn={};o.forEach((p,i)=>g.kn[p]=n==2?[sp[2*i],sp[2*i+1]]:[sp[i%5]]);
+  g.bag=shuf([].concat(...[0,1,2,3,4].map(x=>Array(10).fill(x))));
+  g.col={};g.an={};g.ac={};g.b={};g.pu={};o.forEach(p=>{g.col[p]=[0,0,0,0,0];g.an[p]=[];g.pu[p]=COQ.P0});
+  g.pc={};g.n=COQ.M*COQ.L;g.m=0;g.i=0;g.hist=[];g.last=null;g.carry=[];g.lt=gPool(s,'coqL',g.n);this.tide(s)},
+ tide(s){const g=s.game,n=s.order.length;if(g.m)s.order.forEach(p=>g.pu[p]=(g.pu[p]||0)+COQ.INC);
+  g.et=[];for(let i=0;i<COQ.L;i++)g.et.push(g.bag.splice(0,COQ.SZ(n)));
+  if(g.carry.length){g.et[0]=g.carry.concat(g.et[0]);g.carry=[]}
+  g.ac={};g.ev=null;gWait(g,COQ.AT,'a')},
+ act(s,from,a){const g=s.game;
+  if(g.st=='a'){if(+a.s===-1)g.ac[from]=0;else{const x=+a.s,d=+a.d;if(!(x>=0&&x<5)||(d!==1&&d!==-1))return;g.ac[from]={s:x,d}}g.done[from]=1;return true}
+  if(g.st=='b'){const c=+a.c;if(!COQ.BS.includes(c)||c>(g.pu[from]||0))return;g.b[from]=c;g.done[from]=1;return true}},
+ next(s){const g=s.game;
+  if(g.st=='a'){s.order.forEach(p=>{const c=g.ac[p];if(c)g.an[p].push({m:g.m,s:c.s,d:c.d})});g.ac={};g.b={};gWait(g,COQ.BT,'b');return}
+  if(g.st=='b'){this.res(s);g.b={};g.i++;g.r++;if(g.i<COQ.L){gWait(g,COQ.BT,'b');return}
+   if(g.m>=COQ.M-1){g.sea=g.carry.length?g.carry.slice():null;g.carry=[];g.over=1;return}
+   /* fin de marée : une cote sort (au hasard parmi les cachées) et les annonces sur elle sont vérifiées */
+   const hid=[0,1,2,3,4].filter(x=>g.pc[x]==null),x=hid[Math.floor(Math.random()*hid.length)];g.pc[x]=g.co[x];g.ev={t:'m',s:x};gWait(g,COQ.MT,'m',1);return}
+  if(g.st=='m'){g.m++;g.i=0;this.tide(s)}},
+ /* offres révélées : la plus haute gagne et paie ; égalité en tête = les deux perdent */
+ res(s){const g=s.game,Bd={};s.order.forEach(p=>{let c=+g.b[p]||0;if(c>(g.pu[p]||0))c=0;Bd[p]=c});
+  const lot=g.et[g.i].slice(),vs=[...new Set(Object.values(Bd))].sort((a,b)=>b-a);let w=null;const tie=[];
+  for(const v of vs){if(v<=0&&COQ.TIE!='zero')break;const T=Object.keys(Bd).filter(p=>Bd[p]==v);if(T.length==1){w=T[0];break}tie.push(v);
+   if(COQ.TIE=='few'){const nb=p=>g.col[p].reduce((a,b)=>a+b,0),mn=Math.min(...T.map(nb)),F=T.filter(p=>nb(p)==mn);if(F.length==1){w=F[0];break}}
+   if(COQ.TIE!='next')break}
+  if(w){lot.forEach(x=>g.col[w][x]++);g.pu[w]-=Bd[w]}
+  else{if(g.i+1<COQ.L)g.et[g.i+1]=lot.concat(g.et[g.i+1]);else g.carry=lot.slice()}
+  const h={m:g.m,i:g.i,lot,b:Bd,w,tie};g.hist.push(h);g.last=h},
+ /* grand marché : coquillages × cote + collection + annonces vraies */
+ tally(s){const g=s.game,T={};s.order.forEach(p=>{const c=g.col[p]||[0,0,0,0,0],sh=c.reduce((a,k,x)=>a+k*g.co[x],0),d=c.filter(Boolean).length,
+   an=(g.an[p]||[]).filter(a=>COQ.ok(a.d,g.co[a.s])).length*COQ.AN;const pu=Math.floor((g.pu[p]||0)*COQ.CV);T[p]={sh,set:COQ.SET[d],an,d,pu,t:sh+COQ.SET[d]+an+pu}});return T},
+ fin(s){const g=s.game,T=this.tally(s);s.order.forEach(p=>g.sc[p]=T[p].t);g.T=T;return{pts:g.sc}},
+ /* secrets : cotes cachées, sac, indices des autres, annonces et offres en cours */
+ hide(g,n){const o={...g};delete o.co;delete o.bag;delete o.T;o.kn={[n]:(g.kn[n]||[]).slice()};o.my={};(g.kn[n]||[]).forEach(x=>o.my[x]=g.co[x]);
+  if(g.st=='a')o.ac=hideOwn(g.ac,n);if(g.st=='b')o.b=hideOwn(g.b,n);return o},
+ log(s){const g=s.game,L=[],T=g.T||this.tally(s);
+  s.order.forEach(p=>{const A=g.an[p]||[],ok=A.filter(a=>COQ.ok(a.d,g.co[a.s])).length;if(T[p]&&T[p].d==5)L.push({k:'coqS',n:[p]});
+   if(A.length>=2&&!ok)L.push({k:'coqF',n:[p]});if(A.length>=3&&ok==A.length)L.push({k:'coqT',n:[p]})});
+  const big=g.hist.filter(h=>h.w).sort((a,b)=>b.lot.length-a.lot.length)[0];if(big&&big.lot.length>=5)L.push({k:'coqB',n:[big.w]});return L},/* 📜 */
+ /* ---------- vue ---------- */
+ nm(x){return GT('cqN').split('|')[x]||''},
+ lotH(l,cl){return `<span class="cqlot ${cl||''}">${l.map((x,i)=>cqS(x,'',cl=='big'?`animation-delay:${(.06*i).toFixed(2)}s`:'')).join('')}</span>`},
+ /* l'étal de la marée : lots vendus (pastille), lot en cours, lots à venir */
+ stall(g){return `<div class="cqst">${g.et.map((l,i)=>{const h=g.hist.find(x=>x.m==g.m&&x.i==i),cur=g.st=='b'&&i==g.i;
+   return `<div class="cqsl ${cur?'on':''} ${h?'past':''}">${this.lotH(h?h.lot:l,'xs')}${h?`<i class="cqsw">${h.w?DT(h.w):'↪'}</i>`:''}</div>`}).join('')}</div>`},
+ /* résultat d'un lot : toutes les offres, égalités barrées */
+ resH(h,m){if(!h)return '';const E=Object.entries(h.b).sort((a,b)=>b[1]-a[1]);
+  const who=h.w?`→ ${h.w==m?`<b>${esc(GT('me'))}</b>`:B(h.w)} <span class="cqpay" dir="ltr">−${h.b[h.w]} 🪙</span>`:`<b class="mut">↪ ${GT('cqCarry')}</b>`;
+  return `<div class="cqres ga">${this.lotH(h.lot,'sm')}<span class="cqwho">${who}</span><span class="cqbids" dir="ltr">${E.map(([p,c],i)=>
+   `<span class="cqbid ${p==h.w?'w':''} ${h.tie.includes(c)?'x':''}" ${dl(i,.12)}>${DT(p)}<b>${c}</b></span>`).join('')}</span></div>`},
+ /* tableau des cotes : révélée / mon indice / ? ; annonces (▲ ▼ à la couleur de chacun), vérifiées quand la cote sort */
+ board(s,g){const my=g.my||{},pc=g.pc||{},co=g.co;
+  return `<div class="cqbd">${[0,1,2,3,4].map(x=>{const rv=co?co[x]:pc[x],v=rv!=null?rv:my[x],kn=rv==null&&my[x]!=null,A=[];
+   s.order.forEach(p=>(g.an[p]||[]).forEach(a=>{if(a.s==x)A.push([p,a])}));
+   return `<div class="cqcol" data-tip="${esc(this.nm(x))}">${cqS(x)}<b class="cqv ${kn?'kn':''} ${rv!=null?'rv':''}">${v!=null?v:'?'}</b><span class="cqan">${A.map(([p,a])=>
+    `<i style="--c:${col(p)}" class="${rv!=null?(COQ.ok(a.d,rv)?'t':'f'):''}">${a.d>0?'▲':'▼'}</i>`).join('')}</span></div>`}).join('')}</div>`},
+ coll(c){return c.map((k,x)=>k?`<span class="cqk">${cqS(x,'xs')}<b>${k}</b></span>`:'').join('')},
+ crew(s,g,m){return `<div class="cqcr">${s.order.map(p=>`<div class="cqm ${p==m?'me':''}"><span class="cqnm">${DT(p)}<b>${p==m?esc(GT('me')):esc(p)}</b></span>
+   <span class="cqco">${this.coll(g.col[p]||[])||'<i class="mut">·</i>'}</span><span class="cqpu" dir="ltr">🪙 ${g.pu[p]||0}</span>${g.done[p]&&g.st!='m'?'<i class="tpok" aria-hidden="true"></i>':''}</div>`).join('')}</div>`},
+ tips(g){const my=g.my||{};return `<div class="cqtips">${Object.keys(my).map(x=>`<span class="cqtip">🔍 ${cqS(+x)}<span>${esc(this.nm(+x))}</span><b>${my[x]}</b></span>`).join('')}</div>`},
+ view(s){const g=s.game,m=meN(),R=this,play=s.order.includes(m),L=g.last;
+  const tide=`<p class="cqh"><b>🌊 ${GT('cqTide',{v:g.m+1,n:COQ.M})}</b>${g.st=='b'?` · ${GT('cqLot',{v:g.i+1,n:COQ.L})}`:''}</p>`;
+  if(g.st=='m'){const x=(g.ev||{}).s,A=[];s.order.forEach(p=>(g.an[p]||[]).forEach(a=>{if(a.s==x)A.push([p,a])}));
+   return{html:`<div class="card c">${tide}${R.resH(L,m)}<div class="cqrv"><div class="cqrvs ga" ${dl(2)}>${cqS(x,'big')}<b class="cqbig">${g.pc[x]}</b></div>
+    <p class="gby2 ga" ${dl(3)}>${GT('cqOut',{s:esc(R.nm(x)),v:g.pc[x]})}</p>
+    ${A.length?`<div class="gvl">${A.map(([p,a],i)=>{const ok=COQ.ok(a.d,g.pc[x]);return `<span class="gchip ga ${ok?'ok':''}" ${dl(i,.6)}>${DT(p)}${esc(p)} ${a.d>0?'📈':'📉'} ${ok?'✓ +'+COQ.AN:'✗'}</span>`}).join('')}</div>`:`<p class="gnote mut ga" ${dl(4)}>${GT('cqNoAn')}</p>`}</div>
+    <p class="gnote ga" ${dl(5)}>🪙 ${GT('cqInc',{v:COQ.INC})}</p>${R.board(s,g)}${R.crew(s,g,m)}</div>`,bind(){if(!RM()&&A.some(([p,a])=>p==m&&COQ.ok(a.d,g.pc[x])))sparkles($('.cqrvs'),12)}}}
+  if(g.st=='a'){const cur=g.ac[m],K='ca'+g.k;if(R.ak!==K){R.ak=K;R.dir=cur&&cur.d||1}
+   return{html:`<div class="card c">${tide}<p class="gpre">${GT('cqStall')}</p>${R.stall(g)}${play?R.tips(g):''}
+    ${play?`<p class="gq2">📣 ${GT('cqAnQ')}</p><div class="cqdir" role="group">${[1,-1].map(d=>`<button class="ghost ${R.dir==d?'sel':''}" data-cqd="${d}" aria-pressed="${R.dir==d}">${d>0?'📈 '+GT('cqUp'):'📉 '+GT('cqDn')}</button>`).join('')}</div>
+    <div class="cqsp">${[0,1,2,3,4].map((x,i)=>`<button class="ghost ga ${cur&&cur.s==x?'sel':''}" ${dl(i)} data-cqs="${x}" aria-pressed="${!!(cur&&cur.s==x)}" aria-label="${esc(R.nm(x))}">${cqS(x)}<small>${esc(R.nm(x))}</small></button>`).join('')}</div>
+    <button class="ghost wide cqmu ${cur===0?'sel':''}" data-cqs="-1" aria-pressed="${cur===0}">🤐 ${GT('cqMute')}</button><p class="cqnote">${GT('cqAnD')}</p>`:''}
+    ${R.board(s,g)}${R.crew(s,g,m)}</div>`,
+    bind(){$$('[data-cqd]').forEach(b=>b.onclick=()=>{R.dir=+b.dataset.cqd;const c=g.ac[m];if(c)gs({s:c.s,d:R.dir});else render()});
+     $$('[data-cqs]').forEach(b=>b.onclick=()=>gs({s:+b.dataset.cqs,d:R.dir}))}}}
+  const lot=g.et[g.i]||[],t=g.lt&&g.lt[g.r]?GC('coqL',g.lt[g.r]):'',pu=g.pu[m]||0,my=g.b[m];
+  return{html:`<div class="card c">${tide}${R.stall(g)}${L&&L.m==g.m?R.resH(L,m):''}
+   <div class="cqcur">${t?`<p class="cqlt">${esc(t)}</p>`:''}${R.lotH(lot,'big')}</div>
+   ${play?`<p class="gq2">🪙 ${GT('cqBid',{v:pu})}</p><div class="cqpad" dir="ltr">${COQ.BS.map(v=>`<button class="cqc ${my==v?'sel':''} ${v?'':'z'}" data-cq="${v}" ${v>pu?'disabled':''} aria-pressed="${my==v}">${v}</button>`).join('')}</div>
+   <p class="cqnote">${GT(my==null?'cqAuto':'cqTie')}</p>${R.tips(g)}`:''}${R.board(s,g)}${R.crew(s,g,m)}</div>`,
+   bind(){$$('[data-cq]').forEach(b=>b.onclick=()=>gs({c:+b.dataset.cq}))}}},
+ endView(s){const g=s.game,T=g.T||this.tally(s),m=meN(),R=this;
+  return `${g.sea?`<p class="gnote mut">🌊 ${GT('cqSea')}</p>`:g.last?R.resH(g.last,m):''}<h3 class="gh3">🐚 ${GT('cqMk')}</h3>
+   <div class="cqfin">${[0,1,2,3,4].map((x,i)=>`<div class="cqfc ga" ${dl(i,.2)}>${cqS(x)}<b>${g.co[x]}</b><small>${esc(R.nm(x))}</small></div>`).join('')}</div>
+   <div class="cqtl">${[...s.order].sort((a,b)=>T[b].t-T[a].t).map((p,i)=>{const t=T[p];
+    return `<div class="cqtr ga ${p==m?'me':''}" ${dl(i,.5)}><span class="cqnm">${DT(p)}<b>${esc(p)}</b></span><span class="cqco">${R.coll(g.col[p])}</span>
+     <span class="cqpt" dir="ltr">🐚 ${t.sh}${t.set?` · 🎨 +${t.set}`:''}${t.an?` · 📣 +${t.an}`:''}${t.pu?` · 🪙 +${t.pu}`:''}</span><b class="cqtot">${t.t}</b></div>`}).join('')}</div>
+   <p class="mut cqlg">🐚 ${GT('cqSh')} · 🎨 ${GT('cqSet')} · 📣 ${GT('cqAnn')} · 🪙 ${GT('cqLeft')}</p>`}};
+/* /🐚 */
+
+/* =====================================================================
    📖 TUTORIELS ANIMÉS — une mini-démo scriptée par jeu (pièces factices qui bougent, étape par étape).
    Ouvert par le « ? » du haut (contexte : jeu en cours, ou jeu choisi au salon) et par « Les règles en images » au salon.
    Scène = 300×180 (coordonnées px), éléments .te animés en transform/opacity seulement ; mouvement réduit : état final fixe.
@@ -1289,6 +1415,16 @@ TUS.tmp=[
  {k:'tu_tmp5',d:6,s:()=>tu3A()+TU.e(150,56,TU.cd('⛈️ 3'),0,'a o','--o:1.1s')+TU.e(150,56,TU.cd('⛈️ 2'),1.1,'p o','--o:2.2s')+TU.e(150,56,TU.cd('⛈️ 1','no'),2.2,'p o','--o:3.3s')+TU.e(150,56,'⛈️',3.3,'p big k')+[0,1,2].map(i=>TU.e(60+90*i,104,TU.cd('🌊'),0,'a o','--o:3.5s')).join('')},
  {k:'tu_tmp6',d:6,s:()=>tu3A()+TU.e(150,36,'🌅',.2,'p big')+[0,1,2].map(i=>TU.e(60+90*i,104,'✋',.5+.2*i,'p o','--o:1.6s')+TU.e(60+90*i,104,TU.cd(['11–20','41–50','81–90'][i],'ok'),1.7+.25*i,'p')).join('')},
  {k:'tu_tmp7',d:6,s:()=>tu3A()+TU.e(150,40,TU.cd('🔢 ✕','no'),.2,'p')+[['😎',0],['🫧',1],['😱',2]].map(([e,i])=>TU.e(60+90*i,104,e,.8+.3*i,'p big')).join('')}];
+/* 🐚 tutoriel des Marchands de coquillages : coquillages en SVG, offres en cartes, annonces en bulles */
+const tuQ=i=>cqS(i),tuL=(a,b)=>`<span class="tql">${cqS(a)}${cqS(b)}</span>`,tuQ3=()=>[0,1,2].map(i=>TU.e(60+90*i,150,TU.av(i))).join('');
+TUS.coq=[
+ {k:'tu_coq1',d:6,s:()=>[0,1,2,3,4].map(i=>TU.e(50+50*i,40,tuQ(i),.12*i,'p')+TU.e(50+50*i,76,TU.cd('?'),.8+.1*i,'p')).join('')+TU.e(80,148,TU.av(0))+TU.e(190,148,TU.cd('🔍 '+tuQ(2)+' = 5','ok'),2,'p')},
+ {k:'tu_coq2',d:6,s:()=>tuQ3()+TU.e(150,30,tuL(0,3),0,'p big o','--o:2.6s')+[4,6,2].map((v,i)=>TU.e(60+90*i,104,TU.cd('🂠'),.3+.2*i,'p o','--o:1.5s')+TU.e(60+90*i,104,TU.cd(v,i==1?'ok':''),1.6,'p')).join('')+TU.mv(150,30,150,66,tuL(0,3),2.6,'','--op0:0')+TU.e(222,66,TU.pt('−6 🪙','no'),3.1,'p')},
+ {k:'tu_coq3',d:6,s:()=>tuQ3()+TU.e(150,30,tuL(1,4),0,'p big o','--o:2.4s')+[5,5,3].map((v,i)=>TU.e(60+90*i,104,TU.cd(v,i<2?'no':'ok'),.3+.15*i,'p')).join('')+TU.e(105,104,'✕',1.3,'p big')+TU.mv(150,30,240,66,tuL(1,4),2.4,'','--op0:0')},
+ {k:'tu_coq4',d:6,s:()=>tuQ3()+TU.e(60,100,TU.cd('📈 '+tuQ(1)),.3,'p')+TU.e(150,100,TU.cd('📉 '+tuQ(3)),.7,'p')+TU.e(240,100,TU.cd('🤐'),1.1,'p')+TU.e(150,40,'🤥 ?',2,'p big')},
+ {k:'tu_coq5',d:6,s:()=>TU.e(150,40,tuQ(1),0,'p big')+TU.e(195,40,TU.cd('5','ok'),.8,'p')+TU.e(80,150,TU.av(0))+TU.e(220,150,TU.av(1))+TU.e(80,104,TU.cd('📈 '+tuQ(1)),.2,'a')+TU.e(220,104,TU.cd('📉 '+tuQ(1)),.2,'a')+TU.e(80,72,TU.pt('✓ +1'),1.6,'p')+TU.e(220,72,TU.pt('✗','no'),1.9,'p')},
+ {k:'tu_coq6',d:6,s:()=>[0,1,2,3,4].map(i=>TU.e(50+50*i,40,tuQ(i),.1*i,'p')).join('')+TU.e(150,82,TU.pt('🎨 +7'),1,'p')+TU.e(90,134,TU.cd('🪙 6'),1.5,'p')+TU.e(150,134,'→',1.8,'p')+TU.e(210,134,TU.pt('+3'),2.1,'p')},
+ {k:'tu_coq7',x:'2',s:()=>TU.e(80,150,TU.av(0))+TU.e(220,150,TU.av(1))+TU.e(80,100,TU.cd('🔍 '+tuQ(0)+' '+tuQ(2)),.3,'p')+TU.e(220,100,TU.cd('🔍 '+tuQ(3)+' '+tuQ(4)),.6,'p')+TU.e(150,40,'⚔️',1.4,'p big')}];
 for(const id in TUS)if(GAMES[id])GAMES[id].tut=TUS[id];
 const GTU={id:null,i:0,t:null};
 W.GTut=function(id){const G=GAMES[id];if(!G||!G.tut||typeof document=='undefined')return false;
@@ -1317,7 +1453,7 @@ if(typeof document!='undefined')document.addEventListener('click',e=>{const t=e.
 if(typeof document!='undefined'){const c=document.createElement('style');c.id='games-css';c.textContent=`
 .gw{--gease:cubic-bezier(.22,1,.36,1)}
 .ghd{display:flex;align-items:center;gap:8px;font:600 19px Fredoka,Nunito,sans-serif;margin:8px 4px 8px;color:var(--deep)}
-.ghd .gic{font-size:26px;line-height:1}.ghd .gstop{margin-inline-start:6px;width:30px;height:30px;padding:0;border-radius:50%;font-size:13px;line-height:1;box-shadow:0 2px 0 var(--edge2);color:var(--mut)}.ghd .grd+.gstop{margin-inline-start:6px}.ghd b+.gstop{margin-inline-start:auto}.ghd .grd{margin-inline-start:auto;font:800 13px Nunito;color:var(--mut);background:var(--paper);border:2px solid var(--edge);border-radius:99px;padding:2px 10px}
+.ghd .grd{white-space:nowrap}.ghd .gic{font-size:26px;line-height:1}.ghd .gstop{margin-inline-start:6px;width:30px;height:30px;padding:0;border-radius:50%;font-size:13px;line-height:1;box-shadow:0 2px 0 var(--edge2);color:var(--mut)}.ghd .grd+.gstop{margin-inline-start:6px}.ghd b+.gstop{margin-inline-start:auto}.ghd .grd{margin-inline-start:auto;font:800 13px Nunito;color:var(--mut);background:var(--paper);border:2px solid var(--edge);border-radius:99px;padding:2px 10px}
 .gsab{height:6px;border-radius:9px;background:var(--edge);overflow:hidden;margin:0 4px 10px}
 .gsab i{display:block;height:100%;background:linear-gradient(90deg,var(--ink),var(--gold));transform-origin:left;animation-name:gsab;animation-timing-function:linear;animation-fill-mode:both}
 [dir=rtl] .gsab i{transform-origin:right}
@@ -1646,6 +1782,62 @@ section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) b
 .tutrk{display:block;width:250px;height:3px;border-radius:3px;background:linear-gradient(90deg,#2fa894,#ef8354);opacity:.6}
 @media (prefers-reduced-motion:reduce){.tpw.nw,.tprx{animation:none}.tpsb i{transition:none}}
 @media (max-width:420px){.tpcrew{grid-template-columns:1fr 1fr}.tpv{min-width:40px;font-size:18px;padding:7px 8px}}
+.cqs{width:22px;height:22px;display:inline-block;vertical-align:middle;flex:none;filter:drop-shadow(0 1px 1px #0002)}
+.cqs.xs{width:14px;height:14px}.cqlot.xs .cqs{width:17px;height:17px}.cqlot.sm .cqs{width:18px;height:18px}.cqs.big{width:46px;height:46px}
+.cqlot{display:inline-flex;flex-wrap:wrap;gap:2px;align-items:center;justify-content:center}
+.cqlot.big{gap:8px;margin:6px 0 2px}.cqlot.big .cqs{width:44px;height:44px;animation:cqIn .45s var(--gease) both}
+@keyframes cqIn{from{opacity:0;transform:translateY(10px) scale(.7) rotate(-12deg)}}
+.cqh{font:700 14px Nunito;color:var(--mut);margin:0 0 8px}.cqh b{color:var(--deep)}
+.cqst{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:4px 0 10px}
+.cqsl{position:relative;display:flex;align-items:center;justify-content:center;min-width:44px;min-height:30px;padding:4px 6px;border-radius:12px;background:var(--paper2);border:2px solid transparent;transition:transform .3s var(--gease),opacity .3s}
+.cqsl.on{border-color:var(--acc);transform:translateY(-2px)}.cqsl.past{opacity:.5}
+.cqsw{position:absolute;top:-6px;inset-inline-end:-6px;font-style:normal;font-size:11px;line-height:1}
+.cqres{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 10px;padding:8px 10px;border-radius:14px;background:var(--paper2);margin:0 0 10px;font:700 14px Nunito}
+.cqwho{display:inline-flex;align-items:center;gap:5px}.cqpay{color:var(--mut);font-size:12px}
+.cqbids{display:flex;flex-wrap:wrap;gap:4px;justify-content:center}
+.cqbid{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:99px;background:var(--paper);border:1.5px solid var(--edge);font-size:13px;animation:gin .3s var(--gease) both}
+.cqbid.w{border-color:var(--ink);background:#dff5ec}.cqbid.x b{text-decoration:line-through;opacity:.55}
+.cqcur{text-align:center;margin:4px 0}
+.cqlt{font:600 15px Fredoka,Nunito,sans-serif;color:var(--deep);margin:0;font-style:italic;overflow-wrap:anywhere}
+.cqpad{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;max-width:330px;margin:0 auto}
+.cqpad .cqc{padding:10px 0;font:600 19px Fredoka,Nunito,sans-serif;border-radius:12px;min-width:0}
+.cqpad .cqc.z{color:var(--mut)}.cqpad .cqc:disabled{opacity:.3}.gw .cqpad .cqc.sel{transform:translateY(-3px)}
+.cqnote{font:600 12.5px Nunito;color:var(--mut);margin:8px 0 0;text-align:center}
+.cqtips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:10px 0 0}
+.cqtip{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:99px;background:color-mix(in srgb,var(--gold) 20%,var(--paper2));border:1.5px dashed var(--gold);font:700 13px Nunito}
+.cqtip b{font:600 18px Fredoka,Nunito,sans-serif}
+.cqdir{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 8px}.cqdir button{padding:9px 6px;font-size:15px}
+.cqsp{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.cqsp button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 2px;min-width:0}
+.cqsp .cqs{width:30px;height:30px}.cqsp small,.cqfc small{font:700 10.5px/1.1 Nunito;max-width:100%;overflow-wrap:anywhere;hyphens:auto;text-align:center}
+.cqmu{margin-top:8px}
+.cqbd{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin:14px 0 8px;padding:8px 4px;border-radius:14px;background:var(--paper2)}
+.cqcol{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0}
+.cqv{font:600 17px Fredoka,Nunito,sans-serif;color:var(--mut)}.cqv.kn{color:var(--acc-d)}.cqv.rv{color:var(--ink)}
+.cqan{display:flex;flex-wrap:wrap;justify-content:center;gap:1px;min-height:12px}
+.cqan i{font-style:normal;font-size:11px;line-height:1;color:var(--c)}.cqan i.f{opacity:.35}.cqan i.t{text-shadow:0 0 4px color-mix(in srgb,var(--c) 60%,transparent)}
+.cqcr{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+.cqm{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px;padding:6px 9px;border:1.5px solid var(--edge);border-radius:12px;background:var(--paper2);font-size:13px;text-align:start;min-width:0}
+.cqm.me{border-color:var(--acc)}
+.cqnm{display:flex;align-items:center;gap:5px;min-width:0;flex:1 1 60px}.cqnm b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cqco{display:flex;flex-wrap:wrap;gap:4px}.cqk{display:inline-flex;align-items:center;gap:1px;font-size:11px}
+.cqpu{font:700 12px Nunito;color:var(--mut)}
+.cqrv{text-align:center}
+.cqrvs{display:inline-flex;align-items:center;gap:10px;padding:10px 18px;border-radius:20px;background:var(--paper2)}
+.cqbig{font:600 34px Fredoka,Nunito,sans-serif;color:var(--ink);animation:cqPop .5s cubic-bezier(.3,1.6,.5,1) .5s both}
+@keyframes cqPop{from{transform:scale(.3);opacity:0}}
+.cqfin{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:6px 0 12px}
+.cqfc{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 2px;border-radius:12px;background:var(--paper2);min-width:0}
+.cqfc .cqs{width:30px;height:30px}.cqfc b{font:600 20px Fredoka,Nunito,sans-serif;color:var(--ink)}
+.cqfc small{color:var(--mut)}
+.cqtl{display:flex;flex-direction:column;gap:6px}
+.cqtr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:8px 10px;border-radius:12px;background:var(--paper2);font-size:13px}
+.cqtr.me{outline:2px solid var(--acc)}.cqpt{color:var(--mut);font-weight:700;font-size:12px}.cqtot{margin-inline-start:auto;font:600 18px Fredoka,Nunito,sans-serif;color:var(--ink)}
+.cqlg{font-size:11.5px;text-align:center;margin:8px 0 0}
+.tql{display:inline-flex;gap:3px}.te .tpt{direction:ltr;unicode-bidi:isolate}.te .cqs{width:24px;height:24px}.te.big .cqs{width:34px;height:34px}.tcd .cqs{width:18px;height:18px}
+[data-theme=dark] .cqbid.w{background:#123d33}[data-theme=dark] .cqs{filter:drop-shadow(0 1px 2px #0009)}
+@media (prefers-reduced-motion:reduce){.cqlot.big .cqs,.cqbig,.cqbid{animation:none!important}.cqsl{transition:none}}
+@media (max-width:420px){.cqcr{grid-template-columns:1fr 1fr}.cqlot.big .cqs{width:38px;height:38px}.cqsp small{font-size:9.5px}}
 @media (max-width:420px){.grow2{flex-direction:column}.gq{font-size:19px}.gseed{font-size:26px}.gbr{grid-template-columns:minmax(0,7em) 1fr 1.6em}.gtf{width:78px}.gcamps{gap:6px}}
 @media (prefers-reduced-motion:reduce){.gw .ga,.gw .gbar,.gfloat,.gev .gbig,.grx,.arcb *,.gw.gnx>.card,.mkl{animation:none!important}.gsab i{animation-duration:0s!important;display:none}}
 `;(document.head||document.documentElement).appendChild(c)}
@@ -2941,4 +3133,160 @@ Object.assign(GI18N.zh.ui,{coop_tmp:`穿越风暴`,n_tmp:`风暴`,d_tmp:`默默�
 Object.assign(GI18N.he.ui,{coop_tmp:`המעבר`,n_tmp:`סערה`,d_tmp:`בשקט, שחררו את הגלים לפי הסדר לפני שהסערה מגיעה`,r_tmp:`שיתופי. לכל אחד גלים סודיים מ-1 עד 100. בכל הכאת גל כולם בוחרים בו-זמנית: לשחרר את הגל הנמוך ביותר שלהם או להחזיק. הגלים חייבים לצאת בסדר עולה, בלי לומר אף מספר. מוקדם מדי: −1 ⛵. 2 עד 8.`,tpLv:`שלב {v}`,tpLeft:`בעוד {v}`,tpSince:`הכאות בלי גל: {v}`,tpPut:`לשחרר {v}`,tpHold:`להחזיק`,tpCalm:`גל שקט`,tpNone:`הגלים שלך יצאו. עודדו את הצוות!`,tpX:`מוקדם מדי! הקצף לוקח את {v}`,tpC:`גל שקט: כל אחד מראה את הטווח שלו`,tpW:`הים עוצר את נשימתו…`,tpGo:`הרגישו את הקצב: שחררו ברגע הנכון`,tpOk:`שלב {v} עבר!`,tpStorm:`הסערה היכתה: −1 ⛵`,tpSunk:`טביעה… לא נשארו ספינות.`,tpWin:`כל הגלים עברו: הסערה אולפה!`,tpBonL:`+1 ⛵ תגבורת`,tpBonC:`+1 🌅 גל שקט`,tpEnd:`שלבים שעברו: {v} מתוך {n}`,tpMute:`בלי מספרים: הצ'אט שותק, רק תגובות`,tu_tmp1:`כל אחד מקבל בסוד גלים ממוספרים מ-1 עד 100.`,tu_tmp2:`בכל הכאת גל כולם בוחרים יחד: 🌊 לשחרר את הגל הנמוך ביותר או ⏳ להחזיק.`,tu_tmp3:`הגלים חייבים לצאת בסדר עולה. גלים ששוחררו באותה הכאה מסתדרים לבד.`,tu_tmp4:`מוקדם מדי? גלים נמוכים יותר שעוד ביד הולכים לקצף: −1 ⛵.`,tu_tmp5:`⛈️ הסערה מתקרבת בכל הכאה: סיימו את השלב לפניה. הספירה לאחור היא השעון המשותף שלכם.`,tu_tmp6:`🌅 גל שקט: אם חצי מבקשים, הפסקה. כל אחד מראה את הטווח של הגל הנמוך ביותר שלו (למשל 41–50).`,tu_tmp7:`לא אומרים מספרים: רק תגובות. הקשיבו לקצב של הקבוצה.`});
 Object.assign(GI18N.pt.ui,{coop_tmp:`A travessia`,n_tmp:`Tempestade`,d_tmp:`Em silêncio, soltem suas ondas em ordem antes da tempestade`,r_tmp:`Cooperativo. Cada um tem ondas secretas de 1 a 100. A cada batida do mar, todos escolhem ao mesmo tempo: soltar sua onda mais baixa ou segurar. Elas devem sair em ordem crescente, sem nunca dizer um número. Cedo demais: −1 ⛵. De 2 a 8.`,tpLv:`Nível {v}`,tpLeft:`em {v}`,tpSince:`Batidas sem onda: {v}`,tpPut:`Soltar {v}`,tpHold:`Segurar`,tpCalm:`Onda calma`,tpNone:`Suas ondas já saíram. Anime a tripulação!`,tpX:`Cedo demais! A espuma leva {v}`,tpC:`Onda calma: cada um mostra sua dezena`,tpW:`O mar prende a respiração…`,tpGo:`Sintam o ritmo: soltem na hora certa`,tpOk:`Nível {v} superado!`,tpStorm:`A tempestade atingiu: −1 ⛵`,tpSunk:`Naufrágio… sem cascos.`,tpWin:`Todas as ondas passaram: tempestade domada!`,tpBonL:`+1 ⛵ de reforço`,tpBonC:`+1 🌅 onda calma`,tpEnd:`Níveis superados: {v} de {n}`,tpMute:`Sem números: o chat se cala, só reações`,tu_tmp1:`Cada um recebe em segredo ondas numeradas de 1 a 100.`,tu_tmp2:`A cada batida do mar, todos escolhem ao mesmo tempo: 🌊 soltar a onda mais baixa ou ⏳ segurar.`,tu_tmp3:`As ondas devem sair em ordem crescente. Soltas na mesma batida, elas se ordenam sozinhas.`,tu_tmp4:`Cedo demais? Ondas mais baixas ainda na mão vão para a espuma: −1 ⛵.`,tu_tmp5:`⛈️ A tempestade se aproxima a cada batida: terminem o nível antes dela. A contagem regressiva é o relógio comum de vocês.`,tu_tmp6:`🌅 Onda calma: se metade pedir, pausa. Cada um mostra a dezena da sua onda mais baixa (ex. 41–50).`,tu_tmp7:`Nenhum número é dito: só reações. Escutem o ritmo do grupo.`});
 /* /⛈️ */
+/* 🐚 textes des Marchands de coquillages (9 langues) ; coqL = noms de lots (réserve sans redite entre parties) */
+const GCQ=(l,o,c)=>{Object.assign(GI18N[l].ui,o);Object.assign(GI18N[l],c)};
+GCQ('fr',{n_coq:`Marchands de coquillages`,d_coq:`Enchères secrètes, cotes cachées, annonces vraies ou fausses`,
+r_coq:`Chaque lot va à la plus haute offre secrète, payée en écus 🪙. Offres égales en tête : elles s'annulent, la suivante l'emporte. Chaque espèce a une cote cachée ; tu en connais une. Annonce, vrai ou faux : +1 si c'est vrai. À la fin : cotes, collection et écus restants.`,
+r_coq2:`À deux, chacun connaît deux cotes. Chaque lot va à la plus haute offre secrète, payée en écus 🪙 ; offres égales : le lot reste et grossit. Annonce, vrai ou faux : +1 si c'est vrai. À la fin : cotes, collection et écus restants.`,
+cqN:`Saint-Jacques|Conque|Porcelaine|Turritelle|Ormeau`,cqCarry:`personne, le lot reste`,cqTide:`Marée {v}/{n}`,cqLot:`lot {v}/{n}`,cqStall:`L'étal de la marée`,
+cqAnQ:`Ton annonce publique (vraie ou fausse)`,cqUp:`Précieuse`,cqDn:`Sans valeur`,cqMute:`Rien à dire`,cqAnD:`+1 à la fin si c'est vrai : 📈 = cote 3 ou plus, 📉 = cote 1 ou moins.`,
+cqBid:`Ton offre secrète (bourse : {v} 🪙)`,cqAuto:`0 = tu passes. Sans choix, tu passes.`,cqTie:`Modifiable jusqu'à la fin. Offres égales en tête : elles s'annulent.`,
+cqOut:`La marée découvre une cote : {s} = {v}`,cqNoAn:`Personne n'avait rien annoncé sur cette espèce.`,cqInc:`Nouvelle marée : +{v} 🪙 pour chacun`,cqSea:`Le dernier lot, sans preneur, retourne à la mer.`,
+cqMk:`Le grand marché`,cqSh:`coquillages × cote`,cqSet:`collection (3 espèces +2, 4 +4, 5 +7)`,cqAnn:`annonces vraies`,cqLeft:`½ point par écu restant`,
+tu_coq1:`Cinq espèces de coquillages. Chacune a une cote cachée : 0, 1, 2, 3 ou 5. Toi, tu en connais une en secret.`,
+tu_coq2:`Chaque lot est mis aux enchères : tout le monde offre en même temps, en secret. La plus haute offre gagne et paie ses écus.`,
+tu_coq3:`Offres égales en tête ? Elles s'annulent : la plus haute offre restée seule l'emporte. Sinon, le lot reste et grossit.`,
+tu_coq4:`Au début de chaque marée, une annonce publique : « précieuse » ou « sans valeur ». Elle peut être fausse !`,
+tu_coq5:`À la fin des marées 1 et 2, une cote sort : les annonces vraies rapportent +1, les fausses sont démasquées.`,
+tu_coq6:`Au grand marché : chaque coquillage vaut sa cote, plus la collection (5 espèces : +7) et ½ point par écu gardé.`,
+tu_coq7:`À deux, chacun connaît deux cotes : le bluff devient un duel.`,
+lg_coqS:`{a} a réuni les 5 espèces de coquillages`,lg_coqF:`{a} a vendu du vent : aucune annonce vraie aux Coquillages`,lg_coqT:`{a} n'a dit que la vérité aux Coquillages`,lg_coqB:`{a} a raflé un lot géant de coquillages`},
+{coqL:`Panier de pêche à pied|Trouvaille de marée basse|La boîte à trésors de mamie|Sac oublié sur le ponton|Récolte de l'aube|Cadeau d'un phoque|Butin d'un crabe|Vitrine du musée fermé|Les poches d'un marin|Un seau de plage|Collection d'un vieux capitaine|Repêché après la tempête|Bocal de la cabane|Trésor d'une sirène distraite|Échantillons du professeur|Souvenirs de vacances|Caisse sans étiquette|Filet emmêlé|Le tiroir du phare|Coquilles du dimanche|Collier défait|La bourse d'une mouette|Le stock de la concurrence|Ramassage clandestin|Héritage d'un pirate|Fond de cale|Corbeille de la criée|Plongée de minuit|Laissé par l'écume|Dernière caisse du port`});
+GCQ('en',{n_coq:`Shell Merchants`,d_coq:`Secret bids, hidden prices, true or false claims`,
+r_coq:`Each lot goes to the highest secret bid, paid in coins 🪙. Tied top bids cancel out; the next one wins. Each species has a hidden price; you know one. Make a claim, true or false: +1 if it's true. At the end: prices, collection and leftover coins.`,
+r_coq2:`For two, each of you knows two prices. Each lot goes to the highest secret bid, paid in coins 🪙; tied bids: the lot stays and grows. Make a claim, true or false: +1 if it's true. At the end: prices, collection and leftover coins.`,
+cqN:`Scallop|Conch|Cowrie|Auger|Abalone`,cqCarry:`nobody, the lot stays`,cqTide:`Tide {v}/{n}`,cqLot:`lot {v}/{n}`,cqStall:`This tide's stall`,
+cqAnQ:`Your public claim (true or false)`,cqUp:`Precious`,cqDn:`Worthless`,cqMute:`Nothing to say`,cqAnD:`+1 at the end if true: 📈 = price 3 or more, 📉 = price 1 or less.`,
+cqBid:`Your secret bid (purse: {v} 🪙)`,cqAuto:`0 = you pass. No choice, you pass.`,cqTie:`You can change it until the end. Tied top bids cancel out.`,
+cqOut:`The tide reveals a price: {s} = {v}`,cqNoAn:`Nobody had made a claim about this species.`,cqInc:`New tide: +{v} 🪙 each`,cqSea:`The last lot, unsold, goes back to the sea.`,
+cqMk:`The grand market`,cqSh:`shells × price`,cqSet:`collection (3 species +2, 4 +4, 5 +7)`,cqAnn:`true claims`,cqLeft:`½ point per leftover coin`,
+tu_coq1:`Five species of shells. Each has a hidden price: 0, 1, 2, 3 or 5. You secretly know one.`,
+tu_coq2:`Each lot is auctioned: everyone bids at once, in secret. The highest bid wins and pays its coins.`,
+tu_coq3:`Tied top bids? They cancel out: the highest bid left alone wins. If there is none, the lot stays and grows.`,
+tu_coq4:`At the start of each tide, one public claim: "precious" or "worthless". It may be false!`,
+tu_coq5:`After tides 1 and 2, a price comes out: true claims earn +1, false ones are exposed.`,
+tu_coq6:`At the grand market: each shell is worth its price, plus the collection (5 species: +7) and ½ point per coin kept.`,
+tu_coq7:`For two, each knows two prices: bluffing becomes a duel.`,
+lg_coqS:`{a} gathered all 5 shell species`,lg_coqF:`{a} sold thin air: not one true claim in Shell Merchants`,lg_coqT:`{a} told nothing but the truth in Shell Merchants`,lg_coqB:`{a} scooped a giant lot of shells`},
+{coqL:`The shore-forager's basket|Low-tide find|Grandma's treasure box|Bag forgotten on the pier|Dawn harvest|Gift from a seal|A crab's loot|Closed museum's showcase|A sailor's pockets|A beach bucket|An old captain's collection|Fished out after the storm|Jar from the beach hut|A distracted mermaid's treasure|The professor's samples|Holiday souvenirs|Unlabelled crate|Tangled net|The lighthouse drawer|Sunday shells|Broken necklace|A seagull's purse|The rival's stock|Secret beachcombing|A pirate's inheritance|Bottom of the hold|Fish-market basket|Midnight dive|Left by the foam|Last crate in the port`});
+GCQ('es',{n_coq:`Mercaderes de conchas`,d_coq:`Pujas secretas, precios ocultos, anuncios verdaderos o falsos`,
+r_coq:`Cada lote va a la puja secreta más alta, pagada en monedas 🪙. Pujas iguales en cabeza: se anulan y gana la siguiente. Cada especie tiene un precio oculto; tú conoces uno. Anuncia, verdad o mentira: +1 si es verdad. Al final: precios, colección y monedas sobrantes.`,
+r_coq2:`A dos, cada uno conoce dos precios. Cada lote va a la puja secreta más alta, pagada en monedas 🪙; pujas iguales: el lote se queda y crece. Anuncia, verdad o mentira: +1 si es verdad. Al final: precios, colección y monedas sobrantes.`,
+cqN:`Vieira|Caracola|Cauri|Turritela|Oreja de mar`,cqCarry:`nadie, el lote se queda`,cqTide:`Marea {v}/{n}`,cqLot:`lote {v}/{n}`,cqStall:`El puesto de esta marea`,
+cqAnQ:`Tu anuncio público (verdadero o falso)`,cqUp:`Valiosa`,cqDn:`Sin valor`,cqMute:`Nada que decir`,cqAnD:`+1 al final si es verdad: 📈 = precio 3 o más, 📉 = precio 1 o menos.`,
+cqBid:`Tu puja secreta (bolsa: {v} 🪙)`,cqAuto:`0 = pasas. Sin elección, pasas.`,cqTie:`Puedes cambiarla hasta el final. Pujas iguales en cabeza: se anulan.`,
+cqOut:`La marea descubre un precio: {s} = {v}`,cqNoAn:`Nadie había anunciado nada sobre esta especie.`,cqInc:`Nueva marea: +{v} 🪙 para cada uno`,cqSea:`El último lote, sin comprador, vuelve al mar.`,
+cqMk:`El gran mercado`,cqSh:`conchas × precio`,cqSet:`colección (3 especies +2, 4 +4, 5 +7)`,cqAnn:`anuncios verdaderos`,cqLeft:`½ punto por moneda sobrante`,
+tu_coq1:`Cinco especies de conchas. Cada una tiene un precio oculto: 0, 1, 2, 3 o 5. Tú conoces uno en secreto.`,
+tu_coq2:`Cada lote se subasta: todos pujan a la vez, en secreto. La puja más alta gana y paga sus monedas.`,
+tu_coq3:`¿Pujas iguales en cabeza? Se anulan: gana la puja más alta que quede sola. Si no hay, el lote se queda y crece.`,
+tu_coq4:`Al empezar cada marea, un anuncio público: «valiosa» o «sin valor». ¡Puede ser falso!`,
+tu_coq5:`Tras las mareas 1 y 2 sale un precio: los anuncios verdaderos dan +1, los falsos quedan al descubierto.`,
+tu_coq6:`En el gran mercado: cada concha vale su precio, más la colección (5 especies: +7) y ½ punto por moneda guardada.`,
+tu_coq7:`A dos, cada uno conoce dos precios: el farol se vuelve un duelo.`,
+lg_coqS:`{a} reunió las 5 especies de conchas`,lg_coqF:`{a} vendió humo: ni un anuncio verdadero en Mercaderes de conchas`,lg_coqT:`{a} solo dijo la verdad en Mercaderes de conchas`,lg_coqB:`{a} se llevó un lote gigante de conchas`},
+{coqL:`La cesta del mariscador|Hallazgo de marea baja|La cajita de tesoros de la abuela|Bolsa olvidada en el muelle|Cosecha del alba|Regalo de una foca|El botín de un cangrejo|Vitrina del museo cerrado|Los bolsillos de un marinero|Un cubo de playa|Colección de un viejo capitán|Rescatado tras la tormenta|Tarro de la caseta|Tesoro de una sirena despistada|Muestras del profesor|Recuerdos de vacaciones|Caja sin etiqueta|Red enredada|El cajón del faro|Conchas de domingo|Collar deshecho|La bolsa de una gaviota|El género de la competencia|Recogida clandestina|Herencia de un pirata|Fondo de bodega|Cesta de la lonja|Inmersión de medianoche|Lo que dejó la espuma|Última caja del puerto`});
+GCQ('it',{n_coq:`Mercanti di conchiglie`,d_coq:`Offerte segrete, prezzi nascosti, annunci veri o falsi`,
+r_coq:`Ogni lotto va all'offerta segreta più alta, pagata in monete 🪙. Offerte uguali in testa: si annullano e vince la successiva. Ogni specie ha un prezzo nascosto; tu ne conosci uno. Annuncia, vero o falso: +1 se è vero. Alla fine: prezzi, collezione e monete rimaste.`,
+r_coq2:`In due, ognuno conosce due prezzi. Ogni lotto va all'offerta segreta più alta, pagata in monete 🪙; offerte uguali: il lotto resta e cresce. Annuncia, vero o falso: +1 se è vero. Alla fine: prezzi, collezione e monete rimaste.`,
+cqN:`Capasanta|Conca|Porcellana|Turritella|Orecchia di mare`,cqCarry:`nessuno, il lotto resta`,cqTide:`Marea {v}/{n}`,cqLot:`lotto {v}/{n}`,cqStall:`Il banco di questa marea`,
+cqAnQ:`Il tuo annuncio pubblico (vero o falso)`,cqUp:`Preziosa`,cqDn:`Senza valore`,cqMute:`Niente da dire`,cqAnD:`+1 alla fine se è vero: 📈 = prezzo 3 o più, 📉 = prezzo 1 o meno.`,
+cqBid:`La tua offerta segreta (borsa: {v} 🪙)`,cqAuto:`0 = passi. Senza scelta, passi.`,cqTie:`Puoi cambiarla fino alla fine. Offerte uguali in testa: si annullano.`,
+cqOut:`La marea scopre un prezzo: {s} = {v}`,cqNoAn:`Nessuno aveva annunciato niente su questa specie.`,cqInc:`Nuova marea: +{v} 🪙 a testa`,cqSea:`L'ultimo lotto, invenduto, torna al mare.`,
+cqMk:`Il grande mercato`,cqSh:`conchiglie × prezzo`,cqSet:`collezione (3 specie +2, 4 +4, 5 +7)`,cqAnn:`annunci veri`,cqLeft:`½ punto per moneta rimasta`,
+tu_coq1:`Cinque specie di conchiglie. Ognuna ha un prezzo nascosto: 0, 1, 2, 3 o 5. Tu ne conosci uno in segreto.`,
+tu_coq2:`Ogni lotto va all'asta: tutti offrono insieme, in segreto. L'offerta più alta vince e paga le sue monete.`,
+tu_coq3:`Offerte uguali in testa? Si annullano: vince l'offerta più alta rimasta sola. Altrimenti il lotto resta e cresce.`,
+tu_coq4:`All'inizio di ogni marea, un annuncio pubblico: «preziosa» o «senza valore». Può essere falso!`,
+tu_coq5:`Dopo le maree 1 e 2 esce un prezzo: gli annunci veri valgono +1, quelli falsi vengono smascherati.`,
+tu_coq6:`Al grande mercato: ogni conchiglia vale il suo prezzo, più la collezione (5 specie: +7) e ½ punto per moneta tenuta.`,
+tu_coq7:`In due, ognuno conosce due prezzi: il bluff diventa un duello.`,
+lg_coqS:`{a} ha riunito tutte e 5 le specie di conchiglie`,lg_coqF:`{a} ha venduto fumo: nessun annuncio vero in Mercanti di conchiglie`,lg_coqT:`{a} ha detto solo la verità in Mercanti di conchiglie`,lg_coqB:`{a} ha vinto un lotto gigante di conchiglie`},
+{coqL:`Il cesto della pesca a piedi|Scoperta di bassa marea|La scatola dei tesori della nonna|Borsa dimenticata sul pontile|Raccolto dell'alba|Regalo di una foca|Il bottino di un granchio|Vetrina del museo chiuso|Le tasche di un marinaio|Un secchiello da spiaggia|Collezione di un vecchio capitano|Ripescato dopo la tempesta|Barattolo del capanno|Tesoro di una sirena distratta|Campioni del professore|Ricordi delle vacanze|Cassa senza etichetta|Rete aggrovigliata|Il cassetto del faro|Conchiglie della domenica|Collana disfatta|La borsa di un gabbiano|La merce della concorrenza|Raccolta clandestina|Eredità di un pirata|Fondo della stiva|Cesta del mercato del pesce|Immersione di mezzanotte|Lasciato dalla schiuma|Ultima cassa del porto`});
+GCQ('de',{n_coq:`Muschelhändler`,d_coq:`Geheime Gebote, verborgene Preise, wahre oder falsche Ansagen`,
+r_coq:`Jedes Los geht an das höchste geheime Gebot, bezahlt in Münzen 🪙. Gleiche Höchstgebote heben sich auf, das nächste gewinnt. Jede Art hat einen verborgenen Preis; du kennst einen. Sag etwas an, wahr oder falsch: +1, wenn es stimmt. Am Ende zählen Preise, Sammlung und übrige Münzen.`,
+r_coq2:`Zu zweit kennt ihr je zwei Preise. Jedes Los geht an das höchste geheime Gebot, bezahlt in Münzen 🪙; bei Gleichstand bleibt das Los liegen und wächst. Sag etwas an, wahr oder falsch: +1, wenn es stimmt. Am Ende zählen Preise, Sammlung und übrige Münzen.`,
+cqN:`Jakobsmuschel|Flügelschnecke|Kauri|Turmschnecke|Seeohr`,cqCarry:`niemand, das Los bleibt`,cqTide:`Gezeit {v}/{n}`,cqLot:`Los {v}/{n}`,cqStall:`Der Stand dieser Gezeit`,
+cqAnQ:`Deine öffentliche Ansage (wahr oder falsch)`,cqUp:`Wertvoll`,cqDn:`Wertlos`,cqMute:`Nichts zu sagen`,cqAnD:`+1 am Ende, wenn es stimmt: 📈 = Preis 3 oder mehr, 📉 = Preis 1 oder weniger.`,
+cqBid:`Dein geheimes Gebot (Börse: {v} 🪙)`,cqAuto:`0 = du passt. Ohne Wahl passt du.`,cqTie:`Änderbar bis zum Schluss. Gleiche Höchstgebote heben sich auf.`,
+cqOut:`Die Gezeit enthüllt einen Preis: {s} = {v}`,cqNoAn:`Niemand hatte etwas über diese Art angesagt.`,cqInc:`Neue Gezeit: +{v} 🪙 für alle`,cqSea:`Das letzte Los ohne Käufer geht zurück ins Meer.`,
+cqMk:`Der große Markt`,cqSh:`Muscheln × Preis`,cqSet:`Sammlung (3 Arten +2, 4 +4, 5 +7)`,cqAnn:`wahre Ansagen`,cqLeft:`½ Punkt je übrige Münze`,
+tu_coq1:`Fünf Muschelarten. Jede hat einen verborgenen Preis: 0, 1, 2, 3 oder 5. Du kennst heimlich einen.`,
+tu_coq2:`Jedes Los wird versteigert: Alle bieten gleichzeitig und geheim. Das höchste Gebot gewinnt und zahlt seine Münzen.`,
+tu_coq3:`Gleiche Höchstgebote? Sie heben sich auf: Das höchste allein stehende Gebot gewinnt. Sonst bleibt das Los liegen und wächst.`,
+tu_coq4:`Zu Beginn jeder Gezeit eine öffentliche Ansage: „wertvoll“ oder „wertlos“. Sie darf falsch sein!`,
+tu_coq5:`Nach Gezeit 1 und 2 kommt ein Preis heraus: Wahre Ansagen bringen +1, falsche fliegen auf.`,
+tu_coq6:`Auf dem großen Markt zählt jede Muschel ihren Preis, dazu die Sammlung (5 Arten: +7) und ½ Punkt je behaltene Münze.`,
+tu_coq7:`Zu zweit kennt jede Seite zwei Preise: Bluffen wird zum Duell.`,
+lg_coqS:`{a} hat alle 5 Muschelarten gesammelt`,lg_coqF:`{a} hat heiße Luft verkauft: keine einzige wahre Ansage bei den Muschelhändlern`,lg_coqT:`{a} hat bei den Muschelhändlern nur die Wahrheit gesagt`,lg_coqB:`{a} hat ein riesiges Muschellos ergattert`},
+{coqL:`Korb vom Wattsammeln|Fund bei Ebbe|Omas Schatzkästchen|Am Steg vergessene Tasche|Ernte im Morgengrauen|Geschenk einer Robbe|Beute einer Krabbe|Vitrine des geschlossenen Museums|Die Taschen eines Seemanns|Ein Sandeimer|Sammlung eines alten Kapitäns|Nach dem Sturm herausgefischt|Glas aus der Strandhütte|Schatz einer zerstreuten Meerjungfrau|Proben des Professors|Urlaubsandenken|Kiste ohne Etikett|Verheddertes Netz|Die Schublade im Leuchtturm|Sonntagsmuscheln|Gerissene Kette|Die Börse einer Möwe|Ware der Konkurrenz|Heimliches Sammeln|Erbe eines Piraten|Ganz unten im Laderaum|Korb vom Fischmarkt|Tauchgang um Mitternacht|Vom Schaum zurückgelassen|Letzte Kiste im Hafen`});
+GCQ('ru',{n_coq:`Торговцы ракушками`,d_coq:`Тайные ставки, скрытые цены, правдивые или ложные заявления`,
+r_coq:`Каждый лот уходит к самой высокой тайной ставке в монетах 🪙. Равные лучшие ставки сгорают, побеждает следующая. У каждого вида скрытая цена; одну знаешь ты. Делай заявление, правдивое или ложное: +1, если оно верно. В конце: цены, коллекция и оставшиеся монеты.`,
+r_coq2:`Вдвоём каждый знает две цены. Каждый лот уходит к самой высокой тайной ставке в монетах 🪙; при равных ставках лот остаётся и растёт. Делай заявление, правдивое или ложное: +1, если оно верно. В конце: цены, коллекция и оставшиеся монеты.`,
+cqN:`Гребешок|Стромбус|Каури|Башенка|Морское ушко`,cqCarry:`никто, лот остаётся`,cqTide:`Прилив {v}/{n}`,cqLot:`лот {v}/{n}`,cqStall:`Прилавок этого прилива`,
+cqAnQ:`Твоё публичное заявление (правда или ложь)`,cqUp:`Ценная`,cqDn:`Ничего не стоит`,cqMute:`Нечего сказать`,cqAnD:`+1 в конце, если это правда: 📈 = цена 3 и выше, 📉 = цена 1 и ниже.`,
+cqBid:`Твоя тайная ставка (кошелёк: {v} 🪙)`,cqAuto:`0 = пас. Без выбора — пас.`,cqTie:`Можно менять до конца. Равные лучшие ставки сгорают.`,
+cqOut:`Прилив открывает цену: {s} = {v}`,cqNoAn:`Об этом виде никто ничего не заявлял.`,cqInc:`Новый прилив: +{v} 🪙 каждому`,cqSea:`Последний лот без покупателя уходит обратно в море.`,
+cqMk:`Большой рынок`,cqSh:`ракушки × цена`,cqSet:`коллекция (3 вида +2, 4 +4, 5 +7)`,cqAnn:`верные заявления`,cqLeft:`½ очка за каждую оставшуюся монету`,
+tu_coq1:`Пять видов ракушек. У каждого скрытая цена: 0, 1, 2, 3 или 5. Одну из них ты тайно знаешь.`,
+tu_coq2:`Каждый лот идёт с торгов: все ставят одновременно и тайно. Самая высокая ставка побеждает и платит свои монеты.`,
+tu_coq3:`Равные лучшие ставки? Они сгорают: побеждает самая высокая ставка, оставшаяся в одиночку. Если такой нет, лот остаётся и растёт.`,
+tu_coq4:`В начале каждого прилива — публичное заявление: «ценная» или «ничего не стоит». Оно может быть ложным!`,
+tu_coq5:`После 1-го и 2-го прилива открывается одна цена: верные заявления дают +1, ложные раскрыты.`,
+tu_coq6:`На большом рынке каждая ракушка стоит своей цены, плюс коллекция (5 видов: +7) и ½ очка за каждую сохранённую монету.`,
+tu_coq7:`Вдвоём каждый знает две цены: блеф превращается в дуэль.`,
+lg_coqS:`{a} {g.a:собрал|собрала|собрал(а)} все 5 видов ракушек`,lg_coqF:`{a} {g.a:продавал|продавала|продавал(а)} воздух: ни одного верного заявления в «Торговцах ракушками»`,lg_coqT:`{a} {g.a:говорил|говорила|говорил(а)} только правду в «Торговцах ракушками»`,lg_coqB:`{a} {g.a:урвал|урвала|урвал(а)} гигантский лот ракушек`},
+{coqL:`Корзинка собирателя на отмели|Находка в отлив|Бабушкина шкатулка с сокровищами|Сумка, забытая на пирсе|Утренний сбор|Подарок тюленя|Добыча краба|Витрина закрытого музея|Карманы моряка|Пляжное ведёрко|Коллекция старого капитана|Выловлено после шторма|Банка из пляжного домика|Клад рассеянной русалки|Образцы профессора|Сувениры из отпуска|Ящик без этикетки|Спутанная сеть|Ящик стола на маяке|Воскресные ракушки|Рассыпанное ожерелье|Кошелёк чайки|Товар конкурентов|Тайный сбор|Наследство пирата|Со дна трюма|Корзина с рыбного рынка|Ночное погружение|Оставлено пеной|Последний ящик в порту`});
+GCQ('zh',{n_coq:`贝壳商人`,d_coq:`秘密出价、隐藏价格、真假宣言`,
+r_coq:`每个拍品归出价最高者，用金币 🪙 暗中出价。最高出价相同则互相抵消，次高者得。每种贝壳都有隐藏价格，你知道其中一种。发表宣言，真假随意：属实 +1。终局计算价格、收藏和剩余金币。`,
+r_coq2:`两人对局，每人知道两种价格。每个拍品归暗中出价最高者（金币 🪙）；出价相同则拍品留下并变大。发表宣言，真假随意：属实 +1。终局计算价格、收藏和剩余金币。`,
+cqN:`扇贝|凤螺|宝贝|锥螺|鲍鱼`,cqCarry:`无人得手，拍品留下`,cqTide:`第 {v}/{n} 潮`,cqLot:`拍品 {v}/{n}`,cqStall:`本潮的摊位`,
+cqAnQ:`你的公开宣言（真假随意）`,cqUp:`珍贵`,cqDn:`不值钱`,cqMute:`无可奉告`,cqAnD:`属实则终局 +1：📈 = 价格 3 或以上，📉 = 价格 1 或以下。`,
+cqBid:`你的秘密出价（钱袋：{v} 🪙）`,cqAuto:`0 = 放弃。不选就算放弃。`,cqTie:`结束前都可修改。最高出价相同则互相抵消。`,
+cqOut:`潮水揭晓一个价格：{s} = {v}`,cqNoAn:`没有人对这种贝壳发表过宣言。`,cqInc:`新的潮水：每人 +{v} 🪙`,cqSea:`最后一个拍品无人买下，回到大海。`,
+cqMk:`大集市`,cqSh:`贝壳 × 价格`,cqSet:`收藏（3 种 +2，4 种 +4，5 种 +7）`,cqAnn:`属实的宣言`,cqLeft:`每枚剩余金币 ½ 分`,
+tu_coq1:`五种贝壳，每种都有隐藏价格：0、1、2、3 或 5。你暗中知道其中一种。`,
+tu_coq2:`每个拍品都要拍卖：大家同时暗中出价。最高出价者获胜并付出金币。`,
+tu_coq3:`最高出价相同？互相抵消：单独剩下的最高出价获胜。若没有，拍品留下并变大。`,
+tu_coq4:`每次潮开始时，发表一条公开宣言：「珍贵」或「不值钱」。可以是假的！`,
+tu_coq5:`第 1、2 次潮结束时揭晓一个价格：属实的宣言 +1，假的被识破。`,
+tu_coq6:`大集市上：每个贝壳按价格计分，加上收藏（5 种：+7），每枚留下的金币 ½ 分。`,
+tu_coq7:`两人对局，每人知道两种价格：虚张声势变成一场对决。`,
+lg_coqS:`{a} 集齐了 5 种贝壳`,lg_coqF:`{a} 在「贝壳商人」里卖空气：没有一句宣言属实`,lg_coqT:`{a} 在「贝壳商人」里句句属实`,lg_coqB:`{a} 拿下了一大堆贝壳`},
+{coqL:`赶海人的篮子|退潮时的发现|奶奶的百宝盒|码头上遗忘的袋子|黎明的收获|海豹的礼物|螃蟹的战利品|闭馆博物馆的橱窗|水手的口袋|沙滩小桶|老船长的收藏|风暴后捞起的|海滩小屋的罐子|迷糊美人鱼的宝藏|教授的样本|度假纪念品|没有标签的箱子|缠成一团的渔网|灯塔的抽屉|星期天的贝壳|散开的项链|海鸥的钱袋|对手的存货|偷偷捡来的|海盗的遗产|货舱最底层|鱼市的篮子|午夜潜水|浪花留下的|港口最后一箱`});
+GCQ('he',{n_coq:`סוחרי צדפים`,d_coq:`הצעות סודיות, מחירים נסתרים, הכרזות אמת או שקר`,
+r_coq:`כל חבילה הולכת להצעה הסודית הגבוהה ביותר, בתשלום במטבעות 🪙. הצעות שוות בראש מבטלות זו את זו, והבאה בתור זוכה. לכל מין מחיר נסתר, ואחד מהם ידוע לך. מכריזים, אמת או שקר: ⁦+1⁩ אם זה נכון. בסוף: מחירים, אוסף ומטבעות שנשארו.`,
+r_coq2:`בשניים, כל צד יודע שני מחירים. כל חבילה הולכת להצעה הסודית הגבוהה ביותר, בתשלום במטבעות 🪙; בהצעות שוות החבילה נשארת וגדלה. מכריזים, אמת או שקר: ⁦+1⁩ אם זה נכון. בסוף: מחירים, אוסף ומטבעות שנשארו.`,
+cqN:`מסרקית|קונכייה|קאורי|צריחון|אוזן־ים`,cqCarry:`אין זוכה, החבילה נשארת`,cqTide:`גאות {v}/{n}`,cqLot:`חבילה {v}/{n}`,cqStall:`הדוכן של הגאות הזאת`,
+cqAnQ:`ההכרזה הפומבית שלך (אמת או שקר)`,cqUp:`יקרת ערך`,cqDn:`חסרת ערך`,cqMute:`אין מה לומר`,cqAnD:`⁦+1⁩ בסוף אם זה נכון: 📈 = מחיר 3 ומעלה, 📉 = מחיר 1 ומטה.`,
+cqBid:`ההצעה הסודית שלך (ארנק: {v} 🪙)`,cqAuto:`0 = ויתור. בלי בחירה — ויתור.`,cqTie:`אפשר לשנות עד הסוף. הצעות שוות בראש מבטלות זו את זו.`,
+cqOut:`הגאות חושפת מחיר: {s} = {v}`,cqNoAn:`לא הייתה שום הכרזה על המין הזה.`,cqInc:`גאות חדשה: ⁦+{v}⁩ 🪙 לכולם`,cqSea:`החבילה האחרונה, בלי קונה, חוזרת לים.`,
+cqMk:`השוק הגדול`,cqSh:`צדפים × מחיר`,cqSet:`אוסף (3 מינים ⁦+2⁩, 4 ⁦+4⁩, 5 ⁦+7⁩)`,cqAnn:`הכרזות נכונות`,cqLeft:`חצי נקודה לכל מטבע שנשאר`,
+tu_coq1:`חמישה מיני צדפים. לכל אחד מחיר נסתר: 0, 1, 2, 3 או 5. אחד מהם ידוע לך בסוד.`,
+tu_coq2:`כל חבילה עולה למכירה פומבית: כולם מציעים יחד, בסוד. ההצעה הגבוהה ביותר זוכה ומשלמת את המטבעות.`,
+tu_coq3:`הצעות שוות בראש? הן מתבטלות: ההצעה הגבוהה ביותר שנשארה לבד זוכה. אם אין, החבילה נשארת וגדלה.`,
+tu_coq4:`בתחילת כל גאות, הכרזה פומבית: „יקרת ערך" או „חסרת ערך". מותר לשקר!`,
+tu_coq5:`אחרי גאות 1 ו־2 נחשף מחיר: הכרזות נכונות שוות ⁦+1⁩, והשקריות נחשפות.`,
+tu_coq6:`בשוק הגדול: כל צדף שווה את מחירו, ועוד האוסף (5 מינים: ⁦+7⁩) וחצי נקודה לכל מטבע שנשמר.`,
+tu_coq7:`בשניים, כל צד יודע שני מחירים: הבלוף הופך לדו־קרב.`,
+lg_coqS:`{a} {g.a:אסף|אספה|אסף/ה} את כל 5 מיני הצדפים`,lg_coqF:`{a} {g.a:מכר|מכרה|מכר/ה} אוויר: אף הכרזה נכונה בסוחרי צדפים`,lg_coqT:`{a} {g.a:אמר|אמרה|אמר/ה} רק אמת בסוחרי צדפים`,lg_coqB:`{a} {g.a:חטף|חטפה|חטף/ה} חבילת צדפים ענקית`},
+{coqL:`הסל של מלקטי החוף|ממצא של שפל|קופסת האוצרות של סבתא|תיק שנשכח על המזח|קציר של שחר|מתנה מכלב ים|שלל של סרטן|ויטרינה של מוזיאון סגור|הכיסים של מלח|דלי של חוף|האוסף של רב־חובל זקן|נמשה אחרי הסערה|צנצנת מהבקתה|אוצר של בתולת ים מפוזרת|הדגימות של הפרופסור|מזכרות מהחופשה|ארגז בלי תווית|רשת מסובכת|המגירה של המגדלור|צדפים של שבת|שרשרת שהתפרקה|הארנק של שחף|הסחורה של המתחרים|ליקוט חשאי|הירושה של פיראט|בתחתית הספינה|סל משוק הדגים|צלילת חצות|מה שהקצף השאיר|הארגז האחרון בנמל`});
+GCQ('pt',{n_coq:`Mercadores de conchas`,d_coq:`Lances secretos, preços ocultos, anúncios verdadeiros ou falsos`,
+r_coq:`Cada lote vai para o lance secreto mais alto, pago em moedas 🪙. Lances iguais no topo se anulam, e o seguinte vence. Cada espécie tem um preço oculto; você conhece um. Anuncie, verdade ou mentira: +1 se for verdade. No fim: preços, coleção e moedas que sobraram.`,
+r_coq2:`A dois, cada um conhece dois preços. Cada lote vai para o lance secreto mais alto, pago em moedas 🪙; lances iguais: o lote fica e cresce. Anuncie, verdade ou mentira: +1 se for verdade. No fim: preços, coleção e moedas que sobraram.`,
+cqN:`Vieira|Búzio|Cauri|Turritela|Orelha-do-mar`,cqCarry:`ninguém, o lote fica`,cqTide:`Maré {v}/{n}`,cqLot:`lote {v}/{n}`,cqStall:`A banca desta maré`,
+cqAnQ:`Seu anúncio público (verdadeiro ou falso)`,cqUp:`Valiosa`,cqDn:`Sem valor`,cqMute:`Nada a dizer`,cqAnD:`+1 no fim se for verdade: 📈 = preço 3 ou mais, 📉 = preço 1 ou menos.`,
+cqBid:`Seu lance secreto (bolsa: {v} 🪙)`,cqAuto:`0 = você passa. Sem escolha, você passa.`,cqTie:`Dá para mudar até o fim. Lances iguais no topo se anulam.`,
+cqOut:`A maré revela um preço: {s} = {v}`,cqNoAn:`Ninguém tinha anunciado nada sobre esta espécie.`,cqInc:`Nova maré: +{v} 🪙 para cada um`,cqSea:`O último lote, sem comprador, volta para o mar.`,
+cqMk:`O grande mercado`,cqSh:`conchas × preço`,cqSet:`coleção (3 espécies +2, 4 +4, 5 +7)`,cqAnn:`anúncios verdadeiros`,cqLeft:`½ ponto por moeda que sobrou`,
+tu_coq1:`Cinco espécies de conchas. Cada uma tem um preço oculto: 0, 1, 2, 3 ou 5. Você conhece um em segredo.`,
+tu_coq2:`Cada lote vai a leilão: todos dão lances ao mesmo tempo, em segredo. O lance mais alto vence e paga suas moedas.`,
+tu_coq3:`Lances iguais no topo? Eles se anulam: vence o lance mais alto que ficou sozinho. Se não houver, o lote fica e cresce.`,
+tu_coq4:`No início de cada maré, um anúncio público: «valiosa» ou «sem valor». Pode ser falso!`,
+tu_coq5:`Depois das marés 1 e 2 sai um preço: anúncios verdadeiros valem +1, os falsos são desmascarados.`,
+tu_coq6:`No grande mercado: cada concha vale seu preço, mais a coleção (5 espécies: +7) e ½ ponto por moeda guardada.`,
+tu_coq7:`A dois, cada um conhece dois preços: o blefe vira um duelo.`,
+lg_coqS:`{a} reuniu as 5 espécies de conchas`,lg_coqF:`{a} vendeu fumaça: nenhum anúncio verdadeiro em Mercadores de conchas`,lg_coqT:`{a} só disse a verdade em Mercadores de conchas`,lg_coqB:`{a} arrematou um lote gigante de conchas`},
+{coqL:`O cesto da mariscagem|Achado da maré baixa|A caixinha de tesouros da avó|Sacola esquecida no píer|Colheita do amanhecer|Presente de uma foca|O saque de um caranguejo|Vitrine do museu fechado|Os bolsos de um marinheiro|Um baldinho de praia|Coleção de um velho capitão|Pescado depois da tempestade|Pote da cabana|Tesouro de uma sereia distraída|Amostras do professor|Lembranças das férias|Caixa sem etiqueta|Rede embaraçada|A gaveta do farol|Conchas de domingo|Colar desfeito|A bolsa de uma gaivota|O estoque da concorrência|Coleta clandestina|Herança de um pirata|Fundo do porão|Cesto da peixaria|Mergulho da meia-noite|Deixado pela espuma|Última caixa do porto`});
+/* /🐚 i18n */
 })();
