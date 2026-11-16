@@ -63,33 +63,46 @@ function gLogGame(s,r){if(typeof localStorage=='undefined')return;const g=s.game
 
 /* ---------- moteur ---------- */
 const gOn=s=>s.order.filter(n=>{const p=P(n);return p&&p.online!==false});
+/* attente : une coupure brève (téléphone en veille, changement d'appli, réseau) ne fait pas sauter quelqu'un — on l'attend
+   encore GGR ms après sa déconnexion (le sablier, lui, court toujours). Jamais compté comme « fini » pour autant. */
+const GOFF={},GGR=60000;
+const gWt=s=>s.order.filter(n=>{const p=P(n);if(!p)return false;if(p.online!==false){delete GOFF[n];return true}const t=GOFF[n]||(GOFF[n]=Date.now());return Date.now()-t<GGR});
+/* spectateurs 👀 : au salon, chacun peut choisir de regarder (s.gspec) ; en partie, toute personne hors s.order regarde
+   (arrivée en cours de partie → elle joue à la suivante). gPl = qui jouera la prochaine partie. */
+const gPl=s=>s.players.filter(p=>p.online&&!(s.gspec||[]).includes(p.name)).map(p=>p.name);
+W.GSpec=(s,n)=>!!(s&&P(n)&&(s.phase=='game'||s.phase=='gend'?s.order&&!s.order.includes(n):s.phase=='lobby'&&s.gsel&&(s.gspec||[]).includes(n)));
+/* scores toujours propres : nombre fini, arrondi au dixième, 0 pour qui n'en a pas */
+const gNum=v=>{v=+v;return isFinite(v)?Math.round(v*10)/10:0};
+function gScl(s){const g=s.game;if(!g)return;g.sc=g.sc||{};s.order.forEach(n=>g.sc[n]=gNum(g.sc[n]))}
 /* sablier : durée de base × facteur de l'hôte (TF : 1,5 / 1 / 0,7, comme l'Expédition). TF 0 = pas de sablier : g.dl=-1,
    on avance seulement quand tout le monde a fini. Toutes les durées de jeu passent par gWait. */
 const gTF=()=>{try{return typeof st!='undefined'&&st?+(st.timer??1):1}catch(e){return 1}};/* = TF() hors mode éclair (propre à l'Expédition) */
 function gWait(g,sec,st,rv){const f=gTF();sec=Math.round(sec*(f||1));g.st=st;g.k++;g.done={};g.need=null;g.dl=f?Date.now()+sec*1000:-1;g.sec=sec;g.rv=rv?1:0}
 const gLate=g=>g.dl>0&&Date.now()>g.dl;
-const gNeed=s=>{const g=s.game;return gOn(s).filter(n=>!g.need||g.need.includes(n))};
+const gNeed=s=>{const g=s.game;return gWt(s).filter(n=>!g.need||g.need.includes(n))};
 const gAll=s=>gNeed(s).every(n=>s.game.done[n]);
-function gFin(s){const g=s.game,r=GAMES[g.id].fin(s)||{};s.gres={pts:r.pts||g.sc,coop:r.coop||null};g.dl=0;s.phase='gend';if(g.over)try{gLogGame(s,r)}catch(e){}}
+function gFin(s){const g=s.game;gScl(s);const r=GAMES[g.id].fin(s)||{},rp=r.pts||g.sc,pts={};s.order.forEach(n=>pts[n]=gNum(rp[n]));s.gres={pts,coop:r.coop?{...r.coop,v:gNum(r.coop.v),max:gNum(r.coop.max)}:null};g.dl=0;s.phase='gend';if(g.over)try{gLogGame(s,r)}catch(e){}}
 function gCheck(s){const g=s.game;let i=0;
- while(s.phase=='game'&&g.dl&&(gAll(s)||gLate(g))&&i++<6){g.dl=0;GAMES[g.id].next(s);if(g.over){gFin(s);break}}}
+ while(s.phase=='game'&&g.dl&&(gAll(s)||gLate(g))&&i++<6){g.dl=0;GAMES[g.id].next(s);gScl(s);if(g.over){gFin(s);break}}}
 function gStart(s){const id=s.gsel;s.game={id,k:0,r:0,n:0,sc:{},done:{},rx:{}};s.order.forEach(n=>s.game.sc[n]=0);s.gres=null;s.phase='game';s.gid=Date.now().toString(36);GAMES[id].init(s);
  /* 📜 clin d'œil : le dernier temps fort de CE jeu entre ces personnes, en tête de la 1re étape (sauf si Le Phare en pose déjà un) */
  try{const g=s.game,e=!g.lq&&typeof localStorage!='undefined'&&gLogFor(s.order).find(e=>e.g==id);if(e)g.nod={k:e.k,n:e.n}}catch(e){}gCheck(s)}
 /* @games : appelé en tête de act() ; true = géré ici */
 W.GAct=function(s,from,a){const t=a&&a.t;
  if(t=='gsel'){if(from==s.host&&s.phase=='lobby'&&(!a.v||GAMES[a.v])){s.gsel=a.v||null;bump()}return true}
- if(t=='start'&&s.gsel&&s.phase=='lobby'){const G=GAMES[s.gsel],on=s.players.filter(p=>p.online);
-  if(from==s.host&&G&&on.length>=G.min&&on.length<=G.max){s.order=on.map(p=>p.name);gStart(s);bump()}return true}
+ if(t=='start'&&s.gsel&&s.phase=='lobby'){const G=GAMES[s.gsel],on=gPl(s);
+  if(from==s.host&&G&&on.length>=G.min&&on.length<=G.max){s.order=on;gStart(s);bump()}return true}
+ if(t=='gspec'){if(s.phase=='lobby'&&P(from)){const L=(s.gspec||[]).filter(n=>n!=from&&P(n));s.gspec=a.v?[...L,from]:L;bump()}return true}
  if(t=='gtie'){/* liens connus (couples…) : n'importe qui peut lier deux personnes ; seul·es les autres peuvent délier */
   if(s.phase=='lobby'&&s.players.some(p=>p.name==from)&&Array.isArray(a.v)&&a.v.length==2&&a.v[0]!==a.v[1]&&a.v.every(n=>typeof n=='string'&&s.players.some(p=>p.name==n))){
    const k=a.v[0]<a.v[1]?a.v[0]+'|'+a.v[1]:a.v[1]+'|'+a.v[0],L=s.gtie||[];if(L.includes(k)){if(a.v.includes(from))return true;s.gtie=L.filter(x=>x!=k)}else s.gtie=[...L,k].slice(-8);bump()}return true}
  if(t=='gx'&&a.v=='stop'){if(from==s.host&&s.phase=='game'&&s.game){gFin(s);bump()}return true}
  if(t=='gx'){if(from!=s.host||s.phase!='gend')return true;s.players=s.players.filter(p=>p.online);
-  const G=GAMES[s.game.id],on=s.players.map(p=>p.name);
+  const G=GAMES[s.game.id],on=gPl(s);s.gspec=(s.gspec||[]).filter(n=>P(n));
   if(a.v=='again'&&on.length>=G.min&&on.length<=G.max){s.gsel=s.game.id;s.order=on;gStart(s)}else{s.phase='lobby';s.game=null;s.gres=null}
   bump();return true}
- if(t=='g'){const g=s.game;if(s.phase!='game'||!g||!s.order.includes(from))return true;if(a.k!=null&&a.k!==g.k&&!a.rx)return true;
+ if(t=='g'){const g=s.game;if(s.phase!='game'||!g||!P(from))return true;if(a.k!=null&&a.k!==g.k&&!a.rx)return true;
+  /* 👀 spectateurs : réactions seulement */if(!s.order.includes(from)&&!a.rx)return true;
   let ch=false;if(a.rx&&typeof a.rx=='string'&&RX.includes(a.rx)){g.rx[from]=a.rx;(g.rxt=g.rxt||{})[from]=Date.now();ch=true}/* rxt : pour rejouer une réaction une seule fois */
   else if(a.ok&&g.rv){if(!g.done[from]){g.done[from]=1;ch=true}}
   else{/* on peut changer d'avis tant que l'étape n'est pas finie (les autres jouent encore, sablier en cours) */
@@ -109,6 +122,7 @@ const NM=n=>n=='~'?`<b>🐟 ${esc(GT('ghost'))}</b>`:B(n);
 const DT=n=>n=='~'?'<span class="dot" style="background:#7aa6b8"></span>':DOT(n);
 const dl=(i,b=0)=>`style="animation-delay:${(b+i*.07).toFixed(2)}s"`;
 function gHint(s){const g=s.game,m=meN(),need=gNeed(s);
+ if(!s.order.includes(m))return{hint:'👀 '+GT('specH')};
  if(g.rv){const w=need.filter(n=>!g.done[n]);return g.done[m]?{hint:w.length?GT('waitN',{n:w.map(B).join(', ')}):'…'}:{hint:GT('ready'),hintBtn:`<button class="pri gokb" id="gok">${GT('ok')}</button>`,mine:true}}
  if(!need.includes(m))return{hint:GT('watch')};
  if(!g.done[m])return{hint:GT('yourMove'),mine:true};
@@ -117,20 +131,45 @@ const pick=(names,cur,attr,ex)=>`<div class="gpk">${names.filter(n=>n!=ex).map((
 const norm=w=>String(w||'').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,'').replace(/^(.{4,})[sx]$/,'$1');
 const hideOwn=(o,n)=>{const r={};for(const k in o||{})r[k]=k==n?o[k]:null;return r};
 
+/* animations d'entrée : une seule fois par étape (clé jeu + g.k). Un nouveau rendu dans la même étape (offre, réaction,
+   choix d'un·e autre, chat…) recrée le DOM : chaque animation déjà vue reprend là où elle en était (currentTime), donc
+   rien ne rejoue ni ne clignote ; seuls les éléments vraiment nouveaux s'animent. [data-gan] : animations qui se calent
+   elles-mêmes sur une horloge (sablier, séquences, bulles de réaction) — on n'y touche pas. */
+const gAnP=(el,root)=>{let p='';for(let e=el;e&&e!==root;e=e.parentElement){const c=((e.getAttribute('class')||'').split(' ')[0])||'',t=e.tagName;let i=0;
+ for(let x=e.previousElementSibling;x;x=x.previousElementSibling)if(x.tagName==t&&((x.getAttribute('class')||'').split(' ')[0]||'')==c)i++;p='/'+t+'.'+c+':'+i+p}return p};
+function gAnim(root,key){if(!root||!root.getAnimations)return;try{const now=performance.now(),N=new Map();if(GV.ak!==key){GV.ak=key;GV.am=new Map()}const M=GV.am;
+ for(const a of root.getAnimations({subtree:true})){const el=a.effect&&a.effect.target;if(!el||!a.animationName||el.closest('[data-gan]'))continue;
+  const id=gAnP(el,root.parentElement)+(a.effect.pseudoElement||'')+'@'+a.animationName,t0=M.get(id);
+  if(t0!=null){a.currentTime=now-t0;N.set(id,t0)}else N.set(id,now)}
+ GV.am=N}catch(e){}}
+W.GAnim=gAnim;
+/* brouillons de jeu (textes en cours d'écriture) : gardés aussi dans la session de l'onglet → survivent à un rechargement
+   de page (téléphone qui a tué l'onglet) tant que la partie est la même */
+const GDK='terra:gdr';
+function gDrIn(s){if(GV.dr===s.gid)return;GV.dr=s.gid;try{const o=JSON.parse(sessionStorage.getItem(GDK)||'null');if(o&&o.gid===s.gid)for(const k in o.d)if(drafts[k]==null)drafts[k]=o.d[k]}catch(e){}}
+function gDrOut(){try{const d={};for(const k in drafts)if(/^g[a-z]/.test(k)&&typeof drafts[k]=='string')d[k]=drafts[k];sessionStorage.setItem(GDK,JSON.stringify({gid:st.gid,d}))}catch(e){}}
+if(typeof document!='undefined')document.addEventListener('input',e=>{const t=e.target;if(t&&t.closest&&t.closest('.gw')&&t.dataset&&t.dataset.d)setTimeout(gDrOut,0)});
+/* 👀 bandeau des spectateurs (en partie) : qui regarde, et sa dernière réaction */
+function gSpecBar(s){const o=s.order||[],L=(s.players||[]).filter(p=>p.online&&!o.includes(p.name));if(!L.length)return '';const g=s.game||{};
+ return `<div class="gspb2"><span class="gspi" aria-hidden="true">👀</span>${L.map(p=>`<span class="gspn">${DT(p.name)}${p.name==meN()?esc(GT('me')):esc(p.name)}${(g.rx||{})[p.name]&&Date.now()-((g.rxt||{})[p.name]||0)<8000?` <i>${g.rx[p.name]}</i>`:''}</span>`).join('')}</div>`}
+
 W.GView=function(){const s=isHost?GHide(meN(),st):st,g=s.game;if(!g||!GAMES[g.id])return{html:''};/* l'hôte voit la même chose que les autres */
  if(s.v!==GV.v){GV.v=s.v;GV.t=Date.now()}
+ try{gDrIn(s)}catch(e){}
  if(s.phase=='gend')return gEndView(s);
+ const spc=!s.order.includes(meN());
  const G=GAMES[g.id],v=G.view(s)||{},two=s.order.length==2;
  const rem=g.dl>0?Math.max(0,(g.dl-((s.updatedAt||Date.now())+(Date.now()-(RCV||Date.now()))))/1000):0;
  const rk='r_'+g.id+(two&&GI18N.fr.ui['r_'+g.id+'2']?'2':'');
  const head=`<div class="ghd"><span class="gic">${G.icon}</span><b>${GT('n_'+g.id)}</b>${g.n?`<span class="grd">${Math.min(g.r+1,g.n)} / ${g.n}</span>`:''}${meN()==s.host?`<button class="gstop" id="gstop" aria-label="${esc(GT('stopAsk'))}" data-tip="${esc(GT('stopAsk'))}">✕</button>`:''}</div>
- ${g.dl>0?`<div class="gsab" aria-hidden="true"><i style="animation-duration:${g.sec}s;animation-delay:-${Math.max(0,g.sec-rem).toFixed(2)}s"></i></div>`:''}
+ ${spc?`<p class="gspc0">👀 ${GT((s.gspec||[]).includes(meN())?'specT2':'specT')}</p>`:''}${g.dl>0?`<div class="gsab" data-gan aria-hidden="true"><i style="animation-duration:${g.sec}s;animation-delay:-${Math.max(0,g.sec-rem).toFixed(2)}s"></i></div>`:''}
  ${g.k<=1?`<p class="grule">${GT(rk)}</p>${g.nod?`<p class="gnod ga" ${dl(2)}>📜 ${GT('lgLast',{t:gLogT({g:g.id,...g.nod})})}</p>`:''}`:''}`;
  const h={...gHint(s),...v};const ob=v.bind;
- return{...h,html:`<div class="gw g-${g.id}${g.k>1?' gnx':''}">${head}${v.html}</div>`,bind(){
+ if(spc){delete h.hintBtn;h.mine=false}
+ return{...h,html:`<div class="gw g-${g.id}${g.k>1?' gnx':''}${spc?' gspc':''}">${head}${v.html}${gSpecBar(s)}</div>`,bind(){
   $('#gok')&&($('#gok').onclick=()=>gs({ok:1}));$('#gstop')&&($('#gstop').onclick=()=>ask(GT('stopAsk'),GT('stop')).then(v=>v&&send({t:'gx',v:'stop'})));
   if(GV.fx!==g.id+g.k){GV.fx=g.id+g.k;if(g.rv)try{SFX.reveal()}catch(e){}}
-  ob&&ob()}}};
+  gAnim($('section>.gw'),'g'+s.gid+'.'+g.k);ob&&ob()}}};
 
 function gEndView(s){const g=s.game,G=GAMES[g.id],R=s.gres||{pts:{}},host=meN()==s.host,two=s.order.length==2;
  const rows=Object.entries(R.pts).sort((a,b)=>b[1]-a[1]);let rank=0,prev=null;
@@ -140,10 +179,11 @@ function gEndView(s){const g=s.game,G=GAMES[g.id],R=s.gres||{pts:{}},host=meN()=
  ${host?`<div class="gbtns"><button class="pri wide" data-gend="again">${GT('again')}</button><button class="ghost wide" data-gend="lobby">${GT('lobby')}</button></div>`:''}</div>`;
  return{html,mine:host,hint:host?GT('hostNext'):GT('waitHostN',{n:B(s.host)}),bind(){
   $$('[data-gend]').forEach(b=>b.onclick=()=>send({t:'gx',v:b.dataset.gend}));
+  gAnim($('section>.gw'),'e'+s.gid);
   if(GV.fx!=='end'+s.gid){GV.fx='end'+s.gid;if(!RM())setTimeout(()=>{try{confetti(rows[0]&&rows[0][0]==meN()||R.coop?50:24)}catch(e){}},350)}}}}
 
 /* @games : carte « Salle de jeux » du salon */
-W.GLobby=function(host,on,E){const sel=st.gsel&&GAMES[st.gsel]?st.gsel:'';
+W.GLobby=function(host,on,E){const sel=st.gsel&&GAMES[st.gsel]?st.gsel:'',on0=on;on=gPl(st).length;/* 👀 les spectateurs ne comptent pas */
  const tile=id=>{const G=GAMES[id],ok=!id||on<=G.max,tag=host?'button':'div';
   return `<${tag} class="gtile ggt ${sel==id?'sel':''}" ${host?`data-gsel="${id}" ${ok?'':'disabled'}`:''}><span class="gi">${id?G.icon:'⛵'}</span><span class="gt"><b>${id?GT('n_'+id):GT('exp')}</b><span class="mut">${id?GT('d_'+id):GT('expD')}</span></span><span class="gtags">${(id?G.tags:['social']).map(t=>`<i class="gtg-${t}">${GT('t_'+t)}</i>`).join('')}</span><span class="gmin">≈ ${id?G.dur:(E||'?')} min · ${id?G.min:2}–${id?G.max:8} 👤</span></${tag}>`};
  let h=`<div class="card"><h3>🎲 ${GT('room')}</h3><div class="gtiles">${host?['',...Object.keys(GAMES)].map(tile).join(''):tile(sel)}</div>${host?'':`<p class="gby">${T('chosenBy',{n:B(st.host)})}</p>`}</div>`;
@@ -156,11 +196,14 @@ W.GLobby=function(host,on,E){const sel=st.gsel&&GAMES[st.gsel]?st.gsel:'';
   let ti='';if(G.ties){const L=(st.gtie||[]).filter(k=>k.split('|').every(p=>st.players.some(x=>x.name==p))),ps=st.players.filter(p=>p.online).map(p=>p.name);
    ti=`<h3 class="gh">🔗 ${GT('mtieT')}</h3><p class="gsub">${GT('mtieD')}</p>${L.length?`<div class="gties">${L.map(k=>`<span class="gtie">${k.split('|').map(B).join(' 🔗 ')}${k.split('|').includes(meN())?'':`<button class="gtx" data-gtie="${esc(k)}" aria-label="✕">✕</button>`}</span>`).join('')}</div>`:`<p class="gval">${GT('mtie0')}</p>`}
    ${ps.length>1?`<p class="gsub">${GT('mtieH')} ${GT('mtieA')}</p><div class="gtiep">${ps.map(p=>`<button class="ghost ${GV.tie==p?'sel':''}" data-gtp="${esc(p)}">${esc(p)}</button>`).join('')}</div>`:''}`}
-  h+=(G.tone?g2ToneCard(host):'')+`<div class="card"><p class="grule">${GT(rk)}</p>${G.tut?`<button class="ghost gtutb" data-gtut="${sel}">📖 ${GT('tuB')}</button>`:''}${ok?'':`<p class="err">${GT('needP',{a:G.min,b:G.max})}</p>`}${tm}${ti}
+  const sp=(st.gspec||[]).includes(meN()),SL=(st.gspec||[]).filter(n=>st.players.some(p=>p.name==n&&p.online));
+  const spc=on0>1||sp?`<div class="gspw"><button class="ghost gspt ${sp?'sel':''}" id="gspec" aria-pressed="${sp}">👀 ${GT('specB')}</button><p class="gsub">${GT('specD')}</p>${SL.length?`<p class="gval gspl">${GT('specL',{n:SL.map(B).join(', ')})}</p>`:''}</div>`:'';
+  h+=(G.tone?g2ToneCard(host):'')+`<div class="card"><p class="grule">${GT(rk)}</p>${G.tut?`<button class="ghost gtutb" data-gtut="${sel}">📖 ${GT('tuB')}</button>`:''}${ok?'':`<p class="err">${GT('needP',{a:G.min,b:G.max})}</p>`}${tm}${ti}${spc}
   ${host?`<button class="pri wide" id="start" ${ok?'':'disabled'}>${GT('play',{g:GT('n_'+sel)})}</button>`:`<p class="gby">${GT('waitHost')}</p>`}</div>`}
  return h};
 /* liens connus : clics délégués (le salon est rendu par index.html) */
 if(typeof document!='undefined')document.addEventListener('click',e=>{const lg=e.target.closest&&e.target.closest('.glog>summary');if(lg){GV.lgo=!lg.parentNode.open;return}
+ if(e.target.closest&&e.target.closest('#gspec')){send({t:'gspec',v:!(st.gspec||[]).includes(meN())});return}
  const t=e.target.closest&&e.target.closest('[data-gtp],[data-gtie]');if(!t)return;
  if(t.dataset.gtie!=null){send({t:'gtie',v:t.dataset.gtie.split('|')});return}
  const p=t.dataset.gtp;if(!GV.tie||GV.tie==p){GV.tie=GV.tie==p?null:p;render();return}const a=GV.tie;GV.tie=null;send({t:'gtie',v:[a,p]});render()});
@@ -208,8 +251,14 @@ GAMES.bot={icon:'🍾',min:2,max:8,dur:10,tags:['social'],tone:true,
  view(s){const g=s.game,m=meN(),two=s.order.length==2,t18=(+s.tone||0)>0;
   if(g.st=='w'){if(g.done[m]&&GV.ed!==g.id+g.k)return{html:`<div class="card c"><div class="gbig ga gfloat">🍾</div><p class="ga" ${dl(2)}>${GT('bwait')}</p><button class="ghost gedit ga" ${dl(3)} id="gedit">✏️ ${GT('edit')}</button></div>`,bind(){$('#gedit').onclick=()=>{GV.ed=g.id+g.k;render()}}};
    const fl=i=>drafts['gbf'+i]=='1',ip=(g.ip&&g.ip[m])||[];
-   return{html:`<div class="card">${[0,1,2].map(i=>`<div class="gwr ga" ${dl(i)}>${two?`<button type="button" class="gtf ${fl(i)?'f':''}" data-gf="${i}" aria-pressed="${fl(i)}">${GT(fl(i)?'bF':'bT')}</button>`:''}<textarea data-d="gbw${i}" rows="2" maxlength="220" placeholder="${esc(ip[i]?'💡 '+GC('bot',ip[i])+'…':GT(two?'bph2':t18?'bph18':'bph'))}"></textarea></div>`).join('')}<p class="err"></p><button class="pri wide" id="gsend">${GT('send')}</button></div>`,
-    bind(){$$('[data-gf]').forEach(b=>b.onclick=()=>{const k='gbf'+b.dataset.gf,v=drafts[k]=='1'?'0':'1';drafts[k]=v;b.classList.toggle('f',v=='1');b.setAttribute('aria-pressed',v=='1');b.textContent=GT(v=='1'?'bF':'bT')});
+   return{html:`<div class="card">${[0,1,2].map(i=>`<div class="gwr ga" ${dl(i)}>${two?`<button type="button" class="gtf ${fl(i)?'f':''}" data-gf="${i}" aria-pressed="${fl(i)}">${GT(fl(i)?'bF':'bT')}</button>`:''}<textarea data-d="gbw${i}" rows="2" maxlength="220" placeholder="${esc(GT(two?'bph2':t18?'bph18':'bph'))}"></textarea></div>`).join('')}
+    ${ip.length?`<div class="gidea"><p class="gidh">💡 ${GT('bIdea')}</p><div class="gidl">${ip.map((x,i)=>`<button type="button" class="gidc" data-gid="${i}">${esc(GC('bot',x))}</button>`).join('')}</div><p class="gidd">${GT('bIdeaD')}</p></div>`:''}<p class="err"></p><button class="pri wide" id="gsend">${GT('send')}</button></div>`,
+    bind(){/* 💡 idées facultatives : rien n'est écrit tant qu'on ne touche pas une idée ; elle va dans la case choisie
+      (ou la 1re vide), et ne remplace un texte que si toutes les cases sont pleines */
+     const T=[0,1,2].map(i=>$(`[data-d="gbw${i}"]`));T.forEach((t,i)=>t&&t.addEventListener('focus',()=>GV.bf=i));
+     $$('[data-gid]').forEach(b=>b.onclick=()=>{const tx=GC('bot',ip[+b.dataset.gid])+' : ';let i=GV.bf!=null&&T[GV.bf]&&!T[GV.bf].value.trim()?GV.bf:T.findIndex(t=>t&&!t.value.trim());if(i<0)i=GV.bf!=null?GV.bf:2;
+      const t=T[i];if(!t)return;t.value=tx;drafts['gbw'+i]=tx;t.dispatchEvent(new Event('input',{bubbles:true}));t.focus();try{t.setSelectionRange(tx.length,tx.length)}catch(e){}GV.bf=i});
+     $$('[data-gf]').forEach(b=>b.onclick=()=>{const k='gbf'+b.dataset.gf,v=drafts[k]=='1'?'0':'1';drafts[k]=v;b.classList.toggle('f',v=='1');b.setAttribute('aria-pressed',v=='1');b.textContent=GT(v=='1'?'bF':'bT')});
      $('#gsend').onclick=()=>{const w=[0,1,2].map(i=>tidy($(`[data-d="gbw${i}"]`).value)),f=[0,1,2].map(fl);
       if(two?(w.some(x=>!x)||!f.includes(true)||!f.includes(false)):w.filter(Boolean).length<2)return err(GT(two?'bmin2':'bmin'));GV.ed=null;gs({w,f})}}}}
   if(two){const o=s.order.find(x=>x!=m),b=(g.w[o]||[])[g.i]||{},my=(g.w[m]||[])[g.i]||{};
@@ -380,7 +429,7 @@ GAMES.pec={bag:PBAG,icon:'🦪',min:2,max:8,dur:7,tags:['chance'],
    :ev.it=='m'?`<div class="gev ga jel"><span class="gbig">🪼</span><b>${GT('pjel')}</b>${ev.t.length?`<span>${ev.t.map(NM).join(', ')} −½</span>`:''}</div>`
    :`<div class="gev ga shk ${g.sh>=2?'dead':''}"><span class="gbig">🦈</span><b>${g.sh>=2?GT('pdead'):GT('pshark')} (${g.sh}/2)</b></div>`;
   const divers=`<div class="gdv">${g.ps.filter(n=>g.fil[n]!=null).map((n,i)=>{const d=g.down.includes(n);return `<span class="gchip ${d?'dn':'up'} ${n==m?'me':''}">${d?'🤿':'⛵'} ${DT(n)}${n=='~'?'🐟':esc(n)} <b>${d?g.fil[n]:g.upv[n]!=null?'+'+g.upv[n]:g.lost[n]?'✗':''}</b>${g.rx[n]&&d?` <span class="grx">${g.rx[n]}</span>`:''}</span>`}).join('')}</div>`;
-  const cof=`<p class="gcof">🔒 ${GT('pcof')} : <b>${g.cof[m]??0}</b> <span class="mut">· ${GT('psecret')}</span></p>`;
+  const cof=!s.order.includes(m)?'':`<p class="gcof">🔒 ${GT('pcof')} : <b>${g.cof[m]??0}</b> <span class="mut">· ${GT('psecret')}</span></p>`;
   if(g.st=='e'){const h=g.mh.at(-1)||{upv:{},lost:{}};return{html:`<div class="card c">${evh}<h3>${GT('pmanche')}</h3><div class="gdv">${g.ps.map((n,i)=>`<span class="gchip ga" ${dl(i,.2)}>${DT(n)}${n=='~'?'🐟':esc(n)} <b>${h.upv[n]!=null?'+'+h.upv[n]:h.lost[n]?'✗ −'+h.lost[n]:'0'}</b></span>`).join('')}</div>${cof}</div>`}}
   return{html:`<div class="card c">${evh}${divers}${down?`<p class="gfil">${GT('pfil')} : <b>${g.fil[m]}</b></p><div class="gpk">${[['u','pup','⛵'],['d','pdown','🤿']].map(([v,k,ic],i)=>`<button class="ga gdec ${g.ch[m]==v?'sel':''}" ${dl(i)} data-gd="${v}">${ic} ${GT(k)}</button>`).join('')}</div>
    <div class="grxb">${RX.map(e=>`<button class="ghost" data-grx="${e}" aria-label="${e}">${e}</button>`).join('')}</div>`:`<p class="gnote">${g.upv[m]!=null?GT('pyouup',{v:g.upv[m]}):g.lost[m]?GT('pdead'):''}</p>`}${bag}${cof}</div>`,
@@ -571,7 +620,9 @@ GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,ties:true,MK
  mn(i){return `<span class="mkm"><span class="mke">${MKE[i]||'❔'}</span> ${esc(GL('mkn')[i]||'')}</span>`},
  view(s){const g=s.game,m=meN(),me=g.me||{},R=GAMES.msk;
   const sh=v=>v?`<span class="mksh" title="${esc(GT('mshT'))}">🦈${v>1?'×'+v:''}</span>`:'',duo=me.pt&&me.pt.length?me.pt.map((i,j)=>R.mn(i)+sh((me.ptr||[])[j])).join(''):'';
-  const head=g.st=='m'||g.st=='c'||g.st=='r'?`<div class="mkhd"><span class="mkme ga">${GT('ymask')} ${R.mn(me.m)}${sh(me.mtr)}</span><span class="mkvs ga" ${dl(1)}>${GT(me.pt.length>1?'ytrio':'yduo')} ${duo}</span></div>`:'';
+  const sp=!s.order.includes(m);/* 👀 spectateur : seulement le public (la mer des masques, la finale) */
+  if(sp&&(g.st=='m'||g.st=='c'))return{html:`<div class="card c"><div class="gbig ga gfloat">🎭</div></div>`};
+  const head=sp?'':g.st=='m'||g.st=='c'||g.st=='r'?`<div class="mkhd"><span class="mkme ga">${GT('ymask')} ${R.mn(me.m)}${sh(me.mtr)}</span><span class="mkvs ga" ${dl(1)}>${GT(me.pt.length>1?'ytrio':'yduo')} ${duo}</span></div>`:'';
   if(g.st=='m'){const pq=g.q[g.r];
    if(g.done[m]&&R.ed!==g.k)return{html:`<div class="card c">${head}<div class="mkbub mine ga" ${dl(2)}>${me.msg?esc(me.msg):`<i class="mut">${GT('mnone')}</i>`}</div><p class="gnote ga" ${dl(3)}>${GT('msent')}</p><button class="ghost mked" id="gedit">✏️ ${GT('medit')}</button></div>`,
     bind(){$('#gedit').onclick=()=>{R.ed=g.k;drafts['gmw'+g.k]=me.msg||'';render()}}};
@@ -584,19 +635,21 @@ GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,ties:true,MK
    ${(me.ptr||[]).some(Boolean)?`<p class="mut mkshd">🦈 ${GT('mshD')}</p>`:''}</div>`,
    bind(){$$('[data-gm]').forEach(x=>x.onclick=()=>gs(x.dataset.to!=null?{v:x.dataset.gm,to:+x.dataset.to}:{v:x.dataset.gm}))}};
   if(g.st=='r'){const sea=(g.pub[g.r]||[]).map((gr,i)=>`<div class="mksea ga" ${dl(i,.4)}>${gr.map(([k,c,v])=>`<span class="mkc ${c=='P'?'p':'g'} ${k===me.m?'me':''}">${MKE[k]} ${c=='P'?'🤝🏻':'🔒'} <b>+${v}</b></span>`).join('')}</div>`).join('');
+   if(sp)return{html:`<div class="card c"><h3 class="gh3">🌊 ${GT('msea')}</h3>${sea}</div>`};
    const rep=me.hab;
    return{html:`<div class="card c">${head}<div class="mkres">${(me.pc||[]).map((c,i)=>`<p class="ga" ${dl(i+1)}>${MKE[me.pt[i]]} ${GT(c=='P'?'mshared':'mkept')}${me.pt.length>1?` <span class="mut">· ${esc(GT('me'))} ${me.ch[i]=='P'?'🤝🏻':'🔒'}</span>`:''}</p>`).join('')}
     <p class="gbig2 ga ${me.gain>=4?'ok':''}" ${dl(3)}>+${me.gain}</p>${me.nb?`<p class="mknet ga" ${dl(4)}>🕸️ ${GT('mnet',{v:me.nb})}</p>`:''}${rep?`<p class="mut ga" ${dl(4)}>🔁 ${GT('mrep')}</p>`:''}${me.tm?`<p class="mut ga" ${dl(4)}>🔗 ${GT('mtieM')}</p>`:''}${me.mtr?`<p class="mut ga" ${dl(5)}>${sh(me.mtr)} ${GT('myshk',{v:me.mtr})}</p>`:''}<p class="gcof">🔒 ${GT('mtot',{v:g.sc[m]??0})}</p></div>
     <h3 class="gh3">🌊 ${GT('msea')}</h3>${sea}</div>`,bind(){if(me.gain>=4&&!RM())sparkles($('.mkres .gbig2'),me.nb?14:8)}}}
   const fin=g.fin||[],isF=fin.includes(m),names=fin.map((p,i)=>NM(p)+((g.ftr||[])[i]?' 🦈'+(g.ftr[i]>1?'×'+g.ftr[i]:''):'')).join(' & ');
   if(g.st=='f'){const top=`<div class="mkfin ga"><span class="gbig">🎭</span><b>${GT('mfinT')}</b><p>${GT('mfinD',{n:names,v:g.pot})}</p><p class="mut">${GT('mfinC')}</p></div>`;
+   if(sp)return{html:`<div class="card c">${top}</div>`};
    if(isF)return{html:`<div class="card c">${top}<div class="gpk mkch">${['P','V'].map((v,i)=>`<button class="ga gdec ${g.fc[m]==v?'sel':''}" ${dl(i,.3)} data-gf="${v}">${GT('k'+v)}</button>`).join('')}</div><p class="gcof">🔒 ${GT('mtot',{v:g.sc[m]??0})}</p></div>`,
     bind(){$$('[data-gf]').forEach(x=>x.onclick=()=>gs({v:x.dataset.gf}))}};
    return{html:`<div class="card c">${top}<p class="gq2">${GT('mbet')}</p><div class="gab">${[0,1,2].map(i=>`<button class="gopt ga ${g.bet[m]===i?'sel':''}" ${dl(i,.3)} data-gb="${i}">${GT('mb'+i)}</button>`).join('')}</div></div>`,
     bind(){$$('[data-gb]').forEach(x=>x.onclick=()=>gs({b:+x.dataset.gb}))}}}
   const fr=g.fr||{c:{},add:{}};
   return{html:`<div class="card c"><div class="mkfin"><b>${GT('mfinT')}</b></div><div class="gduo mkduo">${fin.map((p,i)=>`<div class="ga" ${dl(i*2,.1)}>${DT(p)}<b>${esc(p)}</b><br><span class="gtag ${fr.c[p]=='P'?'':'no'}">${GT('k'+fr.c[p])}</span><br><b>+${fr.add[p]||0}</b></div>`).join('')}</div>
-   <p class="gbig2 ga ok" ${dl(4)}>${GT('mb'+fr.out)}</p>${isF?'':`<p class="gnote ga" ${dl(5)}>${g.bet[m]===fr.out?GT('mbetok'):'—'}</p>`}</div>`,
+   <p class="gbig2 ga ok" ${dl(4)}>${GT('mb'+fr.out)}</p>${isF||sp?'':`<p class="gnote ga" ${dl(5)}>${g.bet[m]===fr.out?GT('mbetok'):'—'}</p>`}</div>`,
    bind(){if(fr.out==0&&!RM())sparkles($('.mkduo'),16)}}},
  endView(s){const g=s.game,o=s.order,n=o.length,W=220,cx=110,cy=110,rr=82,pos={};o.forEach((p,i)=>{const a=2*Math.PI*i/n-Math.PI/2;pos[p]=[cx+rr*Math.cos(a),cy+rr*Math.sin(a)]});
   const E={};(g.h||[]).forEach(r=>r.grp.forEach(x=>{for(let i=0;i<x.length;i++)for(let j=i+1;j<x.length;j++){const a=x[i],b=x[j],k=mkPair(a,b),e=E[k]=E[k]||{a:a<b?a:b,b:a<b?b:a,pp:0,gg:0,t:{}};
@@ -677,14 +730,14 @@ GAMES.chn={icon:'🧭',min:4,max:8,dur:20,tags:['social'],CHI,NF:n=>n<=5?1:2,RL:
  /* route : capitaine 🧭 puis gardiens 🗼 ; kn(p,i) = [reçu, transmis] connus de moi (moi, ou le joueur aux fers) */
  chain(route,hold,kn){const R=this,m=meN();return `<div class="chrt">${route.map((p,i)=>{const k=kn(p,i);
   return `${i?'<i class="charr" aria-hidden="true">➜</i>':''}<span class="chn ga ${p==hold?'on':''} ${p==m?'me':''}" ${dl(i)}>${DT(p)}<b>${p==m?esc(GT('me')):esc(p)}</b>${k?`<span class="chk">${R.ch(k[0])}<i>›</i>${R.ch(k[1],k[1]!=null&&k[0]!=k[1]?'x':'')}</span>`:''}</span>`}).join('')}</div>`},
- log(g,m){const R=this,mine={};((g.pv||{})[m]||[]).forEach(([w,a,b])=>mine[w]=[a,b]);
+ hlog(g,m){const R=this,mine={};((g.pv||{})[m]||[]).forEach(([w,a,b])=>mine[w]=[a,b]);
   return g.h.length?`<details class="chlog"><summary>📜 ${GT('chLog')} (${g.h.length})</summary>${g.h.map((w,i)=>`<div class="chlr"><b>${w.ok?'⛵':'💥'} ${i+1}</b> ${w.route.map((p,j)=>esc(p)+(mine[i]&&p==m?` ${R.ch(mine[i][0])}›${R.ch(mine[i][1])}`:w.ir==p&&w.ip?` ⛓️${R.ch(w.ip[0])}›${R.ch(w.ip[1],w.ip[0]!=w.ip[1]?'x':'')}`:'')).join(' <i class="charr">➜</i> ')}</div>`).join('')}</details>`:''},
  view(s){const g=s.game,m=meN(),R=GAMES.chn,N=!!(g.nf&&g.nf.includes(m));
-  const hd=`<div class="chhd"><span class="chrole ga ${N?'n':''}">${N?'🏴‍☠️ '+GT('chN'):'🗼 '+GT('chC')}${N&&g.nf.length>1?' · '+g.nf.filter(p=>p!=m).map(B).join(', '):''}</span>
+  const hd=`<div class="chhd">${s.order.includes(m)?`<span class="chrole ga ${N?'n':''}">${N?'🏴‍☠️ '+GT('chN'):'🗼 '+GT('chC')}${N&&g.nf.length>1?' · '+g.nf.filter(p=>p!=m).map(B).join(', '):''}</span>`:''}
    <span class="chsk ga" ${dl(1)} title="${esc(GT('chSkT',{v:g.th}))}">💥 ${g.sk}/${g.th} · ⛵ ${g.ok}</span>${g.irn?`<span class="chir ga" ${dl(2)}>⛓️ ${B(g.irn)}</span>`:''}</div>`;
   const kn=(rc,ps)=>p=>p in rc||p in ps?[rc[p],ps[p]]:null;
   if(g.st=='p'){const me=m==g.hold,cap=g.route[0]==m;
-   if(!me)return{html:`<div class="card c">${hd}${R.chain(g.route,g.hold,kn(g.rc,g.ps))}<p class="gnote ga" ${dl(2)}>${GT(g.route.length==1?'chWaitC':'chWait',{n:B(g.hold)})}</p>${g.lv&&g.route.length==1?R.lvote(g):''}${R.log(g,m)}</div>`};
+   if(!me)return{html:`<div class="card c">${hd}${R.chain(g.route,g.hold,kn(g.rc,g.ps))}<p class="gnote ga" ${dl(2)}>${GT(g.route.length==1?'chWaitC':'chWait',{n:B(g.hold)})}</p>${g.lv&&g.route.length==1?R.lvote(g):''}${R.hlog(g,m)}</div>`};
    const pl=R.pilot(s),E=pl?[]:R.elig(s),rc=g.rc[m],K='ch'+g.k;if(R.sk!==K){R.sk=K;R.sc=rc;R.st=null}
    const ready=R.sc!=null&&(pl||E.includes(R.st));
    return{html:`<div class="card c">${hd}${R.chain(g.route,g.hold,kn(g.rc,g.ps))}<p class="gq2 ga">${GT(cap?'chCap':'chGot')} ${R.ch(rc,'big')}</p>
@@ -700,13 +753,13 @@ GAMES.chn={icon:'🧭',min:4,max:8,dur:20,tags:['social'],CHI,NF:n=>n<=5?1:2,RL:
   const body=`${hd}${res}${R.chain(w.route,null,wk)}`;
   if(g.st=='v'){const v=g.vt[m];
    return{html:`<div class="card c">${body}<p class="gq2">⛓️ ${GT('chVote')}</p><p class="gsub">${GT('chVoteD')}</p>${pick(s.order,v,'data-chv',m)}
-    <button class="ghost wide chno ${v===''?'sel':''}" data-chv="">${GT(g.irn?'chFree':'chNone')}</button>${R.log(g,m)}</div>`,
+    <button class="ghost wide chno ${v===''?'sel':''}" data-chv="">${GT(g.irn?'chFree':'chNone')}</button>${R.hlog(g,m)}</div>`,
     bind(){$$('[data-chv]').forEach(b=>b.onclick=()=>gs({v:b.dataset.chv}));if(!w.ok&&!RM())try{$('.chres').classList.add('shk')}catch(e){}}}}
   const K='ca'+g.k;if(R.ak!==K){R.ak=K;R.ac=[...(g.acc[m]||[])]}
   const sent=g.acc[m]!=null&&g.done[m];
   return{html:`<div class="card c">${body}<p class="gq2">🕵🏻 ${GT('chAcc',{v:g.K})}</p><p class="gsub">${GT(N?'chAccN':'chAccD')}</p>
    <div class="gpk">${s.order.filter(p=>p!=m).map((p,i)=>`<button class="ga ${R.ac.includes(p)?'sel':''}" ${dl(i)} data-cha="${esc(p)}" aria-pressed="${R.ac.includes(p)}">${DT(p)}<span>${esc(p)}</span></button>`).join('')}</div>
-   <button class="pri wide" id="gsend">${GT(sent?'chAccOk':'send')}</button>${R.log(g,m)}</div>`,
+   <button class="pri wide" id="gsend">${GT(sent?'chAccOk':'send')}</button>${R.hlog(g,m)}</div>`,
    bind(){$$('[data-cha]').forEach(b=>b.onclick=()=>{const p=b.dataset.cha;R.ac=R.ac.includes(p)?R.ac.filter(x=>x!=p):[...R.ac,p].slice(-g.K);render()});
     $('#gsend').onclick=()=>gs({v:R.ac})}}},
  lvote(g){const e=Object.entries(g.lv.c||{}).sort((a,b)=>b[1]-a[1]);if(!e.length)return '';
@@ -807,7 +860,10 @@ GAMES.mim={icon:'🐙',min:4,max:8,dur:10,tags:['social','skill'],
   const t=g.N[d.m];if(v.mk||now<(v.cd||0)||!t||t==from||!s.order.includes(t)||g.out.includes(t))return;
   v.mk=t;v.me=now+this.MD*1000;g.fx.push({i:++g.xi,x:v.x,y:v.y,t:now})},
  /* instantané pour UN joueur : seulement ce qui est dans son halo ; apparence (jamais l'identité réelle) */
- snap(s,n,now){const g=s.game,me=g.dv&&g.dv[n];if(!me||g.st!='p')return null;const R2=(MIL+14)**2,N=g.N,im=g.M.includes(n),r=Math.round,ix=x=>N.indexOf(x),near=(x,y)=>(x-me.x)**2+(y-me.y)**2<=R2;
+ snap(s,n,now){const g=s.game,me=g.dv&&g.dv[n];
+  if(!me&&g.st=='p'&&!s.order.includes(n)){let a=0;for(const k in g.ann)a+=g.ann[k];/* 👀 spectateur : rien de ce qui se voit dans la grotte */
+   return{t:'grt',k:g.k,h:now,me:null,sp:1,d:[],p:[],x:[],l:Math.max(0,Math.ceil(this.left(g,now)/100)),a,v:g.th,dc:Math.max(0,Math.ceil((g.da-now)/1000)),f:g.feed.slice(-4)}}
+  if(!me||g.st!='p')return null;const R2=(MIL+14)**2,N=g.N,im=g.M.includes(n),r=Math.round,ix=x=>N.indexOf(x),near=(x,y)=>(x-me.x)**2+(y-me.y)**2<=R2;
   const ds=[];for(const p of s.order){const d=g.dv[p];if(p==n||!d||!near(d.x,d.y))continue;const ap=d.mk||p;ds.push([ix(ap),r(d.x),r(d.y),(g.out.includes(ap)?1:0)|(im&&g.M.includes(p)?2:0)])}
   ds.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);ds.forEach((e,i)=>e.push(i&&ds[i-1][0]==e[0]?ds[i-1][4]+1:0));
   let a=0;for(const k in g.ann)a+=g.ann[k];
@@ -832,17 +888,17 @@ GAMES.mim={icon:'🐙',min:4,max:8,dur:10,tags:['social','skill'],
   o.ss={[n]:g.ss[n]};o.hist=g.hist.map(h=>({...h,vt:null}));if(g.vt)o.vt=hideOwn(g.vt,n);return o},
  view(s){const g=s.game,m=meN(),R=this,N=g.N,im=!!(g.M&&g.M.includes(m)),out=g.out.includes(m),play=s.order.includes(m);
   const L=MI.gid==s.gid&&MI.last&&MI.last.k==g.k?MI.last:null,an=L?L.a:Object.values(g.ann).reduce((a,b)=>a+b,0);
-  const role=`<span class="chrole ga ${im?'n':''}">${im?'🐙 '+GT(out?'miOut':'miMim')+(g.M.length>1?' · '+g.M.filter(p=>p!=m).map(B).join(', '):''):'🤿 '+GT('miCrew')}</span>`;
+  const role=!play?'':`<span class="chrole ga ${im?'n':''}">${im?'🐙 '+GT(out?'miOut':'miMim')+(g.M.length>1?' · '+g.M.filter(p=>p!=m).map(B).join(', '):''):'🤿 '+GT('miCrew')}</span>`;
   const hd=`<div class="mihd">${role}<span class="michip ga" ${dl(1)} id="mitl">⏱ ${miClock(L?L.l/10:g.left0/1000)}</span><span class="michip ga" ${dl(2)} id="mian" data-tip="${esc(GT('miGoalT'))}">🦪 <b>${an}</b>/${g.Q}${g.k>2?` · ✓${g.net}`:''}</span><span class="michip ga mith" ${dl(3)} id="mith">🐙 <b>${L?L.v:g.th}</b>/${g.S} ${GT('miThefts')}</span>${g.out.length?`<span class="michip ga" ${dl(3)}>🐙 ${g.out.map(B).join(', ')}</span>`:''}</div>`;
   const fl=(e,i)=>`<li class="ga${e.s?' st':''}" ${dl(i||0)}>${miFeedLi(N,e)}</li>`;
   if(g.st=='p'){const tg=s.order.filter(p=>p!=m&&!g.out.includes(p)),canCall=play&&!g.cl[m]&&g.D>0;
    const fd=(MI.gid==s.gid?MI.feed:g.feed).filter(e=>e.i>g.f0).slice(-3).reverse();
-   return{hint:GT(im&&!out?'miHintM':'miHint'),mine:false,html:`<div class="card c mim">${hd}<div class="micv" id="micv"></div>
-    <div class="mibar">${im&&!out?`<button class="ghost mimk" id="mimk">🎭 ${GT('miMask')}</button>`:''}<span class="michip" id="mimine">${im?'🎭':'🦪'} <b>${L?L.me[7]:(g.ss[m]||{})[im?'v':'c']||0}</b> ${GT(im?'miStolen':'miMine')}</span>
+   return{hint:GT(im&&!out?'miHintM':'miHint'),mine:false,html:`<div class="card c mim">${hd}${play?`<div class="micv" id="micv"></div>`:''}
+    <div class="mibar">${im&&!out?`<button class="ghost mimk" id="mimk">🎭 ${GT('miMask')}</button>`:''}${play?`<span class="michip" id="mimine">${im?'🎭':'🦪'} <b>${L&&L.me?L.me[7]:(g.ss[m]||{})[im?'v':'c']||0}</b> ${GT(im?'miStolen':'miMine')}</span>`:''}
      ${play?`<button class="ghost micall" id="micall" ${canCall&&!(L&&L.dc>0)?'':'disabled'}>📯 ${GT('miCall')} · ${g.D}</button>`:''}</div>
     ${im&&!out?`<div class="mipk" id="mipk" ${MI.pick?'':'hidden'}><p class="gsub">${GT('miMaskQ')}</p><div class="gpk">${tg.map(p=>`<button data-mim="${N.indexOf(p)}">${DT(p)}<span>${esc(p)}</span></button>`).join('')}</div></div>`:''}
     <ul class="mifd" id="mifd" aria-live="polite">${fd.map(e=>fl(e)).join('')}</ul></div>`,
-    bind(){miMount();const k=$('#mimk');k&&(k.onclick=()=>{const l=MI.last;if(l&&l.me[4]>=0){miSend({m:-1});return}MI.pick=!MI.pick;const pk=$('#mipk');pk&&(pk.hidden=!MI.pick)});
+    bind(){miMount();const k=$('#mimk');k&&(k.onclick=()=>{const l=MI.last;if(l&&l.me&&l.me[4]>=0){miSend({m:-1});return}MI.pick=!MI.pick;const pk=$('#mipk');pk&&(pk.hidden=!MI.pick)});
      $$('[data-mim]').forEach(b=>b.onclick=()=>{miSend({m:+b.dataset.mim});MI.pick=false;const pk=$('#mipk');pk&&(pk.hidden=true)});
      const c=$('#micall');c&&(c.onclick=()=>ask(GT('miCallAsk',{v:g.D}),GT('miCall')).then(v=>v&&gs({a:'call'})));if(L)miHud(L)}}}
   const since=g.feed.filter(e=>e.i>g.f0).reverse();
@@ -869,7 +925,7 @@ W.GRtIn=function(from,d){try{const s=st,g=s&&s.game;if(!isHost||!g||s.phase!='ga
 W.GRtTick=function(){try{if(!isHost||!st||st.phase!='game'||!st.game||st.game.id!='mim'||st.game.st!='p')return;const G=GAMES.mim,now=Date.now();
  if(G.tick(st,now)){gFin(st);bump();return}
  if(now-(MI.ls||0)<95)return;MI.ls=now;
- for(const id in conns){const c=conns[id];if(c.open&&c.pname&&st.order.includes(c.pname))try{const v=G.snap(st,c.pname,now);v&&c.send(v)}catch(e){}}
+ for(const id in conns){const c=conns[id];if(c.open&&c.pname&&P(c.pname))try{const v=G.snap(st,c.pname,now);v&&c.send(v)}catch(e){}}
  const v=G.snap(st,me.name,now);v&&W.GRtRx(v)}catch(e){console.warn(e)}};
 /* minuteur dans un Worker : un onglet hôte en arrière-plan continue d'envoyer ~10 instantanés/s (setInterval y serait bridé) */
 let MIT=null;function miTicker(){if(MIT)return;try{const u=URL.createObjectURL(new Blob(['setInterval(()=>postMessage(0),66)'],{type:'text/javascript'}));MIT=new Worker(u);MIT.onmessage=()=>W.GRtTick()}catch(e){MIT=1}}
@@ -878,20 +934,20 @@ if(typeof setInterval!='undefined'&&typeof document!='undefined')setInterval(()=
 /* ---------- 🐙 temps réel : côté joueur (réception, interpolation, rendu canvas) ---------- */
 const MI={gid:null,k:null,buf:[],off:null,last:null,feed:[],fmax:0,fx:{},cv:null,ctx:null,raf:0,ro:null,sp:null,tap:null,ts:0,tt:0,pick:false,cam:null,bg:null,bgL:null,w:0,h:0,dpr:1,ft:0};
 function miSend(o){try{o.t='grt';o.k=st.game.k;if(isHost)W.GRtIn(me.name,o);else if(hostConn&&hostConn.open)hostConn.send(o)}catch(e){}}
-W.GRtRx=function(d){try{if(!st||st.phase!='game'||!st.game||st.game.id!='mim'||!d||!d.me)return;const now=Date.now();
+W.GRtRx=function(d){try{if(!st||st.phase!='game'||!st.game||st.game.id!='mim'||!d||!(d.me||d.sp))return;const now=Date.now();
  if(MI.gid!==st.gid){MI.gid=st.gid;MI.feed=[];MI.fmax=0;MI.fx={};MI.pick=false;MI.off=null}
  if(d.k!==MI.k){MI.k=d.k;MI.buf=[];MI.sp=null;MI.tap=null}
  const o=now-d.h;MI.off=MI.off==null||o<MI.off?o:MI.off+(o-MI.off)*.02;
  MI.buf.push(d);if(MI.buf.length>12)MI.buf.shift();MI.last=d;
  const nf=[];(d.f||[]).forEach(e=>{if(e.i>MI.fmax){MI.fmax=e.i;MI.feed.push(e);nf.push(e)}});if(MI.feed.length>80)MI.feed.splice(0,MI.feed.length-80);
  (d.x||[]).forEach(([i,x,y])=>{if(!MI.fx[i])MI.fx[i]={x,y,t:now}});
- miHud(d,nf);if(MI.cv&&MI.cv.isConnected&&!MI.raf&&!document.hidden)MI.raf=requestAnimationFrame(miDraw)}catch(e){}};
-function miHud(d,nf){const g=st.game,m=meN(),q=s=>document.getElementById(s);if(!q('micv'))return;
+ miHud(d,nf);if(d.me&&MI.cv&&MI.cv.isConnected&&!MI.raf&&!document.hidden)MI.raf=requestAnimationFrame(miDraw)}catch(e){}};
+function miHud(d,nf){const g=st.game,m=meN(),q=s=>document.getElementById(s);if(!q('mitl'))return;
  const t=q('mitl');t&&(t.textContent='⏱ '+miClock(d.l/10),t.classList.toggle('low',d.l<300));
  const a=q('mian');if(a){const b=a.querySelector('b');b&&(b.textContent=d.a)}
  const h=q('mith');if(h){const b=h.querySelector('b');if(b&&b.textContent!=String(d.v)){b.textContent=d.v;h.classList.add('hot');RM()||h.animate&&h.animate([{transform:'scale(1.2)'},{transform:'none'}],{duration:400})}}
- const n=q('mimine');if(n){const b=n.querySelector('b');b&&b.textContent!=String(d.me[7])&&(b.textContent=d.me[7],RM()||n.animate&&n.animate([{transform:'scale(1.15)'},{transform:'none'}],{duration:300}))}
- const k=q('mimk');if(k){const on=d.me[4]>=0,cd=d.me[6];k.disabled=!on&&cd>0;k.classList.toggle('on',on);
+ const n=d.me&&q('mimine');if(n){const b=n.querySelector('b');b&&b.textContent!=String(d.me[7])&&(b.textContent=d.me[7],RM()||n.animate&&n.animate([{transform:'scale(1.15)'},{transform:'none'}],{duration:300}))}
+ const k=d.me&&q('mimk');if(k){const on=d.me[4]>=0,cd=d.me[6];k.disabled=!on&&cd>0;k.classList.toggle('on',on);
   k.style.setProperty('--cd',on?d.me[5]/(GAMES.mim.MD*10):cd>0?cd/(GAMES.mim.CD*10):0);
   const lb=on?'🎭 '+GT('miAs',{n:esc(g.N[d.me[4]]||'')})+' · '+Math.ceil(d.me[5]/10)+' s':cd>0?'🎭 '+Math.ceil(cd/10)+' s':'🎭 '+GT('miMask');if(k._l!==lb){k._l=lb;k.innerHTML=lb}
   if(on&&MI.pick){MI.pick=false;const pk=q('mipk');pk&&(pk.hidden=true)}}
@@ -1158,7 +1214,7 @@ GAMES.tmp={icon:'⛈️',min:2,max:8,dur:8,tags:['skill'],mute:1,TMP,
    ${P.map(x=>`<b class="tpw ${x.e?'bad':''} ${nw&&x.b==nw?'nw':''}" style="inset-inline-start:${x.v-1}%;--c:${col(x.p)}"><span>${x.v}</span></b>`).join('')}<span class="tp0">1</span><span class="tp1">100</span></div>`},
  /* réaction : bulle de 2,6 s, jouée une fois par envoi (les re-rendus de coup la continuent sans la relancer) */
  rxa(g,p){const t=(g.rxt||{})[p],e=(g.rx||{})[p];if(!t||!e)return '';const M=this.rxs=this.rxs||{};if(!M[p]||M[p].t!==t)M[p]={t,at:Date.now()};
-  const age=Date.now()-M[p].at;return age<2600?`<span class="tprx" style="animation-delay:-${age}ms">${e}</span>`:''},
+  const age=Date.now()-M[p].at;return age<2600?`<span class="tprx" data-gan style="animation-delay:-${age}ms">${e}</span>`:''},
  seq(g){return `<div class="tpseq">${[...(g.pl||[]).map(x=>`<b class="${x.e?'bad':''}" style="--c:${col(x.p)}">${x.v}</b>`),...(g.ec||[]).map(x=>`<b class="ec">${x.v}</b>`)].join('')}</div>`},
  view(s){const g=s.game,m=meN(),R=this,my=(g.h||{})[m]||[],ch=g.ch||{};
   const bar=`<div class="tpbar"><span class="tplf" title="⛵">${'⛵'.repeat(Math.max(0,g.life))}</span><span class="tpcl ${g.calm?'':'z'}" title="🌅">🌅 ${g.calm}</span><b class="tplv">${GT('tpLv',{v:g.r+1})}</b></div>`;
@@ -1174,7 +1230,7 @@ GAMES.tmp={icon:'⛈️',min:2,max:8,dur:8,tags:['skill'],mute:1,TMP,
     ${bd!=null&&k?`<span class="tpbd" dir="ltr">${tpBand(bd*10+1)}</span>`:''}${ch[p]=='C'?'<span class="tpcq">🌅</span>':''}${g.done[p]&&k?'<i class="tpok" aria-hidden="true"></i>':''}${R.rxa(g,p)}</div>`}).join('');
   const c=ch[m]||'W',hand=my.length?`<div class="tphand">${my.map((v,i)=>`<b class="tpv ${i?'':'lo'}">${v}</b>`).join('')}</div>
    <div class="tpbt"><button class="tpgo ${c=='P'?'sel':''}" data-tp="P" aria-pressed="${c=='P'}">🌊 ${GT('tpPut',{v:my[0]})}</button><button class="ghost ${g.done[m]&&c=='W'?'sel':''}" data-tp="W" aria-pressed="${c=='W'}">⏳ ${GT('tpHold')}</button>
-   <button class="ghost tpcb ${c=='C'?'sel':''}" data-tp="C" ${g.calm?'':'disabled'} aria-pressed="${c=='C'}">🌅 ${GT('tpCalm')}${nc?` <small>${nc}/${Math.max(1,Math.ceil(H.length/2))}</small>`:''}</button></div>`:`<p class="gnote">${GT('tpNone')}</p>`;
+   <button class="ghost tpcb ${c=='C'?'sel':''}" data-tp="C" ${g.calm?'':'disabled'} aria-pressed="${c=='C'}">🌅 ${GT('tpCalm')}${nc?` <small>${nc}/${Math.max(1,Math.ceil(H.length/2))}</small>`:''}</button></div>`:s.order.includes(m)?`<p class="gnote">${GT('tpNone')}</p>`:'';
   return{html:`<div class="card c tpcard">${bar}<div class="tpst"><span>⛈️ ${GT('tpLeft',{v:g.left})}</span><span class="tpsb"><i style="width:${Math.max(0,Math.min(100,100*g.left/g.B))}%"></i></span></div>
    ${R.sea(g,g.bt-1)}<p class="tpev" aria-live="polite">${evt}</p><p class="tpsi">${GT('tpSince',{v:g.since})}</p><div class="tpcrew">${crew}</div>${hand}
    <div class="grxb tprxb">${RX.map(e=>`<button class="ghost" data-grx="${e}" aria-label="${e}">${e}</button>`).join('')}</div><p class="tpmu">🤫 ${GT('tpMute')}</p></div>`,
@@ -1481,7 +1537,7 @@ if(typeof document!='undefined'){const c=document.createElement('style');c.id='g
 .gw button.sel{border-color:var(--acc);background:#fff1e4;box-shadow:0 4px 0 var(--acc-d)}
 .ga{animation:gin .34s var(--gease,ease) both}
 @keyframes gin{from{opacity:0;transform:translateY(8px) scale(.97)}}
-.still .ga,.still .gbar{animation:none}
+.still .ga:not(.gw .ga),.still .gbar:not(.gw .gbar){animation:none}/* en jeu : gAnim() reprend les animations au lieu de les couper */
 .gbig{font-size:46px;line-height:1.1;display:block}
 .gfloat{animation:gin .34s ease both,gfl 4s ease-in-out .4s infinite}
 @keyframes gfl{50%{transform:translateY(-5px) rotate(-4deg)}}
@@ -1563,7 +1619,7 @@ if(typeof document!='undefined'){const c=document.createElement('style');c.id='g
 [data-theme=dark] .gtags i{background:#12403f;color:#8fd6dc}[data-theme=dark] .gtags i.gtg-chance{background:#45321a;color:#ffc27a}[data-theme=dark] .gtags i.gtg-skill{background:#262f5a;color:#b7c1ff}
 [data-theme=dark] .gpl{color:#3b2a1b}
 /* entre deux étapes : l'en-tête et la carte restent, seul le contenu se renouvelle (plus d'écran vide pendant le fondu) */
-section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) both}.still .gw.gnx>.card{animation:none}
+section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) both}
 @keyframes gstep{from{opacity:.55}}
 /* 🏝️ Archipel */
 .arcsc{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:0 0 8px}.arcsc .gchip b{font-size:14px}.arcsc .gchip i{font-style:normal;font-size:12px}
@@ -1588,7 +1644,7 @@ section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) b
 .arcb .mv{animation:arcmv .75s var(--gease) both}@keyframes arcmv{from{transform:translate(var(--dx),var(--dy))}}
 .arcb .pop{transform-box:fill-box;transform-origin:center;animation:arcpop .45s var(--gease) .45s both}@keyframes arcpop{from{transform:scale(.3);opacity:0}}
 .arcb .gone{opacity:0;transform-box:fill-box;transform-origin:center;animation:arcgone 1s ease .35s both}@keyframes arcgone{from{opacity:1;transform:none}to{opacity:0;transform:scale(.5)}}
-.still .arcb *{animation:none!important}
+
 [data-theme=dark] .arcb .r0{fill:#2a7f97}[data-theme=dark] .arcb .r1{fill:#21627a}[data-theme=dark] .arcb .r2{fill:#1b4e66}[data-theme=dark] .arcb .r3{fill:#163f55}
 [data-theme=dark] .arcb .v{fill:#bfe6ee;opacity:.7}[data-theme=dark] .arcb .isl{stroke:#e9f6f8}[data-theme=dark] .arcb .rk circle{fill:#8d9ea6;stroke:#53646b}
 [data-theme=dark] .arcb .tg.on{fill:#ff8a3d55}
@@ -1614,7 +1670,7 @@ section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) b
 .mkcst{display:block;width:100%;max-width:300px;margin:4px auto 0;overflow:visible}
 .mkcst line{stroke-width:2.2;stroke-linecap:round}.mkcst .pp{stroke:var(--ink)}.mkcst .gg{stroke:var(--mut);stroke-dasharray:3 4;opacity:.6}.mkcst .tr{stroke:var(--bad)}
 .mkcst circle{stroke:var(--paper);stroke-width:2.5}.mkcst .mkn{font:800 10px Nunito,sans-serif;fill:var(--txt);text-anchor:middle;dominant-baseline:central}
-.mkl{animation:fi .5s ease both}.still .mkl{animation:none}
+.mkl{animation:fi .5s ease both}
 .mktr p{margin:4px 0;font:600 14px Nunito;text-align:center}
 [data-theme=dark] .mkc.p{border-color:#2c7a62}[data-theme=dark] .mkc.g{border-color:#7a4a2a}
 /* 📖 tutoriels animés */
@@ -1752,6 +1808,22 @@ button.prch{cursor:pointer;width:auto}button.prch:hover{border-color:var(--edge2
 @media (prefers-reduced-motion:reduce){.prp,.prbk{animation:none!important}.prtr button.sel{transform:none}}
 @media (max-width:420px){.prmy b{font-size:19px}.prtr{gap:6px}.prtr button{font-size:28px;padding:10px 0}.prch{font-size:13px;padding:5px 10px}}
 /* 📜 Livre de bord */
+.gidea{margin:4px 0 2px;padding:10px 12px;border-radius:14px;border:1.5px dashed var(--edge)}
+.gidh{margin:0 0 8px;font-size:13px;font-weight:700;color:var(--mut)}
+.gidl{display:flex;flex-wrap:wrap;gap:6px}
+.gidc{font:inherit;font-size:13px;line-height:1.3;padding:6px 10px;border-radius:99px;border:1.5px solid var(--edge);background:var(--paper);color:var(--txt);cursor:pointer;text-align:start;max-width:100%;transition:transform .15s,border-color .15s}
+.gidc:hover{border-color:var(--acc)}.gidc:active{transform:scale(.97)}
+.gidd{margin:8px 0 0;font-size:12px;color:var(--mut);line-height:1.4}
+/* 👀 spectateurs */
+.gspc0{font-size:13px;color:var(--mut);margin:0 0 10px;padding:6px 11px;border-inline-start:3px solid var(--acc);border-radius:4px 12px 12px 4px;background:color-mix(in srgb,var(--acc) 8%,transparent);line-height:1.4}
+.gw.gspc .card :is(textarea,input,#gsend,.gedit,.grow2,.gwr,.gidea,.gpk,.chno,.gab,.tpbt,.gbtns2,.mipk){display:none!important}
+.gw.gspc .card button:not([data-grx]):not(.gtutb){pointer-events:none}
+.gw.gspc .card .gpk button:not(.sel),.gw.gspc .card [data-tp]{opacity:.55}
+.gspb2{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:12px;font-size:13px;color:var(--mut)}
+.gspi{font-size:15px}.gspn{display:inline-flex;align-items:center;gap:5px}.gspn i{font-style:normal}
+.gspw{margin-top:14px;padding-top:12px;border-top:1.5px dashed var(--edge)}
+.gspt.sel{background:color-mix(in srgb,var(--acc) 14%,var(--paper));border-color:var(--acc)}
+.gspw .gsub{margin:8px 0 0}.gspl{margin:6px 0 0}
 .gnod{font-size:13px;color:var(--mut);margin:0 0 10px;padding:6px 11px;border-inline-start:3px solid var(--gold);border-radius:4px 12px 12px 4px;background:color-mix(in srgb,var(--gold) 9%,transparent);line-height:1.4}
 .gnod b{font-weight:700}
 .glog{padding:10px 14px}.glog>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;user-select:none}
@@ -1864,7 +1936,7 @@ scores:`Scores`,coopT:`Score de connexion`,again:`Rejouer`,lobby:`Retour au salo
 n_bot:`Bouteilles à la mer`,d_bot:`Des anecdotes vraies et anonymes : qui les a écrites ?`,
 r_bot:`Écris 2 ou 3 choses vraies sur toi. Elles arrivent anonymes : trouve l'auteur (+2). Personne ne te trouve ? +3. Une partie seulement ? +1.`,
 r_bot2:`Écris 3 anecdotes, vraies ou inventées (au moins une de chaque). Devine celles de l'autre (+2) ; chaque bluff réussi te rapporte +2.`,
-bph:`Une chose vraie sur toi…`,bph18:`Une chose vraie (et osée) sur toi…`,bph2:`Une anecdote sur toi…`,bmin:`Écris-en au moins 2`,bmin2:`Remplis les 3, avec au moins une vraie et une inventée`,bwait:`Tes bouteilles sont à l'eau`,
+bph:`Une anecdote vraie sur toi…`,bph18:`Une chose vraie (et osée) sur toi…`,bph2:`Une anecdote sur toi…`,bmin:`Écris-en au moins 2`,bmin2:`Remplis les 3, avec au moins une vraie et une inventée`,bwait:`Tes bouteilles sont à l'eau`,
 bwho:`Qui a écrit ça ?`,bmine:`C'est la tienne : vote quand même, pour brouiller les pistes`,bby:`Écrite par {n}`,bnone:`Personne n'a trouvé : +3 pour {n}`,bsome:`Juste assez mystérieux : +1 pour {n}`,ball:`Tout le monde a trouvé !`,
 bT:`Vraie`,bF:`Inventée`,bguess:`Vraie ou inventée ?`,bfrom:`Bouteille de {n}`,bfool:`Bluff réussi : +2 pour {n}`,bok:`Bien vu : +2 pour {n}`,
 n_pha:`Le Phare`,d_pha:`Qui de nous… ? Votez, le phare éclaire le groupe`,r_pha:`Vote pour la personne qui colle le mieux, même toi. +1 si tu votes comme la majorité.`,r_pha2:`Choisis l'un de vous deux, puis prédis la réponse de l'autre : +1 si tu vois juste.`,
@@ -3203,6 +3275,27 @@ tu_prl4:`A Pérola Negra lê seus tesouros e mergulha em segredo num baú: +3 na
 tu_prl5:`Baú errado, ou nenhum mergulho: +2 para cada nácar. Óbvios demais, seus tesouros a guiam; sutis demais, nada de eco.`,
 tu_prl6:`Cada um é Pérola Negra uma vez por partida.`});
 /* /⚫ */
+/* 💡 Bouteilles : idées facultatives */
+Object.assign(GI18N.fr.ui,{bIdea:`Besoin d'idée ?`,bIdeaD:`Écris ce que tu veux : ce ne sont que des idées, touche-en une seulement si elle t'inspire.`});
+Object.assign(GI18N.en.ui,{bIdea:`Need an idea?`,bIdeaD:`Write whatever you like: these are only ideas, tap one only if it inspires you.`});
+Object.assign(GI18N.es.ui,{bIdea:`¿Necesitas una idea?`,bIdeaD:`Escribe lo que quieras: solo son ideas, toca una únicamente si te inspira.`});
+Object.assign(GI18N.it.ui,{bIdea:`Serve un'idea?`,bIdeaD:`Scrivi quello che vuoi: sono solo idee, toccane una solo se ti ispira.`});
+Object.assign(GI18N.de.ui,{bIdea:`Brauchst du eine Idee?`,bIdeaD:`Schreib, was du willst: Das sind nur Ideen – tipp eine nur an, wenn sie dich inspiriert.`});
+Object.assign(GI18N.ru.ui,{bIdea:`Нужна идея?`,bIdeaD:`Пиши что угодно: это лишь идеи, нажми на одну, только если она вдохновляет.`});
+Object.assign(GI18N.zh.ui,{bIdea:`需要灵感吗？`,bIdeaD:`想写什么都行：这些只是灵感，喜欢再点。`});
+Object.assign(GI18N.he.ui,{bIdea:`צריכים רעיון?`,bIdeaD:`כתבו מה שבא לכם: אלה רק רעיונות, הקישו על אחד רק אם הוא נותן השראה.`});
+Object.assign(GI18N.pt.ui,{bIdea:`Precisa de uma ideia?`,bIdeaD:`Escreva o que quiser: são só ideias, toque numa apenas se ela te inspirar.`});
+/* 👀 Spectateurs : textes */
+Object.assign(GI18N.fr.ui,{specB:`Je regarde`,specD:`Tu suis la partie sans jouer : tu vois ce qui est public, tu peux réagir et discuter.`,specL:`Regardent : {n}`,specT:`Partie en cours : tu regardes, tu joueras à la prochaine.`,specT2:`Tu regardes cette partie.`,specH:`Tu regardes · réactions et chat ouverts`});
+Object.assign(GI18N.en.ui,{specB:`I'm watching`,specD:`Follow the game without playing: you see what's public, and you can react and chat.`,specL:`Watching: {n}`,specT:`Game in progress: you're watching, you'll play the next one.`,specT2:`You're watching this game.`,specH:`You're watching · reactions and chat are open`});
+Object.assign(GI18N.es.ui,{specB:`Solo miro`,specD:`Sigues la partida sin jugar: ves lo que es público y puedes reaccionar y chatear.`,specL:`Miran: {n}`,specT:`Partida en curso: miras y jugarás la próxima.`,specT2:`Estás mirando esta partida.`,specH:`Estás mirando · reacciones y chat abiertos`});
+Object.assign(GI18N.it.ui,{specB:`Guardo e basta`,specD:`Segui la partita senza giocare: vedi ciò che è pubblico, puoi reagire e chattare.`,specL:`Guardano: {n}`,specT:`Partita in corso: guardi e giocherai la prossima.`,specT2:`Stai guardando questa partita.`,specH:`Stai guardando · reazioni e chat aperte`});
+Object.assign(GI18N.de.ui,{specB:`Ich schaue zu`,specD:`Du verfolgst das Spiel, ohne mitzuspielen: Du siehst alles Öffentliche und kannst reagieren und chatten.`,specL:`Schauen zu: {n}`,specT:`Laufendes Spiel: Du schaust zu und spielst beim nächsten mit.`,specT2:`Du schaust diesem Spiel zu.`,specH:`Du schaust zu · Reaktionen und Chat offen`});
+Object.assign(GI18N.ru.ui,{specB:`Я смотрю`,specD:`Следишь за игрой, не играя: видишь всё открытое, можешь реагировать и писать в чат.`,specL:`Смотрят: {n}`,specT:`Игра уже идёт: ты смотришь и сыграешь в следующей.`,specT2:`Ты смотришь эту игру.`,specH:`Ты смотришь · реакции и чат открыты`});
+Object.assign(GI18N.zh.ui,{specB:`我只观看`,specD:`不参与游戏，只观看：你能看到公开内容，也可以互动和聊天。`,specL:`观看中：{n}`,specT:`游戏进行中：你先观看，下一局再加入。`,specT2:`你正在观看这局游戏。`,specH:`观看中 · 可以互动和聊天`});
+Object.assign(GI18N.he.ui,{specB:`אני צופה`,specD:`עוקבים אחרי המשחק בלי לשחק: רואים את מה שגלוי לכולם, ואפשר להגיב ולצ'וטט.`,specL:`צופים: {n}`,specT:`משחק בעיצומו: {g:אתה צופה ותשחק|את צופה ותשחקי} בסיבוב הבא.`,specT2:`{g:אתה צופה|את צופה} במשחק הזה.`,specH:`במצב צפייה · תגובות וצ'אט פתוחים`});
+Object.assign(GI18N.pt.ui,{specB:`Só assisto`,specD:`Acompanhe a partida sem jogar: você vê o que é público e pode reagir e conversar.`,specL:`Assistindo: {n}`,specT:`Partida em andamento: você assiste e joga a próxima.`,specT2:`Você está assistindo a esta partida.`,specH:`Assistindo · reações e chat abertos`});
+/* /👀 */
 /* 📜 Livre de bord : textes */
 Object.assign(GI18N.fr.ui,{lgT:`Livre de bord`,lgLast:`La dernière fois : {t}`,lg_win:`{a} a remporté {g}`,lg_win2:`{a} et {b} ont remporté {g}`,lg_prlC:`{a} s'est fait démasquer en Perle noire`,lg_prlD:`{a} a plongé 🤿 en Perle noire et trouvé le mot des autres`,lg_prlH:`{a} est passé{g.a:|e|·e} inaperçu{g.a:|e|·e} en Perle noire`,lg_chnC:`{a} s'est fait démasquer en Naufrageur`,lg_chnW:`{a} a coulé la flotte en Naufrageur`,lg_chnW2:`{a} et {b} ont coulé la flotte en Naufrageurs`,lg_mimC:`{a} s'est fait démasquer en Mimétique`,lg_mimW:`{a} a filé avec les perles en Mimétique`,lg_mimW2:`{a} et {b} ont filé avec les perles en Mimétiques`,lg_mskS:`{a} a tout volé à {b} en finale des Masques`,lg_mskP:`{a} et {b} ont partagé le trésor en finale des Masques`,lg_mskB:`{a} et {b} ont voulu tout voler en finale des Masques : perdu pour les deux`,lq_c:`se ferait démasquer le plus vite la prochaine fois`,lq_s:`bluffe le mieux sans en avoir l'air`,lq_v:`volerait tout le trésor sans trembler`,lq_t:`partagerait le trésor sans hésiter`,lq_w:`battrait {a} à la revanche`});
 Object.assign(GI18N.en.ui,{lgT:`Logbook`,lgLast:`Last time: {t}`,lg_win:`{a} won {g}`,lg_win2:`{a} and {b} won {g}`,lg_prlC:`{a} got unmasked as the Black Pearl`,lg_prlD:`{a} dived 🤿 as the Black Pearl and found the others' word`,lg_prlH:`{a} went unnoticed as the Black Pearl`,lg_chnC:`{a} got unmasked as a Wrecker`,lg_chnW:`{a} sank the fleet as a Wrecker`,lg_chnW2:`{a} and {b} sank the fleet as Wreckers`,lg_mimC:`{a} got unmasked as the Mimic`,lg_mimW:`{a} got away with the pearls as the Mimic`,lg_mimW2:`{a} and {b} got away with the pearls as Mimics`,lg_mskS:`{a} stole everything from {b} in the Masks final`,lg_mskP:`{a} and {b} shared the treasure in the Masks final`,lg_mskB:`{a} and {b} both tried to steal it all in the Masks final: both lost`,lq_c:`would get unmasked fastest next time`,lq_s:`bluffs best without showing it`,lq_v:`would steal the whole treasure without blinking`,lq_t:`would share the treasure without hesitating`,lq_w:`would beat {a} in a rematch`});
@@ -3511,7 +3604,7 @@ GAMES.aby={icon:'🫧',min:2,max:8,dur:8,tags:['skill'],ABY,gen:abGen,score:abSc
   else if(R.t=='c')h=`<div class="abgc abshow" dir="ltr" style="animation-duration:${ABY.CS(R.n)}ms;animation-delay:${d(L)}">${v.sc.map(x=>`<span class="abcl">${x>=0?ABY.PL[x]:''}</span>`).join('')}</div>`;
   else h=v.s.map((x,j)=>`<span class="abit" style="animation-duration:${R.v}ms;animation-delay:${d(at(j))};--x:${((j*37)%5-2)*16}px;--y:${((j*53)%3-1)*10}px"><b>${ABY.PL[x]}</b></span>`).join('');
   const dots=R.t=='c'?'':`<div class="abdots">${v.s.map((_,j)=>`<i style="animation-delay:${d(at(j))}"></i>`).join('')}</div>`;
-  return `<div class="abs ${R.t=='l'?'l':''}" aria-hidden="true"><i class="abb"></i><i class="abb b2"></i><i class="abb b3"></i><span class="abcd" style="animation-delay:${d(0)};animation-duration:${L}ms"><b>👁️</b></span>${h}${dots}</div>`},
+  return `<div class="abs ${R.t=='l'?'l':''}" data-gan aria-hidden="true"><i class="abb"></i><i class="abb b2"></i><i class="abb b3"></i><span class="abcd" style="animation-delay:${d(0)};animation-duration:${L}ms"><b>👁️</b></span>${h}${dots}</div>`},
  showV(s,g,m){const R=ABY.R[g.r],play=s.order.includes(m),dv=(g.dn||[]).includes(m),K=s.gid+'.'+g.k;
   if(g.sd==null)return{html:`<div class="card c">${this.top(R,'abS')}${this.crew(s,g,m,1)}</div>`};
   const G=abGen(g.sd,R),v=dv?G.D:G.B,T=abLen(R,dv);
@@ -3520,7 +3613,7 @@ GAMES.aby={icon:'🫧',min:2,max:8,dur:8,tags:['skill'],ABY,gen:abGen,score:abSc
    if(play)AG.to=setTimeout(()=>{if(AG.sk===K&&!AG.sent){AG.sent=1;try{gs({seen:1})}catch(e){}}},T+150)}
   const e=Date.now()-AG.st,dvs=(g.dn||[]).filter(p=>p!=m);
   return{html:`<div class="card c abcard">${this.top(R,'abS',dv)}${this.stage(R,v,e)}
-   <p class="abok" style="animation-delay:${((T-e)/1000).toFixed(2)}s">✓ ${GT('abSeen')}</p>${dvs.length?`<p class="abdvs">🤿 ${GT('abDvs',{n:dvs.map(B).join(', ')})}</p>`:''}${this.crew(s,g,m,1)}</div>`,
+   ${play?`<p class="abok" data-gan style="animation-delay:${((T-e)/1000).toFixed(2)}s">✓ ${GT('abSeen')}</p>`:''}${dvs.length?`<p class="abdvs">🤿 ${GT('abDvs',{n:dvs.map(B).join(', ')})}</p>`:''}${this.crew(s,g,m,1)}</div>`,
    ...(play&&!g.done[m]?{hint:GT('abWatch'),mine:false}:{})}},
  recV(s,g,m){const R=ABY.R[g.r],q=(g.q||{})[m],K=s.gid+'.'+g.k,dv=(g.dn||[]).includes(m);
   if(!q)return{html:`<div class="card c">${this.top(R,'abA')}${this.crew(s,g,m,1)}</div>`};
