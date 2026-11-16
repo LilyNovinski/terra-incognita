@@ -77,7 +77,7 @@ function gScl(s){const g=s.game;if(!g)return;g.sc=g.sc||{};s.order.forEach(n=>g.
 /* sablier : durée de base × facteur de l'hôte (TF : 1,5 / 1 / 0,7, comme l'Expédition). TF 0 = pas de sablier : g.dl=-1,
    on avance seulement quand tout le monde a fini. Toutes les durées de jeu passent par gWait. */
 const gTF=()=>{try{return typeof st!='undefined'&&st?+(st.timer??1):1}catch(e){return 1}};/* = TF() hors mode éclair (propre à l'Expédition) */
-function gWait(g,sec,st,rv){const f=gTF();sec=Math.round(sec*(f||1));g.st=st;g.k++;g.done={};g.need=null;g.dl=f?Date.now()+sec*1000:-1;g.sec=sec;g.rv=rv?1:0}
+function gWait(g,sec,st,rv){const f=gTF();sec=Math.round(sec*(f||1));g.st=st;g.k++;g.done={};g.need=null;g.dl=f?Date.now()+sec*1000:-1;g.sec=sec;g.rv=rv?1:0;g.edt=null}
 const gLate=g=>g.dl>0&&Date.now()>g.dl;
 const gNeed=s=>{const g=s.game;return gWt(s).filter(n=>!g.need||g.need.includes(n))};
 const gAll=s=>gNeed(s).every(n=>s.game.done[n]);
@@ -105,8 +105,10 @@ W.GAct=function(s,from,a){const t=a&&a.t;
   /* 👀 spectateurs : réactions seulement */if(!s.order.includes(from)&&!a.rx)return true;
   let ch=false;if(a.rx&&typeof a.rx=='string'&&RX.includes(a.rx)){g.rx[from]=a.rx;(g.rxt=g.rxt||{})[from]=Date.now();ch=true}/* rxt : pour rejouer une réaction une seule fois */
   else if(a.ok&&g.rv){if(!g.done[from]){g.done[from]=1;ch=true}}
+  /* ✏️ Modifier : la personne n'est plus prête tant qu'elle n'a pas renvoyé (jamais pendant un dévoilement) */
+  else if(a.undo){if(!g.rv&&g.done[from]){delete g.done[from];(g.edt=g.edt||{})[from]=1;ch=true}}
   else{/* on peut changer d'avis tant que l'étape n'est pas finie (les autres jouent encore, sablier en cours) */
-   const was=g.done[from];if(was&&!g.rv)delete g.done[from];ch=!!GAMES[g.id].act(s,from,a);if(!ch&&was)g.done[from]=was}
+   const was=g.done[from];if(was&&!g.rv)delete g.done[from];ch=!!GAMES[g.id].act(s,from,a);if(!ch&&was)g.done[from]=was;if(ch&&g.edt)delete g.edt[from]}
   if(ch){gCheck(s);bump()}return true}
  return false};
 W.GHide=function(name,s){if(!s||s.phase!='game'||!s.game)return s;const G=GAMES[s.game.id];return G&&G.hide?{...s,game:G.hide(s.game,name,s)}:s};
@@ -126,7 +128,7 @@ function gHint(s){const g=s.game,m=meN(),need=gNeed(s);
  if(g.rv){const w=need.filter(n=>!g.done[n]);return g.done[m]?{hint:w.length?GT('waitN',{n:w.map(B).join(', ')}):'…'}:{hint:GT('ready'),hintBtn:`<button class="pri gokb" id="gok">${GT('ok')}</button>`,mine:true}}
  if(!need.includes(m))return{hint:GT('watch')};
  if(!g.done[m])return{hint:GT('yourMove'),mine:true};
- const w=need.filter(n=>!g.done[n]);return{hint:GT('waitN',{n:w.map(B).join(', ')})}}
+ const w=need.filter(n=>!g.done[n]);return{hint:GT('waitN',{n:w.map(n=>(g.edt||{})[n]?B(n)+' ✏️ '+GT('gEdg'):B(n)).join(', ')})}}
 const pick=(names,cur,attr,ex)=>`<div class="gpk">${names.filter(n=>n!=ex).map((n,i)=>`<button class="ga ${cur==n?'sel':''}" ${dl(i)} ${attr}="${esc(n)}">${DT(n)}<span>${n==meN()?GT('me'):esc(n)}</span></button>`).join('')}</div>`;
 const norm=w=>String(w||'').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,'').replace(/^(.{4,})[sx]$/,'$1');
 /* nombres lisibles : pluriel par langue, points signés (« +3 points », « −8 pts »), temps restant d'une étape */
@@ -257,7 +259,7 @@ GAMES.bot={icon:'🍾',min:2,max:8,dur:10,tags:['social'],tone:true,
   if(g.q)o.q=g.q.map((b,i)=>i<g.i||(i==g.i&&g.st=='r')?b:i==g.i?{t:b.t,m:b.a==n?1:0}:null);
   if(g.st=='v')o.v=hideOwn(g.v,n);return o},
  view(s){const g=s.game,m=meN(),two=s.order.length==2,t18=(+s.tone||0)>0;
-  if(g.st=='w'){if(g.done[m]&&GV.ed!==g.id+g.k)return{html:`<div class="card c"><div class="gbig ga gfloat">🍾</div><p class="ga" ${dl(2)}>${GT('bwait')}</p><button class="ghost gedit ga" ${dl(3)} id="gedit">✏️ ${GT('edit')}</button></div>`,bind(){$('#gedit').onclick=()=>{GV.ed=g.id+g.k;render()}}};
+  if(g.st=='w'){if(g.done[m]&&GV.ed!==g.id+g.k)return{html:`<div class="card c"><div class="gbig ga gfloat">🍾</div><p class="ga" ${dl(2)}>${GT('bwait')}</p><button class="ghost gedit ga" ${dl(3)} id="gedit">✏️ ${GT('edit')}</button></div>`,bind(){$('#gedit').onclick=()=>{GV.ed=g.id+g.k;gs({undo:1});render()}}};
    const fl=i=>drafts['gbf'+i]=='1',ip=(g.ip&&g.ip[m])||[];
    return{html:`<div class="card">${[0,1,2].map(i=>`<div class="gwr ga" ${dl(i)}>${two?`<button type="button" class="gtf ${fl(i)?'f':''}" data-gf="${i}" aria-pressed="${fl(i)}">${GT(fl(i)?'bF':'bT')}</button>`:''}<textarea data-d="gbw${i}" rows="2" maxlength="220" placeholder="${esc(GT(two?'bph2':t18?'bph18':'bph'))}"></textarea></div>`).join('')}
     ${ip.length?`<div class="gidea"><p class="gidh">💡 ${GT('bIdea')}</p><div class="gidl">${ip.map((x,i)=>`<button type="button" class="gidc" data-gid="${i}">${esc(GC('bot',x))}</button>`).join('')}</div><p class="gidd">${GT('bIdeaD')}</p></div>`:''}<p class="err"></p><button class="pri wide" id="gsend">${GT('send')}</button></div>`,
@@ -352,7 +354,7 @@ GAMES.vag={icon:'🌊',min:2,max:8,dur:5,tags:['skill'],tone:true,
   if(g.st=='v'||g.st=='b'){const mine=g.w[m],br=g.st=='b';
    return{html:`<div class="card c">${head}${br?`<div class="gduo">${s.order.map((n,i)=>`<div class="ga" ${dl(i)}>${DT(n)}<b>${esc((g.w0||{})[n]||'—')}</b></div>`).join('')}</div><p class="gnote">${GT('vmiss')} ${GT('vbr')}</p>`:''}
     ${mine&&GV.ed!==g.id+g.k?`<p class="gword ga">${esc(mine)}</p><button class="ghost gedit ga" ${dl(3)} id="gedit">✏️ ${GT('edit')}</button>`:`<div class="grow2"><input data-d="gvw${g.k}" maxlength="32" autocomplete="off" placeholder="${esc(GT(br?'vbr':'vin'))}"><button class="pri" id="gsend">${GT('send')}</button></div><p class="err"></p>`}</div>`,
-    bind(){$('#gedit')&&($('#gedit').onclick=()=>{GV.ed=g.id+g.k;render()});const i=$(`[data-d="gvw${g.k}"]`);if(!i)return;const go=()=>{const w=tidy(i.value);if(!norm(w))return;if(norm(w)==norm(q)||(br&&Object.values(g.w0||{}).some(x=>norm(x)==norm(w))))return err(GT('vno'));GV.ed=null;gs({w})};
+    bind(){$('#gedit')&&($('#gedit').onclick=()=>{GV.ed=g.id+g.k;gs({undo:1});render()});const i=$(`[data-d="gvw${g.k}"]`);if(!i)return;const go=()=>{const w=tidy(i.value);if(!norm(w))return;if(norm(w)==norm(q)||(br&&Object.values(g.w0||{}).some(x=>norm(x)==norm(w))))return err(GT('vno'));GV.ed=null;gs({w})};
      $('#gsend').onclick=go;i.onkeydown=e=>{if(e.key=='Enter')go()};if(matchMedia('(pointer:fine)').matches&&document.activeElement!==i)i.focus()}}}
   const r=g.res[g.r]||{w:{}};
   if(two){const [a,b]=s.order,ok=r.ok;return{html:`<div class="card c">${head}<div class="gduo">${[a,b].map((n,i)=>`<div class="ga" ${dl(i)}>${DT(n)}<b>${esc(r.w[n]||'—')}</b>${r.b?`<br><span class="mut">→ ${esc(r.b[n]||'—')}</span>`:''}</div>`).join('')}</div>
@@ -633,7 +635,7 @@ GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,ties:true,MK
   const head=sp?'':g.st=='m'||g.st=='c'||g.st=='r'?`<div class="mkhd"><span class="mkme ga">${GT('ymask')} ${R.mn(me.m)}${sh(me.mtr)}</span><span class="mkvs ga" ${dl(1)}>${GT(me.pt.length>1?'ytrio':'yduo')} ${duo}</span></div>`:'';
   if(g.st=='m'){const pq=g.q[g.r];
    if(g.done[m]&&R.ed!==g.k)return{html:`<div class="card c">${head}<div class="mkbub mine ga" ${dl(2)}>${me.msg?esc(me.msg):`<i class="mut">${GT('mnone')}</i>`}</div><p class="gnote ga" ${dl(3)}>${GT('msent')}</p><button class="ghost mked" id="gedit">✏️ ${GT('medit')}</button></div>`,
-    bind(){$('#gedit').onclick=()=>{R.ed=g.k;drafts['gmw'+g.k]=me.msg||'';render()}}};
+    bind(){$('#gedit').onclick=()=>{R.ed=g.k;drafts['gmw'+g.k]=me.msg||'';gs({undo:1});render()}}};
    return{html:`<div class="card c">${head}${pq?`<p class="mktip ga" ${dl(2)}>💡 ${esc(GC('msk',pq))}</p>`:''}<textarea data-d="gmw${g.k}" rows="3" maxlength="140" placeholder="${esc(GT('mph'))}"></textarea>
     <div class="gbtns2"><button class="ghost" id="gskip">${GT('mskip')}</button><button class="pri" id="gsend">${GT('send')}</button></div></div>`,
     bind(){const t=$(`[data-d="gmw${g.k}"]`);$('#gsend').onclick=()=>{R.ed=null;gs({w:tidy(t.value)})};$('#gskip').onclick=()=>{R.ed=null;gs({w:''})}}}}
@@ -3375,6 +3377,16 @@ Object.assign(GI18N.ru.ui,{pts:`{v} очко|{v} очка|{v} очков`,ptsS:`
 Object.assign(GI18N.zh.ui,{pts:`{v} 分`,ptsS:`{v} 分`,prTn:`第 {i} 潮`,cqPay:`支付 {v} 🪙`,chSkL:`已沉 {v}/{n}`,chOkN:`到港 {v}`,tpLeftN:`风暴还有 {v} 拍`,tpBeatN:`{v} 拍`,tpErrN:`{v} 次失误`,tpFocus:`本关你的浪`,tpFocusS:`新关卡：大家各自看自己的浪`,tpFocusD:`记住它们：离风暴还有 {v}。`,tpLgW:`已放出的浪（颜色＝放出的人）`,tpLgB:`放得太早`,tpLgE:`被泡沫卷走`,tpLgL:`剩余船体`,tpLgC:`储备的平静浪`,mGain:`获得 {v}`,mLose:`失去 {v}`,pLostN:`失去 {v}`});
 Object.assign(GI18N.he.ui,{pts:`{v} נקודה|{v} נקודות`,ptsS:`{v} נק׳`,prTn:`גאות {i}`,cqPay:`משלם/ת {v} 🪙`,chSkL:`{v}/{n} טבעו`,chOkN:`{v} הגיעה|{v} הגיעו`,tpLeftN:`סערה בעוד מכה {v}|סערה בעוד {v} מכות`,tpBeatN:`מכה {v}|{v} מכות`,tpErrN:`טעות {v}|{v} טעויות`,tpFocus:`הגלים שלך לשלב הזה`,tpFocusS:`שלב חדש: כל אחד מגלה את הגלים שלו`,tpFocusD:`{g:זכור|זכרי} אותם: {v} עד הסערה.`,tpLgW:`גל ששוחרר (בצבע של מי ששחרר)`,tpLgB:`שוחרר מוקדם מדי`,tpLgE:`נסחף בקצף`,tpLgL:`ספינות שנותרו`,tpLgC:`גלים שקטים במלאי`,mGain:`מרוויח/ה {v}`,mLose:`מפסיד/ה {v}`,pLostN:`{v} אבדו`});
 Object.assign(GI18N.pt.ui,{pts:`{v} ponto|{v} pontos`,ptsS:`{v} pt|{v} pts`,prTn:`Maré {i}`,cqPay:`paga {v} 🪙`,chSkL:`{v}/{n} afundados`,chOkN:`{v} chegou|{v} chegaram`,tpLeftN:`Tempestade em {v} golpe|Tempestade em {v} golpes`,tpBeatN:`{v} golpe|{v} golpes`,tpErrN:`{v} erro|{v} erros`,tpFocus:`Suas ondas neste nível`,tpFocusS:`Novo nível: cada um descobre suas ondas`,tpFocusD:`Guarde-as bem: {v} de ondulação antes da tempestade.`,tpLgW:`onda solta (cor de quem soltou)`,tpLgB:`solta cedo demais`,tpLgE:`levada pela espuma`,tpLgL:`cascos restantes`,tpLgC:`ondas calmas de reserva`,mGain:`ganha {v}`,mLose:`perde {v}`,pLostN:`{v} perdidas`});
+/* ✏️ en train de modifier */
+Object.assign(GI18N.fr.ui,{gEdg:`en train de modifier`});
+Object.assign(GI18N.en.ui,{gEdg:`editing`});
+Object.assign(GI18N.es.ui,{gEdg:`editando`});
+Object.assign(GI18N.it.ui,{gEdg:`sta modificando`});
+Object.assign(GI18N.de.ui,{gEdg:`ändert gerade`});
+Object.assign(GI18N.ru.ui,{gEdg:`редактирует`});
+Object.assign(GI18N.zh.ui,{gEdg:`正在修改`});
+Object.assign(GI18N.he.ui,{gEdg:`עורך/ת`});
+Object.assign(GI18N.pt.ui,{gEdg:`editando`});
 /* 👀 Spectateurs : textes */
 Object.assign(GI18N.fr.ui,{specB:`Je regarde`,specD:`Tu suis la partie sans jouer : tu vois ce qui est public, tu peux réagir et discuter.`,specL:`Regardent : {n}`,specT:`Partie en cours : tu regardes, tu joueras à la prochaine.`,specT2:`Tu regardes cette partie.`,specH:`Tu regardes · réactions et chat ouverts`});
 Object.assign(GI18N.en.ui,{specB:`I'm watching`,specD:`Follow the game without playing: you see what's public, and you can react and chat.`,specL:`Watching: {n}`,specT:`Game in progress: you're watching, you'll play the next one.`,specT2:`You're watching this game.`,specH:`You're watching · reactions and chat are open`});
