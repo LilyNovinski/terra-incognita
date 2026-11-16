@@ -101,10 +101,9 @@ W.GAct=function(s,from,a){const t=a&&a.t;
   const G=GAMES[s.game.id],on=gPl(s);s.gspec=(s.gspec||[]).filter(n=>P(n));
   if(a.v=='again'&&on.length>=G.min&&on.length<=G.max){s.gsel=s.game.id;s.order=on;gStart(s)}else{s.phase='lobby';s.game=null;s.gres=null}
   bump();return true}
- if(t=='g'){const g=s.game;if(s.phase!='game'||!g||!P(from))return true;if(a.k!=null&&a.k!==g.k&&!a.rx)return true;
-  /* 👀 spectateurs : réactions seulement */if(!s.order.includes(from)&&!a.rx)return true;
-  let ch=false;if(a.rx&&typeof a.rx=='string'&&RX.includes(a.rx)){g.rx[from]=a.rx;(g.rxt=g.rxt||{})[from]=Date.now();ch=true}/* rxt : pour rejouer une réaction une seule fois */
-  else if(a.ok&&g.rv){if(!g.done[from]){g.done[from]=1;ch=true}}
+ if(t=='g'){const g=s.game;if(s.phase!='game'||!g||!P(from))return true;if(a.k!=null&&a.k!==g.k)return true;
+  /* 👀 spectateurs : pas d'action de jeu (leurs réactions passent par la barre commune) */if(!s.order.includes(from))return true;
+  let ch=false;if(a.ok&&g.rv){if(!g.done[from]){g.done[from]=1;ch=true}}
   /* ✏️ Modifier : la personne n'est plus prête tant qu'elle n'a pas renvoyé (jamais pendant un dévoilement) */
   else if(a.undo){if(!g.rv&&g.done[from]){delete g.done[from];(g.edt=g.edt||{})[from]=1;ch=true}}
   else{/* on peut changer d'avis tant que l'étape n'est pas finie (les autres jouent encore, sablier en cours) */
@@ -118,6 +117,12 @@ if(typeof setInterval!='undefined'&&typeof document!='undefined')setInterval(W.g
 
 /* ---------- aides de vue ---------- */
 const RX=['😎','😱','🫧','🦈'];
+/* 💬 réactions : la barre de l'Expédition (reactBar, double-tap ❤️), sous le jeu ; G.rx = jeu de réactions propre (mécanique) */
+const gRxBar=G=>typeof reactBar=='function'?`<div class="gwrx">${reactBar(G&&G.rx)}</div>`:'';
+W.GRxOk=e=>{try{return st.phase=='game'&&!!st.game&&(GAMES[st.game.id].rx||[]).includes(e)}catch(x){return false}};
+/* bulle sur la puce du joueur dans le jeu (DOM seul : ne relance aucune autre animation) */
+W.GRxHit=(from,e)=>{if(typeof document=='undefined')return;document.querySelectorAll('section>.gw [data-rxp]').forEach(x=>{if(x.dataset.rxp!==from)return;
+ x.querySelectorAll('.grxf').forEach(o=>o.remove());const b=document.createElement('span');b.className='grxf';b.setAttribute('aria-hidden','true');b.textContent=e;x.appendChild(b);setTimeout(()=>b.remove(),2600)})};
 const gs=a=>send({t:'g',k:st.game.k,...a});
 const meN=()=>me.name;
 const NM=n=>n=='~'?`<b>🐟 ${esc(GT('ghost'))}</b>`:B(n);
@@ -159,7 +164,7 @@ function gDrOut(){try{const d={};for(const k in drafts)if(/^g[a-z]/.test(k)&&typ
 if(typeof document!='undefined')document.addEventListener('input',e=>{const t=e.target;if(t&&t.closest&&t.closest('.gw')&&t.dataset&&t.dataset.d)setTimeout(gDrOut,0)});
 /* 👀 bandeau des spectateurs (en partie) : qui regarde, et sa dernière réaction */
 function gSpecBar(s){const o=s.order||[],L=(s.players||[]).filter(p=>p.online&&!o.includes(p.name));if(!L.length)return '';const g=s.game||{};
- return `<div class="gspb2"><span class="gspi" aria-hidden="true">👀</span>${L.map(p=>`<span class="gspn">${DT(p.name)}${p.name==meN()?esc(GT('me')):esc(p.name)}${(g.rx||{})[p.name]&&Date.now()-((g.rxt||{})[p.name]||0)<8000?` <i>${g.rx[p.name]}</i>`:''}</span>`).join('')}</div>`}
+ return `<div class="gspb2"><span class="gspi" aria-hidden="true">👀</span>${L.map(p=>`<span class="gspn">${DT(p.name)}${p.name==meN()?esc(GT('me')):esc(p.name)}</span>`).join('')}</div>`}
 
 W.GView=function(){const s=isHost?GHide(meN(),st):st,g=s.game;if(!g||!GAMES[g.id])return{html:''};/* l'hôte voit la même chose que les autres */
  if(s.v!==GV.v){GV.v=s.v;GV.t=Date.now()}
@@ -174,7 +179,7 @@ W.GView=function(){const s=isHost?GHide(meN(),st):st,g=s.game;if(!g||!GAMES[g.id
  ${g.k<=1?`<p class="grule">${GT(rk)}</p>${g.nod?`<p class="gnod ga" ${dl(2)}>📜 ${GT('lgLast',{t:gLogT({g:g.id,...g.nod})})}</p>`:''}`:''}`;
  const h={...gHint(s),...v};const ob=v.bind;
  if(spc){delete h.hintBtn;h.mine=false}
- return{...h,html:`<div class="gw g-${g.id}${g.k>1?' gnx':''}${spc?' gspc':''}">${head}${v.html}${gSpecBar(s)}</div>`,bind(){
+ return{...h,html:`<div class="gw g-${g.id}${g.k>1?' gnx':''}${spc?' gspc':''}">${head}${v.html}${gSpecBar(s)}${gRxBar(G)}</div>`,bind(){
   $('#gok')&&($('#gok').onclick=()=>gs({ok:1}));$('#gstop')&&($('#gstop').onclick=()=>ask(GT('stopAsk'),GT('stop')).then(v=>v&&send({t:'gx',v:'stop'})));
   if(GV.fx!==g.id+g.k){GV.fx=g.id+g.k;if(g.rv)try{SFX.reveal()}catch(e){}}
   gAnim($('section>.gw'),'g'+s.gid+'.'+g.k);ob&&ob()}}};
@@ -184,7 +189,7 @@ function gEndView(s){const g=s.game,G=GAMES[g.id],R=s.gres||{pts:{}},host=meN()=
  const list=R.coop?'':`<div class="gsc">${rows.map(([n,p],i)=>{if(p!==prev){rank=i;prev=p}return `<div class="grow ga ${n==meN()?'me':''}" ${dl(i,.1)}><span class="gmd">${['🥇','🥈','🥉'][rank]||rank+1}</span>${DT(n)}<span class="gnm">${NM(n)}</span><b class="gpt">${p}</b></div>`}).join('')}</div>`;
  const html=`<div class="gw g-${g.id}"><div class="ghd"><span class="gic">${G.icon}</span><b>${GT('n_'+g.id)}</b></div>
  <div class="card"><h3>${GT(R.coop?(GI18N.fr.ui['coop_'+g.id]?'coop_'+g.id:'coopT'):'scores')}</h3>${list}${G.endView?G.endView(s):''}</div>
- ${host?`<div class="gbtns"><button class="pri wide" data-gend="again">${GT('again')}</button><button class="ghost wide" data-gend="lobby">${GT('lobby')}</button></div>`:''}</div>`;
+ ${host?`<div class="gbtns"><button class="pri wide" data-gend="again">${GT('again')}</button><button class="ghost wide" data-gend="lobby">${GT('lobby')}</button></div>`:''}${gRxBar()}</div>`;
  return{html,mine:host,hint:host?GT('hostNext'):GT('waitHostN',{n:B(s.host)}),bind(){
   $$('[data-gend]').forEach(b=>b.onclick=()=>send({t:'gx',v:b.dataset.gend}));
   gAnim($('section>.gw'),'e'+s.gid);
@@ -415,7 +420,7 @@ GAMES.rad={icon:'🛟',min:2,max:8,dur:7,tags:['social','skill'],tone:true,
    joueur au seuil 8, il finit 1er dans 34 % des parties : battable, mais menaçant. Égalité : places partagées.
    ===================================================================== */
 const PBAG=[1,1,1,2,2,2,3,3,4,5,6,8,'m','m','r','r','r','r','r'];
-GAMES.pec={bag:PBAG,icon:'🦪',min:2,max:8,dur:7,tags:['chance'],
+GAMES.pec={bag:PBAG,icon:'🦪',rx:RX,min:2,max:8,dur:7,tags:['chance'],
  init(s){const g=s.game;g.n=s.order.length>=5?3:4;g.ps=[...s.order];if(g.ps.length==2)g.ps.push('~');g.cof={};g.ps.forEach(n=>g.cof[n]=0);g.r=-1;g.mh=[];this.man(s)},
  man(s){const g=s.game;g.r++;if(g.r>=g.n){g.over=1;return}g.bag=shuf(this.bag);g.out=[];g.down=g.ps.filter(n=>n=='~'||s.order.includes(n));g.fil={};g.down.forEach(n=>g.fil[n]=0);g.sh=0;g.upv={};g.lost={};g.last=[];g.ch={};this.draw(s)},
  draw(s){const g=s.game,it=g.bag.pop(),ev={it,x:1,t:[]};g.out.push(it);
@@ -438,12 +443,11 @@ GAMES.pec={bag:PBAG,icon:'🦪',min:2,max:8,dur:7,tags:['chance'],
   const evh=ev.it==null?'':typeof ev.it=='number'?`<div class="gev ga pearl"><span class="gpl big v${ev.it}">${ev.it}</span>${ev.x==2?`<b>${GT('pdouble')}</b>`:''}</div>`
    :ev.it=='m'?`<div class="gev ga jel"><span class="gbig">🪼</span><b>${GT('pjel')}</b>${ev.t.length?`<span>${ev.t.map(NM).join(', ')} −½</span>`:''}</div>`
    :`<div class="gev ga shk ${g.sh>=2?'dead':''}"><span class="gbig">🦈</span><b>${g.sh>=2?GT('pdead'):GT('pshark')} (${g.sh}/2)</b></div>`;
-  const divers=`<div class="gdv">${g.ps.filter(n=>g.fil[n]!=null).map((n,i)=>{const d=g.down.includes(n);return `<span class="gchip ${d?'dn':'up'} ${n==m?'me':''}">${d?'🤿':'⛵'} ${DT(n)}${n=='~'?'🐟':esc(n)} <b>${d?g.fil[n]:g.upv[n]!=null?gPs(g.upv[n]):g.lost[n]?'✗':''}</b>${g.rx[n]&&d?` <span class="grx">${g.rx[n]}</span>`:''}</span>`}).join('')}</div>`;
+  const divers=`<div class="gdv">${g.ps.filter(n=>g.fil[n]!=null).map((n,i)=>{const d=g.down.includes(n);return `<span class="gchip ${d?'dn':'up'} ${n==m?'me':''}" data-rxp="${esc(n)}">${d?'🤿':'⛵'} ${DT(n)}${n=='~'?'🐟':esc(n)} <b>${d?g.fil[n]:g.upv[n]!=null?gPs(g.upv[n]):g.lost[n]?'✗':''}</b></span>`}).join('')}</div>`;
   const cof=!s.order.includes(m)?'':`<p class="gcof">🔒 ${GT('pcof')} : <b>${g.cof[m]??0}</b> <span class="mut">· ${GT('psecret')}</span></p>`;
   if(g.st=='e'){const h=g.mh.at(-1)||{upv:{},lost:{}};return{html:`<div class="card c">${evh}<h3>${GT('pmanche')}</h3><div class="gdv">${g.ps.map((n,i)=>`<span class="gchip ga" ${dl(i,.2)}>${DT(n)}${n=='~'?'🐟':esc(n)} <b>${h.upv[n]!=null?gPs(h.upv[n]):h.lost[n]?'✗ '+GT('pLostN',{v:h.lost[n]}):gPs(0)}</b></span>`).join('')}</div>${cof}</div>`}}
-  return{html:`<div class="card c">${evh}${divers}${down?`<p class="gfil">${GT('pfil')} : <b>${g.fil[m]}</b></p><div class="gpk">${[['u','pup','⛵'],['d','pdown','🤿']].map(([v,k,ic],i)=>`<button class="ga gdec ${g.ch[m]==v?'sel':''}" ${dl(i)} data-gd="${v}">${ic} ${GT(k)}</button>`).join('')}</div>
-   <div class="grxb">${RX.map(e=>`<button class="ghost" data-grx="${e}" aria-label="${e}">${e}</button>`).join('')}</div>`:`<p class="gnote">${g.upv[m]!=null?GT('pyouup',{v:g.upv[m]}):g.lost[m]?GT('pdead'):''}</p>`}${bag}${cof}</div>`,
-   bind(){$$('[data-gd]').forEach(x=>x.onclick=()=>gs({v:x.dataset.gd}));$$('[data-grx]').forEach(x=>x.onclick=()=>send({t:'g',rx:x.dataset.grx}))}}},
+  return{html:`<div class="card c">${evh}${divers}${down?`<p class="gfil">${GT('pfil')} : <b>${g.fil[m]}</b></p><div class="gpk">${[['u','pup','⛵'],['d','pdown','🤿']].map(([v,k,ic],i)=>`<button class="ga gdec ${g.ch[m]==v?'sel':''}" ${dl(i)} data-gd="${v}">${ic} ${GT(k)}</button>`).join('')}</div>`:`<p class="gnote">${g.upv[m]!=null?GT('pyouup',{v:g.upv[m]}):g.lost[m]?GT('pdead'):''}</p>`}${bag}${cof}</div>`,
+   bind(){$$('[data-gd]').forEach(x=>x.onclick=()=>gs({v:x.dataset.gd}))}}},
  fin(s){const p={};for(const n in s.game.cof)if(n=='~'||s.order.includes(n))p[n]=s.game.cof[n];return{pts:p}}};
 
 /* =====================================================================
@@ -1188,7 +1192,7 @@ GAMES.prl={icon:'⚫',min:3,max:8,dur:10,tags:['social'],tone:true,PRN,PRS,
    ===================================================================== */
 const TMP={BT:8,BM:7,FT:5,CB:3,LV:n=>n==2?7:n==3?6:n==4?5:n==5?4:3,LF:n=>n==2?2:n==8?5:4,B:c=>Math.ceil(c*1.5)+8,BON:{2:'c',3:'l',5:'c',6:'l'}};
 const tpBand=v=>{const k=Math.floor((v-1)/10);return (10*k+1)+"–"+(10*k+10)};
-GAMES.tmp={icon:'⛈️',min:2,max:8,dur:8,tags:['skill'],mute:1,TMP,clk:g=>g.st=='b',
+GAMES.tmp={icon:'⛈️',rx:RX,min:2,max:8,dur:8,tags:['skill'],mute:1,TMP,clk:g=>g.st=='b',
  init(s){const g=s.game,n=s.order.length;g.n=TMP.LV(n);g.life=TMP.LF(n);g.calm=1;g.hist=[];g.ok=0;this.deal(s)},
  deal(s){const g=s.game,k=g.r+1,d=shuf([...Array(100).keys()].map(i=>i+1));g.h={};s.order.forEach(p=>g.h[p]=d.splice(0,k).sort((a,b)=>a-b));
   g.pl=[];g.ec=[];g.band={};g.left=g.B=TMP.B(k*s.order.length);g.ev=null;g.res=null;g.bt=0;g.since=0;g.nx=0;g.ch={};this.pub(s);gWait(g,TMP.FT,'f',1)},
@@ -1229,9 +1233,6 @@ GAMES.tmp={icon:'⛈️',min:2,max:8,dur:8,tags:['skill'],mute:1,TMP,clk:g=>g.st
    ${P.map(x=>`<b class="tpw ${x.e?'bad':''} ${nw&&x.b==nw?'nw':''}" style="inset-inline-start:${x.v-1}%;--c:${col(x.p)}">${lb('p'+x.v,x.v)}</b>`).join('')}<span class="tp0">1</span><span class="tp1">100</span></div>`},
  /* petite légende : couleurs et icônes */
  lg(){return `<p class="tplg"><span><i class="tpw0" style="--c:${col(meN())}"></i>${GT('tpLgW')}</span><span><i class="tpw0 bad"></i>${GT('tpLgB')}</span><span><i class="tpw0 ec"></i>${GT('tpLgE')}</span><span>⛵ ${GT('tpLgL')}</span><span>🌅 ${GT('tpLgC')}</span></p>`},
- /* réaction : bulle de 2,6 s, jouée une fois par envoi (les re-rendus de coup la continuent sans la relancer) */
- rxa(g,p){const t=(g.rxt||{})[p],e=(g.rx||{})[p];if(!t||!e)return '';const M=this.rxs=this.rxs||{};if(!M[p]||M[p].t!==t)M[p]={t,at:Date.now()};
-  const age=Date.now()-M[p].at;return age<2600?`<span class="tprx" data-gan style="animation-delay:-${age}ms">${e}</span>`:''},
  seq(g){return `<div class="tpseq">${[...(g.pl||[]).map(x=>`<b class="${x.e?'bad':''}" style="--c:${col(x.p)}">${x.v}</b>`),...(g.ec||[]).map(x=>`<b class="ec">${x.v}</b>`)].join('')}</div>`},
  view(s){const g=s.game,m=meN(),R=this,my=(g.h||{})[m]||[],ch=g.ch||{};
   const bar=`<div class="tpbar"><span class="tplf" title="${esc(GT('tpLgL'))}">${'⛵'.repeat(Math.max(0,g.life))}</span><span class="tpcl ${g.calm?'':'z'}" title="${esc(GT('tpLgC'))}">🌅 ${g.calm}</span><b class="tplv">${GT('tpLv',{v:g.r+1})}</b></div>`;
@@ -1246,8 +1247,8 @@ GAMES.tmp={icon:'⛈️',min:2,max:8,dur:8,tags:['skill'],mute:1,TMP,clk:g=>g.st
   const H=s.order.filter(p=>g.cnt[p]),nc=Object.values(ch).filter(v=>v=='C').length,ev=g.ev||{};
   const evt=ev.t=='p'?ev.put.map(x=>`<span class="tpe">${DT(x.p)}<b>${x.v}</b></span>`).join(''):ev.t=='x'?`💥 ${GT('tpX',{v:ev.lost.map(x=>x.v).join(', ')})}`:ev.t=='c'?`🌅 ${GT('tpC')}`:ev.t=='w'?GT('tpW'):GT('tpGo');
   const crew=s.order.map(p=>{const k=g.cnt[p]||0,bd=g.band[p];
-   return `<div class="tpm ${p==m?'me':''} ${k?'':'out'}"><span class="tpnm">${DT(p)}${p==m?esc(GT('me')):esc(p)}</span><span class="tpk">${k?'🌊'.repeat(Math.min(k,7)):'✓'}</span>
-    ${bd!=null&&k?`<span class="tpbd" dir="ltr">${tpBand(bd*10+1)}</span>`:''}${ch[p]=='C'?'<span class="tpcq">🌅</span>':''}${g.done[p]&&k?'<i class="tpok" aria-hidden="true"></i>':''}${R.rxa(g,p)}</div>`}).join('');
+   return `<div class="tpm ${p==m?'me':''} ${k?'':'out'}" data-rxp="${esc(p)}"><span class="tpnm">${DT(p)}${p==m?esc(GT('me')):esc(p)}</span><span class="tpk">${k?'🌊'.repeat(Math.min(k,7)):'✓'}</span>
+    ${bd!=null&&k?`<span class="tpbd" dir="ltr">${tpBand(bd*10+1)}</span>`:''}${ch[p]=='C'?'<span class="tpcq">🌅</span>':''}${g.done[p]&&k?'<i class="tpok" aria-hidden="true"></i>':''}</div>`}).join('');
   const c=ch[m]||'W',hand=my.length?`<div class="tphand">${my.map((v,i)=>`<b class="tpv ${i?'':'lo'}">${v}</b>`).join('')}</div>
    <div class="tpbt"><button class="tpgo ${c=='P'?'sel':''}" data-tp="P" aria-pressed="${c=='P'}">🌊 ${GT('tpPut',{v:my[0]})}</button><button class="ghost ${g.done[m]&&c=='W'?'sel':''}" data-tp="W" aria-pressed="${c=='W'}">⏳ ${GT('tpHold')}</button>
    <button class="ghost tpcb ${c=='C'?'sel':''}" data-tp="C" ${g.calm?'':'disabled'} aria-pressed="${c=='C'}">🌅 ${GT('tpCalm')}${nc?` <small>${nc}/${Math.max(1,Math.ceil(H.length/2))}</small>`:''}</button></div>`:s.order.includes(m)?`<p class="gnote">${GT('tpNone')}</p>`:'';
@@ -1255,8 +1256,8 @@ GAMES.tmp={icon:'⛈️',min:2,max:8,dur:8,tags:['skill'],mute:1,TMP,clk:g=>g.st
   const ga=Math.max(0,Math.min(1,g.left/g.B)),gb=Math.max(0,Math.min(1,(g.left-1)/g.B)),rm=gRem(s),run=g.dl>0&&g.sec;
   return{html:`<div class="card c tpcard">${bar}<div class="tpst"><span>⛈️ ${GTn('tpLeftN',g.left)}</span><span class="tpsb"><i data-gan style="--a:${ga.toFixed(4)};--b:${gb.toFixed(4)};${run?`animation-duration:${g.sec}s;animation-delay:-${Math.max(0,g.sec-rm).toFixed(2)}s`:'animation:none;transform:scaleX(var(--a))'}"></i></span></div>
    ${R.sea(g,g.bt-1)}<p class="tpev" aria-live="polite">${evt}</p><p class="tpsi">${GT('tpSince',{v:g.since})}</p><div class="tpcrew">${crew}</div>${hand}${R.lg()}
-   <div class="grxb tprxb">${RX.map(e=>`<button class="ghost" data-grx="${e}" aria-label="${e}">${e}</button>`).join('')}</div><p class="tpmu">🤫 ${GT('tpMute')}</p></div>`,
-   bind(){$$('[data-tp]').forEach(b=>b.onclick=()=>gs({v:b.dataset.tp}));$$('[data-grx]').forEach(x=>x.onclick=()=>send({t:'g',rx:x.dataset.grx}))}}},
+   <p class="tpmu">🤫 ${GT('tpMute')}</p></div>`,
+   bind(){$$('[data-tp]').forEach(b=>b.onclick=()=>gs({v:b.dataset.tp}))}}},
  endView(s){const g=s.game;
   return `<p class="gbig2 ga ${g.ok>=g.n?'ok':''}">${g.ok>=g.n?'🌈':'⛈️'} ${g.ok} / ${g.n}</p><p class="gnote ga" ${dl(1)}>${GT('tpEnd',{v:g.ok,n:g.n})}</p>
    <div class="tpend">${(g.hist||[]).map((h,i)=>`<div class="ga" ${dl(i,.3)}><b>${GT('tpLv',{v:h.lv})}</b><span>${h.ok?(h.st?'⛈️':'✓'):'🌊'}${h.x?' · 💥 '+GTn('tpErrN',h.x):''}</span><span class="mut">${GTn('tpBeatN',h.bt)}</span></div>`).join('')}</div>`},
@@ -1660,8 +1661,10 @@ div.gtile{cursor:default}
 .gdec{font-size:18px!important;padding:14px!important}
 .gfil{font:700 16px Nunito;margin:12px 0 8px}.gfil b{font-size:22px;color:var(--ink)}
 .gcof{font:700 14px Nunito;margin:10px 0 0}
-.grxb{display:flex;gap:6px;justify-content:center;margin-top:10px}.grxb button{padding:6px 12px;font-size:18px;box-shadow:none}
-.grx{animation:gin .3s ease both}
+.gwrx{margin:4px 0 6px}.gwrx .reacts{margin-top:10px}
+[data-rxp]{position:relative}.grxf{position:absolute;top:-14px;inset-inline-end:-4px;font-size:18px;line-height:1;pointer-events:none;animation:grxF 2.6s ease both}
+@keyframes grxF{0%{opacity:0;transform:translateY(6px) scale(.5)}12%{opacity:1;transform:none}80%{opacity:1;transform:translateY(-4px)}100%{opacity:0;transform:translateY(-10px)}}
+@media (prefers-reduced-motion:reduce){.grxf{animation:none}}
 .gokb{pointer-events:auto}
 [data-theme=dark] .gw button.sel{background:#3a2a1c}
 [data-theme=dark] .ghd{color:#eaf7f9;text-shadow:0 1px 3px #000a}
@@ -1882,7 +1885,7 @@ button.prch{cursor:pointer;width:auto}button.prch:hover{border-color:var(--edge2
 /* 👀 spectateurs */
 .gspc0{font-size:13px;color:var(--mut);margin:0 0 10px;padding:6px 11px;border-inline-start:3px solid var(--acc);border-radius:4px 12px 12px 4px;background:color-mix(in srgb,var(--acc) 8%,transparent);line-height:1.4}
 .gw.gspc .card :is(textarea,input,#gsend,.gedit,.grow2,.gwr,.gidea,.gpk,.chno,.gab,.tpbt,.gbtns2,.mipk){display:none!important}
-.gw.gspc .card button:not([data-grx]):not(.gtutb){pointer-events:none}
+.gw.gspc .card button:not(.gtutb){pointer-events:none}
 .gw.gspc .card .gpk button:not(.sel),.gw.gspc .card [data-tp]{opacity:.55}
 .gspb2{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:12px;font-size:13px;color:var(--mut)}
 .gspi{font-size:15px}.gspn{display:inline-flex;align-items:center;gap:5px}.gspn i{font-style:normal}
@@ -1925,17 +1928,15 @@ button.prch{cursor:pointer;width:auto}button.prch:hover{border-color:var(--edge2
 .tpm.me{border-color:var(--acc)}.tpm.out{opacity:.55}.tpnm{display:flex;align-items:center;gap:5px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 60px}
 .tpk{font-size:11px;letter-spacing:-2px}.tpbd{font-size:11px;font-weight:700;padding:0 6px;border-radius:99px;background:color-mix(in srgb,var(--gold) 24%,transparent)}
 .tpcq{font-size:12px}.tpok{position:absolute;top:-4px;inset-inline-end:-4px;width:10px;height:10px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 2px var(--paper)}
-.tprx{position:absolute;top:-13px;inset-inline-end:14px;font-size:18px;animation:tpRx 2.6s ease both;pointer-events:none}
-@keyframes tpRx{0%{transform:translateY(8px) scale(.5);opacity:0}15%{transform:none;opacity:1}75%{opacity:1}100%{transform:translateY(-6px);opacity:0}}
 .tphand{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:2px 0 12px}
 .tpv{min-width:46px;padding:9px 10px;border-radius:14px;border:2px solid var(--edge);background:var(--paper2);font-size:20px;text-align:center}.tpv.lo{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 14%,var(--paper2))}
 .tpbt{display:grid;grid-template-columns:1fr 1fr;gap:8px}.tpbt .tpgo{grid-column:1/-1;font-size:17px;padding:13px;background:linear-gradient(180deg,#4fb6c9,#2f8fa8);color:#fff;border:0}
 .tpbt button.sel{outline:3px solid var(--acc);outline-offset:1px}.tpbt small{font-size:11px;opacity:.8}
-.tprxb{margin-top:12px}.tpmu{font-size:11.5px;color:var(--mut);margin:6px 0 0}
+.tpmu{font-size:11.5px;color:var(--mut);margin:6px 0 0}
 .tpend{display:grid;gap:5px;margin-top:8px}.tpend>div{display:flex;gap:10px;justify-content:space-between;padding:6px 10px;border:1.5px solid var(--edge);border-radius:10px;font-size:14px}
 .tpseq{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-top:10px}.tpseq b{font-size:13px;padding:2px 7px;border-radius:8px;border:1.5px solid var(--c,var(--edge))}.tpseq b.bad{border-color:var(--bad);color:var(--bad)}.tpseq b.ec{border:1.5px dashed var(--mut);color:var(--mut);text-decoration:line-through}
 .tutrk{display:block;width:250px;height:3px;border-radius:3px;background:linear-gradient(90deg,#2fa894,#ef8354);opacity:.6}
-@media (prefers-reduced-motion:reduce){.tpw.nw,.tprx{animation:none}.tpsb i{animation:none!important;transform:scaleX(var(--a))}}
+@media (prefers-reduced-motion:reduce){.tpw.nw{animation:none}.tpsb i{animation:none!important;transform:scaleX(var(--a))}}
 @media (max-width:420px){.tpcrew{grid-template-columns:1fr 1fr}.tpv{min-width:40px;font-size:18px;padding:7px 8px}}
 .cqs{width:22px;height:22px;display:inline-block;vertical-align:middle;flex:none;filter:drop-shadow(0 1px 1px #0002)}
 .cqs.xs{width:14px;height:14px}.cqlot.xs .cqs{width:17px;height:17px}.cqlot.sm .cqs{width:18px;height:18px}.cqs.big{width:46px;height:46px}

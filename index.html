@@ -1839,7 +1839,7 @@ function fxHit(from,e,n,o){const now=Date.now(),key=from+e,cm=FX.cmb[key]||(FX.c
  if(who.length>=2&&now-g.t>6000){g.t=now;fxGroup(e,who.length)}
  return lv}
 /* réactions : pile #rx en bas à gauche (qui a mis quoi), regroupement ×N, 3,5 s, 4 max */
-function floatReact(from,e,o){o=o||{};const n=Math.max(1,Math.min(10,Math.floor(+o.n)||1));
+function floatReact(from,e,o){o=o||{};try{window.GRxHit&&GRxHit(from,e)}catch(x){}/* @games */const n=Math.max(1,Math.min(10,Math.floor(+o.n)||1));
  const lv=from==me.name?fxLvOf(from,e):fxHit(from,e,n,o);
  let box=$('#rx');if(!box){box=document.createElement('div');box.id='rx';box.setAttribute('aria-live','polite');document.body.appendChild(box)}
  const h=$('.hint');box.style.bottom=((h&&h.firstElementChild?h.offsetHeight:0)+10)+'px';
@@ -1875,7 +1875,7 @@ function fxBind(b){const e=b.dataset.e;let t1=0,t2=0,down=false,rdy=false;
  b.onclick=ev=>{if(ev.detail===0)react(e,b)}}
 /* double-tap sur une carte : ❤️ à l'endroit du tap, visible par tout le monde */
 /* sur PC : le vrai double-clic du système (délai réglé par Windows/macOS) et pas de sélection de texte au 2e clic */
-const dtOk=tg=>tg&&tg.closest&&tg.closest('.card,.guess,.banner')&&!tg.closest('button,input,textarea,a,.reacts,.dd,[contenteditable],select,label')&&$('.reacts');
+const dtOk=tg=>tg&&tg.closest&&tg.closest('.card,.guess,.banner')&&!tg.closest('button,input,textarea,a,.reacts,.dd,[contenteditable],select,label,canvas,.gw svg')&&$('.reacts');
 const dtFire=ev=>{try{getSelection().removeAllRanges()}catch(e){}if(me&&st&&(isHost||(hostConn&&hostConn.open)))react('❤️',null,{k:'tap',x:+(ev.clientX/innerWidth).toFixed(3),y:+(ev.clientY/innerHeight).toFixed(3)})};
 document.addEventListener('mousedown',ev=>{if(ev.detail>1&&dtOk(ev.target))ev.preventDefault()});
 document.addEventListener('dblclick',ev=>{if(dtOk(ev.target))dtFire(ev)});
@@ -1885,7 +1885,7 @@ document.addEventListener('pointerup',ev=>{if(ev.pointerType=='mouse')return;
  if(p&&now-p.t<380&&Math.hypot(ev.clientX-p.x,ev.clientY-p.y)<40){FX.dt=null;try{getSelection().removeAllRanges()}catch(e){}
   if(me&&st&&(isHost||(hostConn&&hostConn.open)))react('❤️',null,{k:'tap',x:+(ev.clientX/innerWidth).toFixed(3),y:+(ev.clientY/innerHeight).toFixed(3)})}
  else FX.dt={t:now,x:ev.clientX,y:ev.clientY}});
-const reactBar=()=>`<div class="reacts">${EMO.map(e=>`<button data-e="${e}">${e}</button>`).join('')}</div>`;
+const reactBar=L=>`<div class="reacts">${(L||EMO).map(e=>`<button data-e="${e}">${e}</button>`).join('')}</div>`;
 
 /* ---------- Tutoriel ---------- */
 const TUTO_R=['rivage','plaines','source','grottes','horizon'];
@@ -2180,7 +2180,7 @@ function viewFor(name,s){if(!s||!name)return s;if(s.phase=='game'||s.phase=='gen
   for(const x in s.maps||{}){const l=s.maps[x]&&s.maps[x][name];if(x!=name&&l&&l.some(e=>e.nt)){if(v.maps===s.maps)v.maps={...s.maps};v.maps[x]={...s.maps[x],[name]:l.map(e=>{if(!e.nt)return e;const o={...e};delete o.nt;return o})}}}}
  if(wh){const m=o=>Object.fromEntries(Object.keys(o||{}).map(k=>[k,k==name?o[k]:'']));v.cur={...c,wo:{...c.wo,v:m(c.wo.v)}};if(v.hist||s.hist)v.hist=(v.hist||s.hist).map(h=>h.cid==c.id&&h.wo?{...h,wo:{...h.wo,v:m(h.wo.v)}}:h)}
  return v}
-function relayReact(from,e,o){o=o||{};if(!EMO.includes(e))return;
+function relayReact(from,e,o){o=o||{};if(!EMO.includes(e)&&!(window.GRxOk&&GRxOk(e)))return;/* @games : réactions propres à un jeu */
  const now=Date.now(),b=FX.bud[from]||(FX.bud[from]={v:30,t:now,g:0});b.v=Math.min(30,b.v+(now-b.t)*.02);b.t=now;
  let n=Math.min(10,Math.max(1,Math.floor(+o.n)||1),Math.floor(b.v));if(n<1)return;b.v-=n;
  const m={t:'react',from,e,n};
