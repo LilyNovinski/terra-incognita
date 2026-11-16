@@ -1453,7 +1453,7 @@ if(typeof document!='undefined')document.addEventListener('click',e=>{const t=e.
 if(typeof document!='undefined'){const c=document.createElement('style');c.id='games-css';c.textContent=`
 .gw{--gease:cubic-bezier(.22,1,.36,1)}
 .ghd{display:flex;align-items:center;gap:8px;font:600 19px Fredoka,Nunito,sans-serif;margin:8px 4px 8px;color:var(--deep)}
-.ghd .grd{white-space:nowrap}.ghd .gic{font-size:26px;line-height:1}.ghd .gstop{margin-inline-start:6px;width:30px;height:30px;padding:0;border-radius:50%;font-size:13px;line-height:1;box-shadow:0 2px 0 var(--edge2);color:var(--mut)}.ghd .grd+.gstop{margin-inline-start:6px}.ghd b+.gstop{margin-inline-start:auto}.ghd .grd{margin-inline-start:auto;font:800 13px Nunito;color:var(--mut);background:var(--paper);border:2px solid var(--edge);border-radius:99px;padding:2px 10px}
+.ghd .grd{white-space:nowrap;direction:ltr;unicode-bidi:isolate}.ghd .gic{font-size:26px;line-height:1}.ghd .gstop{margin-inline-start:6px;width:30px;height:30px;padding:0;border-radius:50%;font-size:13px;line-height:1;box-shadow:0 2px 0 var(--edge2);color:var(--mut)}.ghd .grd+.gstop{margin-inline-start:6px}.ghd b+.gstop{margin-inline-start:auto}.ghd .grd{margin-inline-start:auto;font:800 13px Nunito;color:var(--mut);background:var(--paper);border:2px solid var(--edge);border-radius:99px;padding:2px 10px}
 .gsab{height:6px;border-radius:9px;background:var(--edge);overflow:hidden;margin:0 4px 10px}
 .gsab i{display:block;height:100%;background:linear-gradient(90deg,var(--ink),var(--gold));transform-origin:left;animation-name:gsab;animation-timing-function:linear;animation-fill-mode:both}
 [dir=rtl] .gsab i{transform-origin:right}
