@@ -39,8 +39,8 @@ function gSeen(){try{const a=JSON.parse(localStorage.getItem(GSEEN)||'[]');retur
 function gSeenAdd(ids){try{const S=new Set(ids),a=gSeen().filter(x=>!S.has(x)).concat(ids);localStorage.setItem(GSEEN,JSON.stringify(a.slice(-3000)))}catch(e){}}
 /* pioche n contenus [réserve,index] selon le ton (0 : tout public seulement) — jamais deux fois dans une partie ;
    d'abord les inédits, puis les plus anciennement vus */
-function gPool(s,k,n){const t=+s.tone||0,w=t==2?[.3,.3,.4]:t==1?[.55,.45,0]:[1,0,0],SI=new Map(gSeen().map((x,i)=>[x,i])),id=(p,i)=>k+(p||'')+':'+i;
- const P3=[0,1,2].map(p=>{if(!w[p])return[];const a=shuf(GL(k+(p||''),'fr').map((v,i)=>v.trim()?[p,i]:null).filter(Boolean));/* réserve absente pour ce ton = rien à piocher (on retombe sur un autre ton) */
+function gPool(s,k,n,f){const t=+s.tone||0,w=t==2?[.3,.3,.4]:t==1?[.55,.45,0]:[1,0,0],SI=new Map(gSeen().map((x,i)=>[x,i])),id=(p,i)=>k+(p||'')+':'+i;
+ const P3=[0,1,2].map(p=>{if(!w[p])return[];const a=shuf(GL(k+(p||''),'fr').map((v,i)=>v.trim()&&(!f||f(v,i))?[p,i]:null).filter(Boolean));/* réserve absente pour ce ton = rien à piocher (on retombe sur un autre ton) */
   return a.filter(x=>SI.has(id(...x))).sort((x,y)=>SI.get(id(...y))-SI.get(id(...x))).concat(a.filter(x=>!SI.has(id(...x))))}),out=[];
  for(let j=0;j<n;j++){let r=Math.random(),p=0;while(p<2&&(r-=w[p])>0)p++;if(!P3[p].length)p=P3.findIndex(x=>x.length);if(p<0)break;out.push(P3[p].pop())}
  gSeenAdd(out.map(x=>id(...x)));return shuf(out)}
@@ -54,8 +54,9 @@ const GPLK='terra:playsG';
 function gPlays(){try{const o=JSON.parse(localStorage.getItem(GPLK)||'{}');return o&&typeof o=='object'?o:{}}catch(e){return{}}}
 function gPlayAdd(s,id){const k=id||'exp',L=gPlays(),m={...L,...(s.gplay||{})};for(const x in L)m[x]=Math.max(+L[x]||0,+(s.gplay||{})[x]||0);m[k]=(+m[k]||0)+1;s.gplay=m;
  try{localStorage.setItem(GPLK,JSON.stringify(m))}catch(e){}}
-/* jeux jouables au nombre actuel (spectateurs exclus) */
-function gFit(s){const on=gPl(s).length;return['exp',...Object.keys(GAMES)].filter(k=>k=='exp'?on>=2:on>=GAMES[k].min&&on<=GAMES[k].max)}
+/* jeux jouables au nombre actuel (spectateurs exclus) ; 🔞 jeux 18+ (G.adult) seulement au ton coquin / trash */
+const gAd=(s,G)=>!!(G&&G.adult)&&!((+s.tone||0)>0);
+function gFit(s){const on=gPl(s).length;return['exp',...Object.keys(GAMES)].filter(k=>k=='exp'?on>=2:on>=GAMES[k].min&&on<=GAMES[k].max&&!gAd(s,GAMES[k]))}
 const GLOGK='terra:logG';
 function gLog(){try{const a=JSON.parse(localStorage.getItem(GLOGK)||'[]');return Array.isArray(a)?a.filter(e=>e&&GAMES[e.g]&&e.k&&Array.isArray(e.n)&&e.n.length):[]}catch(e){return[]}}
 function gLogAdd(L){if(!L.length)return;try{localStorage.setItem(GLOGK,JSON.stringify(gLog().concat(L).slice(-150)))}catch(e){}}
@@ -103,7 +104,9 @@ W.GAct=function(s,from,a){const t=a&&a.t;
    s.gsel=L[i]=='exp'?null:L[i];s.groll={L,c:L[i],n:((s.groll&&s.groll.n)||0)+1,at:Date.now()};bump()}}return true}
  if(t=='start'&&!s.gsel&&s.phase=='lobby'&&from==s.host&&gPl(s).length>=2)gPlayAdd(s,'');/* l'Expédition elle-même démarre dans index.html */
  if(t=='start'&&s.gsel&&s.phase=='lobby'){const G=GAMES[s.gsel],on=gPl(s);
-  if(from==s.host&&G&&on.length>=G.min&&on.length<=G.max){s.order=on;gStart(s);bump()}return true}
+  if(from==s.host&&G&&on.length>=G.min&&on.length<=G.max&&!gAd(s,G)){s.order=on;gStart(s);bump()}return true}
+ /* 🔞 options propres à un jeu (G.opts), réglées par l'hôte au salon */
+ if(t=='gopt'){const G=GAMES[s.gsel];if(from==s.host&&s.phase=='lobby'&&G&&(G.opts||[]).includes(a.k)){s.gopt={...(s.gopt||{}),[a.k]:!!a.v};bump()}return true}
  if(t=='gspec'){if(s.phase=='lobby'&&P(from)){const L=(s.gspec||[]).filter(n=>n!=from&&P(n));s.gspec=a.v?[...L,from]:L;bump()}return true}
  if(t=='gtie'){/* liens connus (couples…) : n'importe qui peut lier deux personnes ; seul·es les autres peuvent délier */
   if(s.phase=='lobby'&&s.players.some(p=>p.name==from)&&Array.isArray(a.v)&&a.v.length==2&&a.v[0]!==a.v[1]&&a.v.every(n=>typeof n=='string'&&s.players.some(p=>p.name==n))){
@@ -111,7 +114,7 @@ W.GAct=function(s,from,a){const t=a&&a.t;
  if(t=='gx'&&a.v=='stop'){if(from==s.host&&s.phase=='game'&&s.game){gFin(s);bump()}return true}
  if(t=='gx'){if(from!=s.host||s.phase!='gend')return true;s.players.forEach(p=>{if(!p.online&&isLinked(p.name))p.online=true});s.players=s.players.filter(p=>p.online);
   const G=GAMES[s.game.id],on=gPl(s);s.gspec=(s.gspec||[]).filter(n=>P(n));
-  if(a.v=='again'&&on.length>=G.min&&on.length<=G.max){s.gsel=s.game.id;s.order=on;gStart(s)}else{s.phase='lobby';s.game=null;s.gres=null}
+  if(a.v=='again'&&on.length>=G.min&&on.length<=G.max&&!gAd(s,G)){s.gsel=s.game.id;s.order=on;gStart(s)}else{s.phase='lobby';s.game=null;s.gres=null}
   bump();return true}
  if(t=='g'){const g=s.game;if(s.phase!='game'||!g||!P(from))return true;if(a.k!=null&&a.k!==g.k)return true;
   /* 👀 spectateurs : pas d'action de jeu (leurs réactions passent par la barre commune) */if(!s.order.includes(from))return true;
@@ -230,23 +233,23 @@ W.GLobby=function(host,on,E){const sel=st.gsel&&GAMES[st.gsel]?st.gsel:'',on0=on
   if(n==pmax&&n>=3&&n>=2*Math.max(1,pmed))return`<span class="gfq gfqh">🔥 ${GT('plH')}</span>`;
   return`<span class="gfq">${GT('plN',{n})}</span>`};
  gRollShow();
- const tile=id=>{const G=GAMES[id],ok=!id||on<=G.max,miss=id?Math.max(0,G.min-on):Math.max(0,2-on),tag=host?'button':'div';
-  return `<${tag} class="gtile ggt ${id?'grw':'ghero'} ${sel==id?'sel':''} ${miss||!ok?'gfew':''}" ${host?`data-gsel="${id}" ${ok?'':'disabled'}`:''}>${id?'':`<span class="gmain">★ ${GT('gmain')}</span>`}<span class="gi">${id?G.icon:'⛵'}</span><span class="gt"><b>${id?GT('n_'+id):GT('exp')}</b><span class="mut">${id?GT('d_'+id):GT('expD')}</span></span><span class="gmeta"><span class="gmin">≈ ${id?G.dur:(E||'?')} min · ${id?G.min:2}–${id?G.max:8} 👤</span>${freq(id)}</span>${miss?`<span class="gmiss">${GT(miss>1?'missN':'miss1',{n:miss})}</span>`:!ok?`<span class="gmiss">${GT('needP',{a:G.min,b:G.max})}</span>`:''}</${tag}>`};
- let h=`<div class="card"><div class="grh"><h3>🎲 ${GT('room')}</h3>${host&&fit.length>1?`<button class="ghost groll" id="groll" title="${esc(GT('rollD'))}"><span class="grd6" aria-hidden="true">🗼</span>${GT('rollB')}</button>`:''}</div>${tile('')}${(()=>{const C=[['d',['bot','pha','rad','vag']],['s',['arc','msk','coq']],['h',['chn','mim','prl']],['c',['tmp','sau','aby','pec']]],seen=new Set(C.flatMap(c=>c[1]));
+ const tile=id=>{const G=GAMES[id],ok=!id||on<=G.max,miss=id?Math.max(0,G.min-on):Math.max(0,2-on),tag=host?'button':'div',a18=id&&gAd(st,G);
+  return `<${tag} class="gtile ggt ${id?'grw':'ghero'} ${sel==id?'sel':''} ${miss||!ok?'gfew':''} ${a18?'g18':''}" ${host?`data-gsel="${id}" ${ok?'':'disabled'}`:''}>${id?'':`<span class="gmain">★ ${GT('gmain')}</span>`}<span class="gi">${id?G.icon:'⛵'}</span><span class="gt"><b>${id?GT('n_'+id):GT('exp')}${id&&G.adult?'<span class="g2_18">18+</span>':''}</b><span class="mut">${id?GT('d_'+id):GT('expD')}</span></span><span class="gmeta"><span class="gmin">≈ ${id?G.dur:(E||'?')} min · ${id?G.min:2}–${id?G.max:8} 👤</span>${freq(id)}</span>${a18?`<span class="gmiss g18m">🔞 ${GT('a18')}</span>`:miss?`<span class="gmiss">${GT(miss>1?'missN':'miss1',{n:miss})}</span>`:!ok?`<span class="gmiss">${GT('needP',{a:G.min,b:G.max})}</span>`:''}</${tag}>`};
+ let h=`<div class="card"><div class="grh"><h3>🎲 ${GT('room')}</h3>${host&&fit.length>1?`<button class="ghost groll" id="groll" title="${esc(GT('rollD'))}"><span class="grd6" aria-hidden="true">🗼</span>${GT('rollB')}</button>`:''}</div>${tile('')}${(()=>{const C=[['d',['bot','pha','rad','vag']],['s',['arc','msk','coq']],['h',['chn','mim','prl']],['c',['tmp','sau','aby','pec']],['a',['avd','bal','apn']]],seen=new Set(C.flatMap(c=>c[1]));
   const sec=(k,ids)=>{ids=ids.filter(i=>GAMES[i]);return ids.length?`<h4 class="gsec">${GT('gcat_'+k)}</h4><div class="glist">${ids.map(tile).join('')}</div>`:''};
   return C.map(([k,ids])=>sec(k,ids)).join('')+sec('o',Object.keys(GAMES).filter(i=>!seen.has(i)))})()}${host?'':`<p class="gby">${T('chosenBy',{n:B(st.host)})}</p>`}</div>`;
  /* 📜 livre de bord : l'hôte le recalcule pour les personnes présentes (envoyé au prochain bump) */
  if(host&&typeof localStorage!='undefined')try{const c=gClog(st);if(JSON.stringify(c)!==JSON.stringify(st.clog||[])){st.clog=c;setTimeout(()=>{try{bump()}catch(e){}},0)}}catch(e){}
  const CL=(st.clog||[]).filter(e=>GAMES[e.g]);
  if(CL.length)h+=`<details class="card glog" ${GV.lgo?'open':''}><summary>📜 ${GT('lgT')}<span class="glgn">${CL.length}</span></summary><ul>${CL.map((e,i)=>`<li class="ga" ${dl(i)}><span class="glgi">${GAMES[e.g].icon}</span><span>${gLogT(e)}</span></li>`).join('')}</ul></details>`;
- if(sel){const G=GAMES[sel],ok=on>=G.min&&on<=G.max,rk='r_'+sel+(on==2&&GI18N.fr.ui['r_'+sel+'2']?'2':'');
+ if(sel){const G=GAMES[sel],ad=gAd(st,G),ok=on>=G.min&&on<=G.max&&!ad,rk='r_'+sel+(on==2&&GI18N.fr.ui['r_'+sel+'2']?'2':'');
   let tm='';try{if(!G.rt){const tf=st.timer??1;tm=`<h3 class="gh">${T('timerT')}</h3>${host?`<div class="gseg">${TIM.map((v,i)=>`<button data-tm="${i}" class="${v==tf?'sel':''}">${T('tm'+i)}</button>`).join('')}</div>`:`<p class="gval">${T('tm'+TIM.indexOf(tf))}</p>`}<p class="gsub">${T(tf?'timerD':'timer0D')}</p>`}}catch(e){}
   let ti='';if(G.ties){const L=(st.gtie||[]).filter(k=>k.split('|').every(p=>st.players.some(x=>x.name==p))),ps=st.players.filter(p=>p.online).map(p=>p.name);
    ti=`<h3 class="gh">🔗 ${GT('mtieT')}</h3><p class="gsub">${GT('mtieD')}</p>${L.length?`<div class="gties">${L.map(k=>`<span class="gtie">${k.split('|').map(B).join(' 🔗 ')}${k.split('|').includes(meN())?'':`<button class="gtx" data-gtie="${esc(k)}" aria-label="✕">✕</button>`}</span>`).join('')}</div>`:`<p class="gval">${GT('mtie0')}</p>`}
    ${ps.length>1?`<p class="gsub">${GT('mtieH')} ${GT('mtieA')}</p><div class="gtiep">${ps.map(p=>`<button class="ghost ${GV.tie==p?'sel':''}" data-gtp="${esc(p)}">${esc(p)}</button>`).join('')}</div>`:''}`}
   const sp=(st.gspec||[]).includes(meN()),SL=(st.gspec||[]).filter(n=>st.players.some(p=>p.name==n&&p.online));
   const spc=on0>1||sp?`<div class="gspw"><button class="ghost gspt ${sp?'sel':''}" id="gspec" aria-pressed="${sp}">👀 ${GT('specB')}</button><p class="gsub">${GT('specD')}</p>${SL.length?`<p class="gval gspl">${GT('specL',{n:SL.map(B).join(', ')})}</p>`:''}</div>`:'';
-  h+=(G.tone?g2ToneCard(host):'')+`<div class="card"><p class="grule">${GT(rk)}</p>${G.tut?`<button class="ghost gtutb" data-gtut="${sel}">📖 ${GT('tuB')}</button>`:''}${ok?'':`<p class="err">${GT('needP',{a:G.min,b:G.max})}</p>`}${tm}${ti}${spc}
+  h+=(G.tone?g2ToneCard(host):'')+`<div class="card"><p class="grule">${GT(rk)}</p>${G.tut?`<button class="ghost gtutb" data-gtut="${sel}">📖 ${GT('tuB')}</button>`:''}${ad?`<p class="err">🔞 ${GT('a18')}</p>`:ok?'':`<p class="err">${GT('needP',{a:G.min,b:G.max})}</p>`}${tm}${(G.opts||[]).map(k=>{const v=!!(st.gopt||{})[k];return `<h3 class="gh">${GT(k+'T')}</h3>${host?`<button class="gsw ${v?'on':''}" data-gopt="${k}" role="switch" aria-checked="${v}"><i></i><span>${GT(k)}</span></button>`:`<p class="gval">${v?'✓ '+GT(k):GT(k+'0')}</p>`}<p class="gsub">${GT(k+'D')}</p>`}).join('')}${ti}${spc}
   ${host?`<button class="pri wide" id="start" ${ok?'':'disabled'}>${GT('play',{g:GT('n_'+sel)})}</button>`:`<p class="gby">${GT('waitHost')}</p>`}</div>`}
  return h};
 /* 🗼 tirage au sort : rejoué une seule fois par tirage, seulement s'il vient d'avoir lieu (pas pour qui arrive après) */
@@ -271,6 +274,7 @@ function gRollShow(){const r=st.groll;if(!r||!Array.isArray(r.L)||GV.roll==r.n)r
 if(typeof document!='undefined')document.addEventListener('click',e=>{const lg=e.target.closest&&e.target.closest('.glog>summary');if(lg){GV.lgo=!lg.parentNode.open;return}
  if(e.target.closest&&e.target.closest('#gspec')){send({t:'gspec',v:!(st.gspec||[]).includes(meN())});return}
  if(e.target.closest&&e.target.closest('#groll')){send({t:'groll'});return}
+ const go=e.target.closest&&e.target.closest('[data-gopt]');if(go){send({t:'gopt',k:go.dataset.gopt,v:!(st.gopt||{})[go.dataset.gopt]});return}
  const t=e.target.closest&&e.target.closest('[data-gtp],[data-gtie]');if(!t)return;
  if(t.dataset.gtie!=null){send({t:'gtie',v:t.dataset.gtie.split('|')});return}
  const p=t.dataset.gtp;if(!GV.tie||GV.tie==p){GV.tie=GV.tie==p?null:p;render();return}const a=GV.tie;GV.tie=null;send({t:'gtie',v:[a,p]});render()});
@@ -4463,4 +4467,845 @@ tu_sau6:`Sem chat: só marcas (! náufrago, ✕ vazio) no mapa, e reações.`,
 tu_sau7:`A dois, cada um tem 3 boias e compartilha 3 anéis por rodada.`,
 lg_sauR:`{a} resgatou mais náufragos no Resgate`,lg_sauL:`{a} resgatou o último náufrago logo antes da tempestade`});
 /* /🆘 i18n */
+/* =====================================================================
+   🔞 JEUX 18+ : 🤿 Action ou Vérité sous l'eau (avd) · 💃🏻 Le Bal masqué (bal) · 🫁 Jamais je n'ai… en apnée (apn)
+   Entre adultes consentants, activés par l'hôte : G.adult = jouables SEULEMENT au ton coquin (1) ou trash (2).
+     Tout public : tuile grisée « 18+ : choisir le ton… » (l'hôte peut la sélectionner pour régler le ton juste en
+     dessous), départ refusé côté hôte (GAct), jamais tirés au sort (gFit).
+   Contenus : réserves PURES du ton choisi (clé+'1' coquin : flirt, sous-entendus, jamais graphique ; clé+'2' trash : cru,
+     sans filtre, mais jamais de mineurs, de haine, de non-consentement, d'inceste ni de violence sexuelle). Jamais de
+     mélange des deux : gPoolT pioche dans UNE réserve, sans redite (mémoire gSeen de gPool).
+   Communs aux trois : tout est simultané et secret jusqu'à la révélation, modifiable jusqu'à la fin de l'étape (✏️) ;
+     pas de premier joueur, pas d'élimination ; liens connus (G.ties : couples…) neutralisés (on ne choisit pas pour son
+     lien, son vote / sa devinette / son pari sur lui ne comptent pas) ; à distance (vocal, visio ou écrit) ;
+     toujours une échappatoire digne (🫧 / 🛟 / 🙅🏻, 🎭 garder son masque, 🤐 joker) qui coûte un peu, sans honte.
+   Livre de bord : seulement des lignes anodines (jamais le contenu d'une réponse).
+   ===================================================================== */
+const gTn=s=>(+s.tone||0)>=2?2:1;
+/* n contenus du ton de la partie (réserve pure clé+ton), filtre optionnel f(texte fr) ; → index dans la réserve */
+const gPoolT=(s,k,n,f)=>n>0?gPool({tone:0},k+gTn(s),n,f).map(x=>x[1]):[];
+/* lien connu entre a et b (ignoré à deux : chacun connaît l'autre autant) */
+const gTie=(s,a,b)=>s.order.length>2&&(s.gtie||[]).includes(mkPair(a,b));
+const xEd=g=>GV.ed===g.id+g.k;
+const xRdy=(id,dis,lab)=>`<button class="pri wide xrdy ga" ${dl(4)} id="${id}" ${dis?'disabled':''}>${lab||GT('xRdy')}</button>`;
+const xWait=(g,ic,msg,extra)=>({html:`<div class="card c"><div class="gbig ga gfloat">${ic}</div><p class="ga" ${dl(1)}>${msg}</p>${extra||''}<button class="ghost gedit ga" ${dl(3)} id="gedit">✏️ ${GT('edit')}</button></div>`,
+ bind(){$('#gedit').onclick=()=>{GV.ed=g.id+g.k;gs({undo:1});render()}}});
+const xNm=n=>n==meN()?esc(GT('me')):esc(n);
+const xChip=(n,cl,x)=>`<span class="gchip ${cl||''}" data-rxp="${esc(n)}">${DT(n)}${xNm(n)}${x||''}</span>`;
+
+/* =====================================================================
+   🤿 ACTION OU VÉRITÉ SOUS L'EAU — fiche (18+, 2 à 8, ~15 min)
+   Manche, tout le monde en même temps (rien à tour de rôle) :
+     1. 🎴 Choix secret (30 s) : chacun reçoit UNE personne (rotation : jamais deux fois la même tant qu'il en reste,
+        jamais son lien connu si on peut l'éviter) et une main de cartes pour elle : 1 vérité 💬 + 1 action 🎬 par palier
+        ouvert. Paliers 🌊 croissants : 1re manche 🌊 seulement, puis jusqu'à 🌊🌊, puis 🌊🌊🌊. On en choisit une. Prêt.
+     2. 🤿 Plongée (45 s + 30 s par personne) : chacun découvre SA carte (pas qui l'a choisie) et choisit :
+        🤿 plonger · 🫧 un palier plus doux (même type, 🌊−1, dès 🌊🌊) · 🛟 remonter à la surface (joker : 1 par partie,
+        0 point, aucun coût) · 🙅🏻 passer (−1, rien à justifier). On relève à voix haute, en visio ou par écrit (réponse
+        écrite facultative, 200 car.) : toutes les cartes sont faisables à distance. Prêt quand c'est fait.
+     3. 🗳️ Relevé ? (30 s) : chacun juge les plongées des autres (✓ par défaut, rapide). Ne votent pas sur une plongée :
+        qui a choisi la carte (il / elle y gagne) et le lien connu. Refusé seulement si une majorité STRICTE dit ✗.
+     4. Révélation : points, réponses écrites, et qui avait choisi chaque carte.
+   Points : plongée relevée +🌊 du palier joué ; qui a choisi la carte +🌊 aussi, mais SEULEMENT si la personne a plongé au
+     palier choisi et que c'est relevé. Le skill : lire jusqu'où l'autre a envie d'aller. Pousser trop loin ne paie
+     jamais (🫧 ou 🛟 = 0 pour qui a choisi) ; rester trop sage rapporte peu. Aucun siège ne compte (tout est simultané).
+   Absent·es : au choix, la carte la plus douce (type au hasard) ; en plongée, 0 sans pénalité ni joker perdu.
+   À deux : 6 manches, chacun choisit pour l'autre ; pas de vote (on se fait confiance).
+   Manches : 2 → 6, 3 → 5, 4 → 4, 5 à 8 → 3. Réserves : avdv1 / avda1 (coquin), avdv2 / avda2 (trash), « palier~texte ».
+   ===================================================================== */
+const AVD={R:n=>n==2?6:n==3?5:n==4?4:3,MX:(i,R)=>Math.min(3,1+Math.ceil(i*2/Math.max(1,R-1))),CT:30,FT:n=>45+30*n,VT:30,RT:25,PASS:1,
+ OP:{d:'🤿',s:'🫧',j:'🛟',p:'🙅🏻',x:'💤'}};
+const avTx=(g,c)=>c?String(GC('avd'+c[0]+g.tn,[0,c[2]])||'').replace(/^\s*\d\s*~\s*/,''):'';
+const avCard=(g,c,cl,d)=>c?`<div class="avc avc-${c[0]} ${cl||''} ga" ${dl(d||0)}><span class="avk">${c[0]=='v'?'💬':'🎬'} ${GT(c[0]=='v'?'avV':'avA')}</span><span class="avw" aria-label="${c[1]}">${'🌊'.repeat(c[1])}</span><p>${esc(avTx(g,c))}</p></div>`:'';
+GAMES.avd={icon:'🤿',min:2,max:8,dur:15,tags:['social'],tone:true,adult:1,ties:true,AVD,
+ init(s){const g=s.game,n=s.order.length,R=AVD.R(n);g.tn=gTn(s);g.n=R;g.jk={};g.dv={};g.rd={};g.res=[];
+  /* rotation : un cercle tiré au sort, décalé d'un pas différent à chaque manche ; on garde le cercle qui évite le mieux les liens */
+  const ks=shuf([...Array(n-1).keys()].map(x=>x+1)),sh=[...Array(R).keys()].map(i=>ks[i%ks.length]);let best=null,bc=1e9;
+  for(let t=0;t<300&&bc;t++){const p=shuf(s.order);let c=0;sh.forEach(k=>p.forEach((a,j)=>{if(gTie(s,a,p[(j+k)%n]))c++}));if(c<bc){bc=c;best=p}}
+  g.pm=best;g.sh=sh;
+  /* toutes les cartes de la partie d'un coup (aucune redite) : par type et par palier, autant que de mains qui l'ouvrent */
+  g.dk={};['v','a'].forEach(t=>[1,2,3].forEach(d=>{const k=sh.filter((_,i)=>AVD.MX(i,R)>=d).length*n;g.dk[t+d]=gPoolT(s,'avd'+t,k,v=>parseInt(v)==d)}));
+  this.go(s)},
+ go(s){const g=s.game,n=g.pm.length,k=g.sh[g.r],mx=AVD.MX(g.r,g.n);g.mx=mx;g.as={};g.hd={};g.pk={};g.cd={};g.op={};g.tx={};g.vt={};g.vl={};
+  g.pm.forEach((a,j)=>{const b=g.pm[(j+k)%n];if(a!=b&&s.order.includes(a)&&s.order.includes(b))g.as[a]=b});
+  s.order.forEach(b=>{const h=[];for(let d=1;d<=mx;d++)['v','a'].forEach(t=>{const L=g.dk[t+d]||[];if(L.length)h.push([t,d,L.pop()])});if(h.length)g.hd[b]=h});
+  gWait(g,AVD.CT,'c');g.need=Object.keys(g.as).filter(a=>g.hd[g.as[a]])},
+ vfor(g,v){return(g.vl||{})[v]||[]},
+ act(s,from,a){const g=s.game;
+  if(g.st=='c'){const b=g.as[from],h=b&&g.hd[b];if(!h)return;let ch=false;
+   if(a.c!=null){const i=+a.c;if(!Number.isInteger(i)||!h[i])return;g.pk[from]=i;ch=true}
+   if(a.rdy){if(g.pk[from]==null)return;g.done[from]=1;ch=true}return ch}
+  if(g.st=='f'){const c=g.cd[from];if(!c)return;let ch=false;
+   if(a.o!=null){const o=a.o;if(!['d','s','j','p'].includes(o)||(o=='s'&&!c.s)||(o=='j'&&g.jk[from]))return;g.op[from]=o;ch=true}
+   if(typeof a.tx=='string'){g.tx[from]=tidy(a.tx).slice(0,200);ch=true}
+   if(a.rdy){if(!g.op[from])return;g.done[from]=1;ch=true}return ch}
+  if(g.st=='v'){const L=this.vfor(g,from);if(!L.length)return;let ch=false;
+   if(a.v&&L.includes(a.v.t)){(g.vt[from]=g.vt[from]||{})[a.v.t]=a.v.x?1:0;ch=true}
+   if(a.rdy){g.done[from]=1;ch=true}return ch}},
+ next(s){const g=s.game,two=s.order.length==2;
+  if(g.st=='c'){
+   Object.keys(g.hd).forEach(b=>{if(!s.order.includes(b))return;const h=g.hd[b],a=Object.keys(g.as).find(x=>g.as[x]==b);let i=a!=null?g.pk[a]:null;
+    if(i==null||!h[i]){const L=h.map((c,j)=>c[1]==1?j:-1).filter(j=>j>=0);i=L.length?L[Math.floor(Math.random()*L.length)]:0}
+    const c=h[i],sf=c[1]>1?h.find(x=>x[0]==c[0]&&x[1]==c[1]-1)||null:null;g.cd[b]={c,s:sf,by:a!=null&&g.pk[a]!=null?a:null}});
+   delete g.hd;g.pk={};gWait(g,AVD.FT(s.order.length),'f');g.need=Object.keys(g.cd);return}
+  if(g.st=='f'){const dv=Object.keys(g.cd).filter(b=>s.order.includes(b)&&(g.op[b]=='d'||g.op[b]=='s'));g.vl={};
+   if(!two)s.order.forEach(v=>{const L=dv.filter(b=>b!=v&&g.cd[b].by!=v&&!gTie(s,v,b));if(L.length)g.vl[v]=L});
+   if(Object.keys(g.vl).length){gWait(g,AVD.VT,'v');g.need=Object.keys(g.vl);return}
+   return this.score(s)}
+  if(g.st=='v')return this.score(s);
+  if(g.st=='r'){g.r++;if(g.r>=g.n){g.over=1;return}this.go(s)}},
+ score(s){const g=s.game,res={};
+  Object.keys(g.cd).forEach(b=>{if(!s.order.includes(b))return;const c=g.cd[b],o=g.op[b]||'x',
+    el=Object.keys(g.vl||{}).filter(v=>g.vl[v].includes(b)),no=el.filter(v=>(g.vt[v]||{})[b]===1).length,dv=o=='d'||o=='s',ok=dv&&no*2<=el.length;
+   let pt=0,cp=0;const d=o=='s'?c.c[1]-1:c.c[1];
+   if(ok){pt=d;g.dv[b]=(g.dv[b]||0)+d;if(o=='d'&&c.by&&s.order.includes(c.by)){cp=c.c[1];g.sc[c.by]+=cp;g.rd[c.by]=(g.rd[c.by]||0)+cp}}
+   else if(o=='p')pt=-AVD.PASS;
+   if(o=='j')g.jk[b]=1;g.sc[b]+=pt;
+   res[b]={c:o=='s'?c.s:c.c,o,tx:dv?g.tx[b]||'':'',y:dv?el.length-no:0,n:no,ok,pt,by:c.by,cp,d0:c.c[1]}});
+  g.res[g.r]=res;g.tx={};gWait(g,AVD.RT,'r',1)},
+ hide(g,n,s){const o={...g};delete o.dk;delete o.pm;delete o.sh;
+  if(g.st=='c'){const b=g.as[n];o.as=b?{[n]:b}:{};o.hd=b&&g.hd[b]?{[b]:g.hd[b]}:{};o.pk=hideOwn(g.pk,n)}
+  if(g.st=='f'||g.st=='v'){const vis=b=>b==n||g.st=='v'||g.done[b];o.cd={};
+   for(const b in g.cd){const c=g.cd[b],op=vis(b)?g.op[b]:null;o.cd[b]={c:op=='s'&&b!=n?c.s:c.c,s:b==n||op=='s'?c.s:null,by:c.by==n?n:null}}
+   o.op={};for(const b in g.op)if(vis(b))o.op[b]=g.op[b];
+   o.tx=g.st=='f'?(g.tx[n]!=null?{[n]:g.tx[n]}:{}):g.tx;o.vl={[n]:(g.vl||{})[n]||[]};o.vt=hideOwn(g.vt,n)}
+  else{o.vt={};o.vl={}}/* qui a voté ✗ contre qui : jamais montré, seulement le compte */
+  return o},
+ view(s){const g=s.game,m=meN(),pl=s.order.includes(m),R=g.res[g.r];
+  if(g.st=='c'){const b=g.as[m],h=b&&g.hd[b];
+   if(!pl||!h)return{html:`<div class="card c"><div class="gbig ga gfloat">🤿</div><p class="mut">${GT('avWc')}</p></div>`};
+   if(g.done[m]&&!xEd(g))return xWait(g,'🎴',GT('avDone',{n:B(b)}),avCard(g,h[g.pk[m]],'sm',2));
+   let rows='';for(let d=1;d<=g.mx;d++)rows+=`<div class="avrow">${h.map((c,i)=>c[1]==d?`<button class="avpk ${g.pk[m]==i?'sel':''}" data-avc="${i}" aria-pressed="${g.pk[m]==i}">${avCard(g,c,'',i)}</button>`:'').join('')}</div>`;
+   return{html:`<div class="card avcard"><p class="gpre ga">${GT('avFor',{n:B(b)})}</p><p class="gsub avsub ga" ${dl(1)}>${GT('avForD')}</p>${rows}${xRdy('avok',g.pk[m]==null)}</div>`,
+    bind(){$$('[data-avc]').forEach(x=>x.onclick=()=>gs({c:+x.dataset.avc}));$('#avok').onclick=()=>{GV.ed=null;gs({rdy:1})}}}}
+  if(g.st=='f'){const c=g.cd[m],oth=Object.keys(g.cd).filter(b=>b!=m&&s.order.includes(b));
+   const list=oth.length?`<div class="avls">${oth.map((b,i)=>`<div class="avli ga" ${dl(i,.2)} data-rxp="${esc(b)}">${DT(b)}<b>${esc(b)}</b>${g.done[b]?`<span class="avst">${AVD.OP[g.op[b]]||''} ✓</span>`:`<span class="avst mut">⏳</span>`}${avCard(g,g.cd[b].c,'sm')}</div>`).join('')}</div>`:'';
+   if(!pl||!c)return{html:`<div class="card">${list}</div>`};
+   if(g.done[m]&&!xEd(g))return xWait(g,AVD.OP[g.op[m]]||'🤿',GT('avDoneF'),list);
+   const o=g.op[m],cur=o=='s'?c.s:c.c,jk=g.jk[m],ops=[['d',gSg(c.c[1])],...(c.s?[['s',gSg(c.c[1]-1)]]:[]),['j',jk?'✕':'0'],['p',gSg(-AVD.PASS)]];
+   const tx=cur&&cur[0]=='v'&&(o=='d'||o=='s');
+   return{html:`<div class="card c avcard"><p class="gpre ga">${GT('avYour')}</p>${avCard(g,cur,'big',1)}
+    <div class="avops">${ops.map(([k,p],i)=>`<button class="avop ${o==k?'sel':''}" ${dl(i,.3)} data-avo="${k}" ${k=='j'&&jk?'disabled':''} aria-pressed="${o==k}"><b>${AVD.OP[k]}</b><span>${GT('avO'+k)}</span><small dir="ltr">${p}</small></button>`).join('')}</div>
+    <p class="gsub avhint">${GT(o?'avOd'+o:'avO0')}</p>
+    ${tx?`<textarea class="avtx" data-d="gavt" rows="2" maxlength="200" placeholder="${esc(GT('avTxP'))}"></textarea>`:''}
+    ${xRdy('avok',!o,GT(o=='d'||o=='s'?'avDid':'xRdy'))}</div>${list}`,
+    bind(){$$('[data-avo]').forEach(x=>x.onclick=()=>gs({o:x.dataset.avo}));
+     $('#avok').onclick=()=>{GV.ed=null;const t=$('[data-d="gavt"]');gs(t?{rdy:1,tx:t.value}:{rdy:1})}}}}
+  if(g.st=='v'){const L=g.vl[m]||[],vt=g.vt[m]||{};
+   if(!L.length)return{html:`<div class="card c"><div class="gbig ga gfloat">🗳️</div><p class="mut">${GT('avWv')}</p></div>`};
+   if(g.done[m]&&!xEd(g))return xWait(g,'🗳️',GT('avDoneV'));
+   return{html:`<div class="card avcard"><p class="gpre ga">${GT('avVq')}</p>${L.map((b,i)=>`<div class="avvi ga" ${dl(i,.1)} data-rxp="${esc(b)}"><div class="avvh">${DT(b)}<b>${esc(b)}</b><span>${AVD.OP[g.op[b]]||''}</span></div>${avCard(g,g.cd[b].c,'sm')}${g.tx[b]?`<p class="avans">« ${esc(g.tx[b])} »</p>`:''}
+    <div class="avyn"><button class="avy ${vt[b]!==1?'sel':''}" data-avv="${esc(b)}" data-x="0">✓ ${GT('avY')}</button><button class="avn ${vt[b]===1?'sel':''}" data-avv="${esc(b)}" data-x="1">✗ ${GT('avN')}</button></div></div>`).join('')}${xRdy('avok')}</div>`,
+    bind(){$$('[data-avv]').forEach(x=>x.onclick=()=>gs({v:{t:x.dataset.avv,x:+x.dataset.x}}));$('#avok').onclick=()=>{GV.ed=null;gs({rdy:1})}}}}
+  /* révélation */
+  const E=Object.entries(R||{});
+  return{html:`<div class="card avcard">${E.map(([b,r],i)=>`<div class="avri ga ${r.ok?'ok':''} ${b==m?'me':''}" ${dl(i,.1)} data-rxp="${esc(b)}"><div class="avvh">${DT(b)}<b>${xNm(b)}</b><span class="avo">${AVD.OP[r.o]} ${GT('avO'+r.o)}</span><b class="avpt ${r.pt<0?'no':r.pt?'':'z'}" dir="ltr">${gPs(r.pt)}</b></div>
+   ${r.o=='d'||r.o=='s'?avCard(g,r.c,'sm'):''}${r.tx?`<p class="avans">« ${esc(r.tx)} »</p>`:''}
+   <p class="avrv">${r.o=='d'||r.o=='s'?(r.y+r.n?`<span class="${r.ok?'ok':'no'}">✓ ${r.y} · ✗ ${r.n}</span> `:''):''}${r.by?`🎴 ${GT('avBy',{n:B(r.by)})}${r.cp?` <b class="avpt" dir="ltr">${gPs(r.cp)}</b>`:''}`:''}</p></div>`).join('')}</div>`,
+   bind(){const r=R&&R[m];if(r&&r.ok&&r.o=='d'&&r.d0==3&&!RM())try{sparkles($('.avri.me'),12)}catch(e){}}}},
+ endView(s){const g=s.game,m=meN();
+  return `<div class="abres abfin">${[...s.order].sort((a,b)=>(g.sc[b]||0)-(g.sc[a]||0)).map((p,i)=>`<div class="abrr ga ${p==m?'me':''}" ${dl(i,.3)}>${DT(p)}<b class="abnm">${esc(p)}</b><span class="abac" dir="ltr">🌊 ${g.dv[p]||0} · 🎴 ${g.rd[p]||0}${g.jk[p]?' · 🛟':''}</span><b class="abto" dir="ltr">${g.sc[p]||0}</b></div>`).join('')}</div>
+   <p class="mut cqlg">🌊 ${GT('avLgD')} · 🎴 ${GT('avLgR')} · 🛟 ${GT('avLgJ')}</p>`},
+ log(s){const g=s.game,L=[],deep=s.order.filter(p=>(g.res||[]).some(r=>r&&r[p]&&r[p].ok&&r[p].o=='d'&&r[p].d0==3));deep.forEach(p=>L.push({k:'avdD',n:[p]}));
+  const mx=Math.max(0,...s.order.map(p=>g.rd[p]||0));if(mx>=4)s.order.filter(p=>(g.rd[p]||0)==mx).slice(0,1).forEach(p=>L.push({k:'avdR',n:[p]}));return L},
+ fin(s){const g=s.game;delete g.dk;delete g.pm;delete g.sh;g.vt={};return{pts:g.sc}}};
+
+/* =====================================================================
+   💃🏻 LE BAL MASQUÉ — fiche (18+, 2 à 8, ~10 min)
+   3 à 8 : une question osée (même pour tout le monde) → chacun répond en secret, en quelques mots (100 s, 120 car.)
+     → les réponses arrivent mélangées, chacune derrière un masque (🦋🌙🌹…) → tout le monde devine EN MÊME TEMPS qui a
+     écrit quoi (on attribue chaque réponse ; même nom permis plusieurs fois ; ✏️ jusqu'au bout) → révélation.
+   Points : +1 par réponse bien attribuée ; l'auteur·e gagne +1 par personne qui s'est trompée sur sa réponse (rester
+     insoupçonné·e). Équilibre : n−1 réponses à deviner ↔ n−1 personnes qui devinent la tienne. Les devinettes d'un lien
+     connu sur son lien ne comptent ni pour l'un ni pour l'autre (un couple se reconnaît trop bien).
+   🎭 Garder son masque (échappatoire) : ne pas répondre ce tour-ci ; on devine quand même, sans points d'auteur·e.
+   Manches : 3-4 → 5, 5-6 → 4, 7-8 → 3. Moins de 2 réponses : la manche passe (rien à deviner).
+   À 2 : « vrai ou inventé » : chacun écrit une réponse vraie ET une inventée ; on devine en même temps la vraie de
+     l'autre : +2 si juste, sinon +2 au bluff. 4 manches. 🎭 possible aussi (l'autre n'a alors rien à deviner).
+   Réserves : bal1 (coquin), bal2 (trash).
+   ===================================================================== */
+const BAL={R:n=>n<=4?5:n<=6?4:3,R2:4,WT:100,GU:n=>40+12*n,RT:25,MK:['🦋','🌙','🌹','⭐','🦚','🕊️','🦊','🐚']};
+GAMES.bal={icon:'💃🏻',min:2,max:8,dur:10,tags:['social'],tone:true,adult:1,ties:true,BAL,
+ init(s){const g=s.game,two=s.order.length==2;g.tn=gTn(s);g.n=two?BAL.R2:BAL.R(s.order.length);g.q=gPoolT(s,'bal',g.n);g.n=g.q.length;g.res=[];g.fd={};g.ms={};
+  if(!g.n){g.over=1;return}this.go(s)},
+ go(s){const g=s.game,two=s.order.length==2;g.w={};g.gu={};g.an=null;gWait(g,Math.round(BAL.WT*(two?1.3:1)),'w')},
+ qt(g,i){return esc(GC('bal'+g.tn,[0,g.q[i!=null?i:g.r]]))},
+ act(s,from,a){const g=s.game,two=s.order.length==2;
+  if(g.st=='w'){if(a.ps){g.w[from]={p:1};g.done[from]=1;return true}
+   if(two){if(!Array.isArray(a.w))return;const w=a.w.slice(0,2).map(x=>tidy(x).slice(0,120));if(w.length<2||w.some(x=>!x))return;g.w[from]={t:w};g.done[from]=1;return true}
+   const t=tidy(a.w).slice(0,120);if(!t)return;g.w[from]={t};g.done[from]=1;return true}
+  if(g.st=='g'){let ch=false;
+   if(two){if(a.v===0||a.v===1){if(!g.an2||!g.an2[this.opp(s,from)])return;g.gu[from]=a.v;ch=true}}
+   else if(a.gi!=null){const i=+a.gi,A=g.an&&g.an[i];if(!A||A.a==from)return;const v=a.gv==null?null:String(a.gv);if(v!=null&&(v==from||!s.order.includes(v)))return;
+    const o=g.gu[from]={...(g.gu[from]||{})};if(v==null)delete o[i];else o[i]=v;ch=true}
+   if(a.rdy){if(two&&g.gu[from]==null)return;g.done[from]=1;ch=true}return ch}},
+ opp(s,n){return s.order.find(x=>x!=n)},
+ next(s){const g=s.game,two=s.order.length==2;
+  if(g.st=='w'){
+   if(two){g.an2={};s.order.forEach(p=>{const w=g.w[p];if(w&&w.t){const f=Math.random()<.5?0:1;g.an2[p]={L:f?[w.t[1],w.t[0]]:[w.t[0],w.t[1]],f}}});
+    const need=s.order.filter(p=>g.an2[this.opp(s,p)]);if(!need.length){g.res[g.r]={skip:1};gWait(g,12,'r',1);return}
+    gWait(g,BAL.GU(2),'g');g.need=need;return}
+   const L=shuf(s.order.filter(p=>g.w[p]&&g.w[p].t)),mk=shuf(BAL.MK);
+   if(L.length<2){g.res[g.r]={skip:1};gWait(g,12,'r',1);return}
+   g.an=L.map((a,i)=>({a,t:g.w[a].t,mk:mk[i%mk.length]}));gWait(g,BAL.GU(s.order.length),'g');g.need=s.order.filter(p=>g.an.some(x=>x.a!=p));return}
+  if(g.st=='g'){
+   if(two){const r={v:{...g.gu},an:g.an2,pt:{}};s.order.forEach(p=>r.pt[p]=0);
+    s.order.forEach(x=>{const y=this.opp(s,x),A=g.an2[y],v=g.gu[x];if(!A||v==null)return;if(v==A.f){g.sc[x]+=2;r.pt[x]+=2;g.fd[x]=(g.fd[x]||0)+1}else{g.sc[y]+=2;r.pt[y]+=2;g.ms[y]=(g.ms[y]||0)+1}});
+    g.res[g.r]=r;gWait(g,BAL.RT,'r',1);return}
+   const r={an:g.an.map((A,j)=>{const ok=[],ko=[];s.order.forEach(x=>{if(x==A.a||gTie(s,x,A.a))return;const v=(g.gu[x]||{})[j];if(v==null)return;(v==A.a?ok:ko).push(x)});
+     ok.forEach(x=>{g.sc[x]+=1;g.fd[x]=(g.fd[x]||0)+1});if(s.order.includes(A.a)){g.sc[A.a]+=ko.length;g.ms[A.a]=(g.ms[A.a]||0)+ko.length}return{...A,ok,ko}})};
+   g.res[g.r]=r;gWait(g,BAL.RT,'r',1);return}
+  if(g.st=='r'){delete g.an2;g.an=null;g.w={};g.gu={};g.r++;if(g.r>=g.n){g.over=1;return}this.go(s)}},
+ hide(g,n,s){const o={...g};
+  if(g.st=='w')o.w=g.w&&g.w[n]?{[n]:g.w[n]}:{};else delete o.w;
+  if(g.st=='g'){if(g.an)o.an=g.an.map(A=>({t:A.t,mk:A.mk,m:A.a==n?1:0}));
+   if(g.an2){o.an2={};for(const p in g.an2)o.an2[p]=p==n?g.an2[p]:{L:g.an2[p].L}}o.gu=hideOwn(g.gu,n)}
+  return o},
+ view(s){const g=s.game,m=meN(),pl=s.order.includes(m),two=s.order.length==2,q=`<p class="gpre">${GT('blQ')}</p><p class="gq ga blq">${this.qt(g)}</p>`;
+  if(g.st=='w'){if(!pl)return{html:`<div class="card c">${q}<div class="gbig ga gfloat">💃🏻</div></div>`};
+   const w=g.w[m];if(g.done[m]&&!xEd(g))return xWait(g,w&&w.p?'🎭':'💌',GT(w&&w.p?'blPsd':'blSent'),q);
+   return{html:`<div class="card c blcard">${q}${two?`<div class="blw2"><label class="blt ga" ${dl(1)}>✅ ${GT('blTrue')}</label><textarea data-d="gblw0" rows="2" maxlength="120" placeholder="${esc(GT('blPhT'))}"></textarea>
+     <label class="blt ga" ${dl(2)}>🎭 ${GT('blFake')}</label><textarea data-d="gblw1" rows="2" maxlength="120" placeholder="${esc(GT('blPhF'))}"></textarea></div>`
+     :`<textarea class="ga" ${dl(1)} data-d="gblw" rows="3" maxlength="120" placeholder="${esc(GT('blPh'))}"></textarea>`}
+    <p class="err"></p>${xRdy('blok',0,GT('send'))}<button class="ghost wide blps ga" ${dl(5)} id="blps">🎭 ${GT('blPs')}</button><p class="gsub">${GT('blPsD')}</p></div>`,
+    bind(){$('#blok').onclick=()=>{if(two){const w=[0,1].map(i=>tidy($(`[data-d="gblw${i}"]`).value));if(w.some(x=>!x))return err(GT('blMin2'));GV.ed=null;gs({w})}
+      else{const t=tidy($('[data-d="gblw"]').value);if(!t)return err(GT('blMin'));GV.ed=null;gs({w:t})}};
+     $('#blps').onclick=()=>{GV.ed=null;gs({ps:1})}}}}
+  if(g.st=='g'){
+   if(two){const o=this.opp(s,m),A=g.an2&&g.an2[o];if(!pl||!A)return{html:`<div class="card c">${q}<p class="mut">${GT('blNo2')}</p></div>`};
+    if(g.done[m]&&!xEd(g))return xWait(g,'🔎',GT('blDoneG'),q);
+    return{html:`<div class="card c blcard">${q}<p class="gq2">${GT('blWhichT',{n:B(o)})}</p><div class="bl2">${A.L.map((t,i)=>`<button class="blan ${g.gu[m]===i?'sel':''} ga" ${dl(i,.2)} data-blv="${i}" aria-pressed="${g.gu[m]===i}"><span class="blmk">${['🌙','🌹'][i]}</span>${esc(t)}</button>`).join('')}</div>${xRdy('blok',g.gu[m]==null)}</div>`,
+     bind(){$$('[data-blv]').forEach(x=>x.onclick=()=>gs({v:+x.dataset.blv}));$('#blok').onclick=()=>{GV.ed=null;gs({rdy:1})}}}}
+   const my=g.gu[m]||{},C=s.order.filter(p=>p!=m);
+   if(pl&&g.done[m]&&!xEd(g))return xWait(g,'🔎',GT('blDoneG'),q);
+   return{html:`<div class="card blcard">${q}<p class="gsub ga" ${dl(1)}>${GT(pl?'blGuess':'blWatch')}</p>${(g.an||[]).map((A,i)=>`<div class="blan2 ga ${A.m?'mine':''}" ${dl(i,.2)}><p><span class="blmk">${A.mk}</span>${esc(A.t)}</p>
+    ${A.m?`<span class="gtag">${GT('blMine')}</span>`:pl?`<div class="blch">${C.map(p=>`<button class="blc ${my[i]==p?'sel':''}" data-bli="${i}" data-blp="${esc(p)}" aria-pressed="${my[i]==p}">${DT(p)}${esc(p)}</button>`).join('')}</div>`:''}</div>`).join('')}${pl?xRdy('blok'):''}</div>`,
+    bind(){$$('[data-bli]').forEach(x=>x.onclick=()=>{const i=+x.dataset.bli,p=x.dataset.blp;gs({gi:i,gv:my[i]==p?null:p})});$('#blok')&&($('#blok').onclick=()=>{GV.ed=null;gs({rdy:1})})}}}
+  /* révélation */
+  const r=g.res[g.r]||{};
+  if(r.skip)return{html:`<div class="card c">${q}<div class="gbig ga">🎭</div><p class="gnote">${GT('blSkip')}</p></div>`};
+  if(two){const row=x=>{const y=this.opp(s,x),A=r.an&&r.an[y],v=(r.v||{})[x];if(!A)return '';return `<div class="blres ga" ${dl(x==m?0:3)} data-rxp="${esc(y)}"><p class="mut">${GT('blOf',{n:B(y)})}</p>${A.L.map((t,i)=>`<p class="blrl ${i==A.f?'tr':''}"><span class="gtag ${i==A.f?'ok':'f'}">${GT(i==A.f?'blTrue':'blFake')}</span> ${esc(t)}</p>`).join('')}
+    <p class="gnote">${v==null?'—':v==A.f?GT('blOk2',{n:B(x)}):GT('blFool',{n:B(y)})}</p></div>`};
+   return{html:`<div class="card blcard">${q}${row(m)}${row(this.opp(s,m))}</div>`}}
+  return{html:`<div class="card blcard">${q}${(r.an||[]).map((A,i)=>`<div class="blan2 rv ga ${A.a==m?'mine':''}" ${dl(i,.15)} data-rxp="${esc(A.a)}"><p><span class="blmk">${A.mk}</span>${esc(A.t)}</p>
+   <p class="blby">${DT(A.a)}${B(A.a)}${A.ko.length?` <b class="avpt" dir="ltr">${gPs(A.ko.length)}</b> 🎭`:''}</p>${A.ok.length?`<div class="gvl">${A.ok.map(x=>xChip(x,'ok',' ✓')).join('')}</div>`:''}</div>`).join('')}</div>`,
+   bind(){if((r.an||[]).some(A=>A.ok.includes(m))&&!RM())try{sparkles($('.blan2.rv'),10)}catch(e){}}}},
+ endView(s){const g=s.game,m=meN();
+  return `<div class="abres abfin">${[...s.order].sort((a,b)=>(g.sc[b]||0)-(g.sc[a]||0)).map((p,i)=>`<div class="abrr ga ${p==m?'me':''}" ${dl(i,.3)}>${DT(p)}<b class="abnm">${esc(p)}</b><span class="abac" dir="ltr">🔎 ${g.fd[p]||0} · 🎭 ${g.ms[p]||0}</span><b class="abto" dir="ltr">${g.sc[p]||0}</b></div>`).join('')}</div>
+   <p class="mut cqlg">🔎 ${GT('blLgF')} · 🎭 ${GT('blLgM')}</p>`},
+ log(s){const g=s.game,L=[],top=(o,k,mn)=>{const mx=Math.max(0,...s.order.map(p=>o[p]||0));if(mx>=mn)s.order.filter(p=>(o[p]||0)==mx).slice(0,1).forEach(p=>L.push({k,n:[p]}))};
+  top(g.ms,'balM',4);top(g.fd,'balF',4);return L},
+ fin(s){return{pts:s.game.sc}}};
+
+/* =====================================================================
+   🫁 JAMAIS JE N'AI… EN APNÉE — fiche (18+, 2 à 8, ~8 min, sans alcool)
+   Une phrase « Je n'ai jamais… ». En secret et en même temps (30 s, ✏️ jusqu'au bout) : 🙋🏻 déjà fait / 🙅🏻 jamais
+     (ou 🤐 joker), ET un pari : parmi LES AUTRES (sans soi, ni ses liens connus), combien l'ont déjà fait ?
+   Révélation simultanée. Option de l'hôte (salon) : par défaut ANONYMAT agrégé → seulement le nombre (« 3 sur 6 »),
+     jamais les noms, ni les paris, ni les points des autres pendant la partie (chacun ne voit que les siens) ; ou
+     « montrer les noms ». À deux, l'anonymat est impossible (le nombre trahit l'autre) : la règle le dit.
+   Points = mètres d'apnée 🫁 : pari exact +3 m ; à un près +1 m (seulement s'il y a au moins 3 « autres »).
+   🤐 Joker, à volonté : ta réponse ne compte pas dans le nombre, ton pari ne rapporte rien ce tour-ci (0 m). Sans
+     réponse (absent·e, sablier) = joker. Le pari exclut ses liens connus : un couple n'en sait pas plus que les autres.
+   Pourquoi le pari ne porte pas sur le total : avec les points publics, « total − mon pari » trahirait ma réponse ; ici
+     les points d'une personne ne disent rien de la sienne (et restent privés en mode anonyme).
+   Manches : 2-4 → 10 phrases, 5-8 → 8. Réserves : apn1 (coquin), apn2 (trash).
+   ===================================================================== */
+const APN={R:n=>n<=4?10:8,AT:30,RT:14,EX:3,NE:1};
+GAMES.apn={icon:'🫁',min:2,max:8,dur:8,tags:['social'],tone:true,adult:1,ties:true,opts:['apnNm'],APN,
+ init(s){const g=s.game,n=s.order.length;g.tn=gTn(s);g.nm=n==2||!!(s.gopt||{}).apnNm?1:0;g.n=APN.R(n);g.q=gPoolT(s,'apn',g.n);g.n=g.q.length;g.res=[];g.ex={};g.pv={};
+  if(!g.n){g.over=1;return}this.go(s)},
+ go(s){const g=s.game;g.a={};g.b={};gWait(g,APN.AT,'a')},
+ qt(g,i){return esc(GC('apn'+g.tn,[0,g.q[i!=null?i:g.r]]))},
+ oth(s,x){const o=s.order.filter(y=>y!=x),L=o.filter(y=>!gTie(s,x,y));return L.length?L:o},
+ act(s,from,a){const g=s.game;if(g.st!='a')return;let ch=false;
+  if(a.y!=null){if(a.y==='')delete g.a[from];else if(['y','n','j'].includes(a.y))g.a[from]=a.y;else return;ch=true}
+  if(a.b!=null){const b=+a.b;if(!Number.isInteger(b)||b<0||b>this.oth(s,from).length)return;g.b[from]=b;ch=true}
+  if(a.rdy){if(!g.a[from]||(g.a[from]!='j'&&g.b[from]==null))return;g.done[from]=1;ch=true}return ch},
+ next(s){const g=s.game;
+  if(g.st=='a'){const A={};s.order.forEach(p=>A[p]=g.a[p]||'j');const Y=s.order.filter(p=>A[p]=='y').length,N=s.order.filter(p=>A[p]!='j').length,pv={};
+   s.order.forEach(x=>{const O=this.oth(s,x),T=O.filter(y=>A[y]=='y').length,b=g.b[x];let pt=0;
+    if(A[x]!='j'&&b!=null){if(b==T){pt=APN.EX;g.ex[x]=(g.ex[x]||0)+1}else if(Math.abs(b-T)==1&&O.length>=3)pt=APN.NE}
+    g.sc[x]+=pt;pv[x]={a:A[x],b:b==null?null:b,T,M:O.length,pt}});
+   g.res[g.r]={Y,N,J:s.order.length-N,pv:g.nm?pv:null};g.pv=pv;g.a={};g.b={};gWait(g,APN.RT,'r',1);return}
+  if(g.st=='r'){g.pv={};g.r++;if(g.r>=g.n){g.over=1;return}this.go(s)}},
+ hide(g,n,s){const o={...g};
+  if(g.st=='a'){o.a=hideOwn(g.a,n);o.b=hideOwn(g.b,n)}
+  if(!g.nm){o.pv=g.pv&&g.pv[n]?{[n]:g.pv[n]}:{};o.sc={[n]:g.sc[n]};o.ex={[n]:g.ex[n]}}
+  return o},
+ view(s){const g=s.game,m=meN(),pl=s.order.includes(m),q=`<p class="gq ga apq">${this.qt(g)}</p>`;
+  if(g.st=='a'){if(!pl)return{html:`<div class="card c">${q}<div class="gbig ga gfloat">🫁</div></div>`};
+   const a=g.a[m],b=g.b[m],O=this.oth(s,m),tied=O.length<s.order.length-1;
+   if(g.done[m]&&!xEd(g))return xWait(g,a=='j'?'🤐':'🫁',GT('apDone'),q+`<p class="gsub">${a=='y'?'🙋🏻 '+GT('apY'):a=='n'?'🙅🏻 '+GT('apN'):'🤐 '+GT('apJ')}${a!='j'&&b!=null?' · 🎯 '+b:''}</p>`);
+   return{html:`<div class="card c apcard">${q}<div class="apyn">${[['y','🙋🏻'],['n','🙅🏻']].map(([k,e],i)=>`<button class="apb ${a==k?'sel':''} ga" ${dl(i,.2)} data-apy="${k}" aria-pressed="${a==k}"><b>${e}</b>${GT('ap'+k.toUpperCase())}</button>`).join('')}</div>
+    ${a=='j'?`<p class="gnote ga">🤐 ${GT('apJD')}</p>`:`<p class="gq2 ga" ${dl(2)}>${GT(s.order.length==2?'apBet2':tied?'apBetT':'apBet',{n:B(O[0]),t:O.length})}</p>
+    <div class="apbet">${[...Array(O.length+1).keys()].map(v=>`<button class="apn ${b===v?'sel':''} ga" ${dl(v,.3)} data-apb="${v}" aria-pressed="${b===v}">${v}</button>`).join('')}</div>`}
+    ${xRdy('apok',!a||(a!='j'&&b==null))}<button class="ghost apjk ${a=='j'?'sel':''} ga" ${dl(5)} data-apy="${a=='j'?'':'j'}">🤐 ${GT(a=='j'?'apJx':'apJ')}</button></div>`,
+    bind(){$$('[data-apy]').forEach(x=>x.onclick=()=>{gs({y:x.dataset.apy})});$$('[data-apb]').forEach(x=>x.onclick=()=>gs({b:+x.dataset.apb}));$('#apok').onclick=()=>{GV.ed=null;gs({rdy:1})}}}}
+  const r=g.res[g.r]||{Y:0,N:0,J:0},me=(g.pv||{})[m],pv=r.pv,two=s.order.length==2;
+  const bub=`<div class="apgg" aria-label="${r.Y} / ${r.N}">${[...Array(r.N).keys()].map(i=>`<i class="${i<r.Y?'y':''}" style="animation-delay:${(.2+i*.12).toFixed(2)}s"></i>`).join('')}</div>`;
+  const grp=pv?['y','n','j'].map(k=>{const L=s.order.filter(p=>pv[p]&&pv[p].a==k);return L.length?`<div class="apgr"><b>${k=='y'?'🙋🏻':k=='n'?'🙅🏻':'🤐'}</b>${L.map(p=>xChip(p,'',pv[p].a!='j'&&pv[p].b!=null?` <small>🎯${pv[p].b}</small>`:'')).join('')}</div>`:''}).join(''):'';
+  const mine=me?`<p class="apme ga" ${dl(3)}>${me.a=='j'?`🤐 ${GT('apJD')}`:me.b==null?'—':`🎯 ${GT('apMine',{b:me.b,t:me.T})} <b class="avpt ${me.pt?'':'z'}" dir="ltr">+${me.pt} m</b>`}</p>`:'';
+  return{html:`<div class="card c apcard">${q}<p class="apbig ga">${GT('apRes',{y:r.Y,n:r.N})}</p>${r.J?`<p class="gsub">🤐 × ${r.J}</p>`:''}${bub}${grp}${mine}
+   ${pl?`<p class="apdp ga" ${dl(4)}>🫁 ${GT('apDepth',{v:g.sc[m]||0})}</p>`:''}${!g.nm&&!two?`<p class="gsub">🔒 ${GT('apAnonD')}</p>`:''}</div>`,
+   bind(){if(me&&me.pt==APN.EX&&!RM())try{sparkles($('.apme'),10)}catch(e){}}}},
+ endView(s){const g=s.game,m=meN();
+  return `<div class="abres abfin">${[...s.order].sort((a,b)=>(g.sc[b]||0)-(g.sc[a]||0)).map((p,i)=>`<div class="abrr ga ${p==m?'me':''}" ${dl(i,.3)}>${DT(p)}<b class="abnm">${esc(p)}</b><span class="abac" dir="ltr">🎯 ${g.ex[p]||0}</span><b class="abto" dir="ltr">${g.sc[p]||0} m</b></div>`).join('')}</div>
+   <p class="mut cqlg">🎯 ${GT('apLgE')} · 🫁 ${GT('apLgM')}</p>`},
+ log(s){const g=s.game,mx=Math.max(0,...s.order.map(p=>g.ex[p]||0));return mx>=4?s.order.filter(p=>(g.ex[p]||0)==mx).slice(0,1).map(p=>({k:'apnE',n:[p]})):[]},
+ fin(s){const g=s.game;g.pv={};g.a={};g.b={};g.res=(g.res||[]).map(r=>({...r,pv:null}));return{pts:g.sc}}};
+
+/* 🔞 tutoriels animés */
+const tu3=()=>[0,1,2].map(i=>TU.e(60+90*i,152,TU.av(i))).join('');
+GAMES.avd.tut=[
+ {k:'tu_avd1',d:6,s:()=>tu3()+TU.e(60,100,TU.cd('💬 🌊'),.3,'p')+TU.e(150,100,TU.cd('🎬 🌊🌊'),.6,'p')+TU.e(240,100,TU.cd('💬 🌊'),.9,'p')+TU.mv(60,100,150,52,'🎴',1.6,'','--op0:0')+TU.mv(150,100,240,52,'🎴',1.8,'','--op0:0')+TU.mv(240,100,60,52,'🎴',2,'','--op0:0')+TU.e(150,18,'🤫',2.6,'p')},
+ {k:'tu_avd2',d:6,s:()=>TU.e(70,60,TU.cd('🌊'),.2,'p')+TU.e(150,60,TU.cd('🌊🌊'),1,'p')+TU.e(240,60,TU.cd('🌊🌊🌊'),1.8,'p')+TU.e(70,100,TU.pt('+1'),.5,'p')+TU.e(150,100,TU.pt('+2'),1.3,'p')+TU.e(240,100,TU.pt('+3'),2.1,'p')+TU.e(150,150,'🤿',2.6,'p big')},
+ {k:'tu_avd3',d:6,s:()=>TU.e(150,150,TU.av(0))+TU.e(150,70,TU.cd('🎬 🌊🌊'),.2,'p big')+TU.e(60,40,'🎙️',1,'p')+TU.e(240,40,'📹',1.3,'p')+TU.e(150,24,'✍🏻',1.6,'p')+TU.e(150,112,'🤿 ✓',2.3,'p')},
+ {k:'tu_avd4',d:6,s:()=>tu3()+TU.e(150,60,TU.cd('🤿 🌊🌊'),0,'p')+TU.e(60,104,'✓',.6,'p big')+TU.e(240,104,'✓',.9,'p big')+TU.e(150,20,TU.pt('+2'),1.6,'p')+TU.e(240,60,'🎴',2,'p')+TU.e(240,24,TU.pt('+2'),2.3,'p')},
+ {k:'tu_avd5',d:7,s:()=>TU.e(150,150,TU.av(1))+TU.e(150,40,TU.cd('🎬 🌊🌊🌊'),0,'p')+TU.e(60,100,TU.cd('🫧 🌊🌊'),.8,'p')+TU.e(150,100,TU.cd('🛟 0'),1.4,'p')+TU.e(240,100,TU.cd('🙅🏻 −1'),2,'p')+TU.e(150,72,'💛',2.8,'p')},
+ {k:'tu_avd6',x:'2',d:5,s:()=>TU.e(80,150,TU.av(0))+TU.e(220,150,TU.av(1))+TU.mv(80,100,220,60,'🎴',.3)+TU.mv(220,100,80,60,'🎴',.5)+TU.e(150,100,'🤝🏻',1.5,'p big')}];
+GAMES.bal.tut=[
+ {k:'tu_bal1',d:6,s:()=>tu3()+TU.e(150,30,TU.cd('❓ 🌶️'),.2,'p')+[0,1,2].map(i=>TU.e(60+90*i,100,'✍🏻',.8+.25*i,'p')).join('')},
+ {k:'tu_bal2',d:6,s:()=>tu3()+[0,1,2].map(i=>TU.mv(60+90*i,104,[150,60,240][i],48,TU.cd(['🦋 …','🌙 …','🌹 …'][i]),.3+.3*i)).join('')+TU.e(150,90,'🔀',1.6,'p big')},
+ {k:'tu_bal3',d:6,s:()=>TU.e(150,40,TU.cd('🌹 …'),0,'p')+tu3()+TU.mv(60,120,150,80,'👆🏻',.6,'','--op0:0')+TU.e(150,80,TU.cd(esc(TU.n()[2])+' ?'),1.4,'p')+TU.e(240,40,TU.pt('+1'),2.2,'p')},
+ {k:'tu_bal4',d:6,s:()=>TU.e(150,40,TU.cd('🦋 …'),0,'p')+TU.e(150,150,TU.av(0))+TU.e(80,100,TU.cd(esc(TU.n()[1])+' ?','no'),.4,'p')+TU.e(220,100,TU.cd(esc(TU.n()[2])+' ?','no'),.7,'p')+TU.e(150,104,'🎭',1.4,'p big')+TU.e(210,150,TU.pt('+2'),2,'p')},
+ {k:'tu_bal5',d:6,s:()=>TU.e(150,150,TU.av(1))+TU.e(150,40,TU.cd('❓ 🔥'),0,'p')+TU.e(150,96,'🎭',.8,'p big')+TU.e(230,96,TU.cd('🔎 ✓'),1.6,'p')},
+ {k:'tu_bal6',x:'2',d:6,s:()=>TU.e(80,150,TU.av(0))+TU.e(220,150,TU.av(1))+TU.e(220,60,TU.cd('🌙 …'),.2,'p')+TU.e(220,100,TU.cd('🌹 …'),.4,'p')+TU.mv(80,110,220,100,'👆🏻',1.2,'','--op0:0')+TU.e(220,100,TU.cd('✅','ok'),2,'p')+TU.e(80,100,TU.pt('+2'),2.4,'p')}];
+GAMES.apn.tut=[
+ {k:'tu_apn1',d:6,s:()=>TU.e(150,36,TU.cd('🫁 …'),0,'p big')+tu3()+TU.e(60,104,'🙋🏻',.6,'p o','--o:1.6s')+TU.e(150,104,'🙅🏻',.8,'p o','--o:1.6s')+TU.e(240,104,'🙋🏻',1,'p o','--o:1.6s')+[0,1,2].map(i=>TU.e(60+90*i,104,'🤫',1.7+.1*i,'p')).join('')},
+ {k:'tu_apn2',d:6,s:()=>tu3()+[0,1,2].map(i=>TU.e(60+90*i,104,TU.cd('🎯 '+[1,2,1][i]),.4+.3*i,'p')).join('')+TU.e(150,36,'❓',1.6,'p big')},
+ {k:'tu_apn3',d:6,s:()=>TU.e(150,40,TU.cd('2 / 3'),.2,'p big')+[0,1,2].map(i=>TU.e(105+45*i,96,'<i class="tapb '+(i<2?'y':'')+'"></i>',.6+.25*i,'p')).join('')+TU.e(150,150,'🔒',1.6,'p')},
+ {k:'tu_apn4',d:6,s:()=>tu3()+TU.e(60,104,TU.cd('🎯 1','ok'),.2,'p')+TU.e(150,104,TU.cd('🎯 2'),.3,'p')+TU.e(240,104,TU.cd('🎯 3','no'),.4,'p')+TU.e(60,66,TU.pt('+3'),1.2,'p')+TU.e(150,66,TU.pt('+1'),1.5,'p')+TU.e(150,24,'🫁',2,'p big')},
+ {k:'tu_apn5',d:5,s:()=>TU.e(150,150,TU.av(2))+TU.e(150,40,TU.cd('🫁 …'),0,'p')+TU.e(150,100,'🤐',.7,'p big')+TU.e(220,100,TU.pt('0'),1.4,'p')},
+ {k:'tu_apn6',x:'2',d:5,s:()=>TU.e(80,150,TU.av(0))+TU.e(220,150,TU.av(1))+TU.e(80,100,TU.cd('🎯 1'),.3,'p')+TU.e(220,100,'🙋🏻',.8,'p')+TU.e(80,60,TU.pt('+3'),1.6,'p')}];
+
+if(typeof document!='undefined'){const c=document.createElement('style');c.id='adult-css';c.textContent=`
+.gtile.g18:not(.sel){opacity:.5;filter:saturate(.3)}
+.gtile .g18m{color:#c94a2a}
+.gtile .g2_18{margin-inline-start:6px;vertical-align:2px}
+.xrdy{margin-top:12px}
+.avcard,.blcard,.apcard{--av1:#e9f6f8;--av2:#d6eef2;--avv:#c2508a;--ava:#2f8f9d;--avb:#f6f1e7}
+[data-theme=dark] .avcard,[data-theme=dark] .blcard,[data-theme=dark] .apcard{--av1:#12324a;--av2:#0d263a;--avv:#f08bbd;--ava:#64d0dc;--avb:#10263a}
+.avc{position:relative;text-align:start;border-radius:14px;padding:10px 12px;background:linear-gradient(160deg,var(--av1),var(--av2));border:2px solid var(--edge);box-shadow:0 2px 0 var(--edge2)}
+.avc .avk{font:800 12px Nunito,sans-serif;letter-spacing:.02em;text-transform:uppercase}
+.avc-v .avk{color:var(--avv)}.avc-a .avk{color:var(--ava)}
+.avc .avw{position:absolute;top:8px;inset-inline-end:10px;font-size:12px;letter-spacing:-2px}
+.avc p{margin:6px 0 0;font:600 15px/1.35 Nunito,sans-serif;color:var(--ink)}
+.avc.big p{font-size:18px}.avc.big{padding:14px 16px;margin:6px 0 4px}
+.avc.sm p{font-size:13.5px}.avc.sm{padding:7px 10px;box-shadow:none}
+.avrow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+.gw .avpk{display:block;padding:0;border:0;background:none;box-shadow:none;border-radius:16px;text-align:start;width:100%}
+.avpk .avc{height:100%;transition:transform .15s,border-color .15s}
+.avpk.sel .avc{border-color:var(--acc);transform:translateY(-2px);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 35%,transparent)}
+.avsub{margin:2px 0 6px}
+.avops{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:12px 0 4px}
+.avop{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 6px;border-radius:14px;font:700 13.5px Nunito,sans-serif}
+.avop b{font-size:24px;line-height:1.1}.avop small{font:800 12px Nunito;color:var(--mut)}
+.avop.sel,.blan.sel,.blc.sel,.apb.sel,.apn.sel,.apjk.sel{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 14%,var(--paper))}
+.avop:disabled{opacity:.4}
+.avhint{min-height:18px}
+.avtx{width:100%;margin-top:6px}
+.avls{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.avli,.avvi,.avri{position:relative;padding:8px 10px;border-radius:14px;background:var(--avb)}
+.avli{display:grid;grid-template-columns:auto auto 1fr;gap:4px 6px;align-items:center}.avli .avc{grid-column:1/-1}
+.avst{justify-self:end;font:700 13px Nunito}
+.avvh{display:flex;align-items:center;gap:6px;margin-bottom:6px}.avvh .avpt,.avvh .avo{margin-inline-start:auto}.avvh .avo+.avpt{margin-inline-start:8px}
+.avo{font:700 12.5px Nunito;color:var(--mut)}
+.avvi+.avvi,.avri+.avri{margin-top:8px}
+.avans{margin:6px 2px 0;font:italic 600 14px/1.35 Nunito,sans-serif;overflow-wrap:anywhere}
+.avyn{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.avyn button{padding:8px;border-radius:12px;font:700 14px Nunito}
+.avy.sel{border-color:#2fa894;background:color-mix(in srgb,#2fa894 16%,var(--paper))}.avn.sel{border-color:#d9534f;background:color-mix(in srgb,#d9534f 14%,var(--paper))}
+.avri.ok{box-shadow:inset 3px 0 0 #2fa894}[dir=rtl] .avri.ok{box-shadow:inset -3px 0 0 #2fa894}
+.avri.me{outline:2px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+.avrv{margin:6px 2px 0;font:600 13px Nunito;color:var(--mut)}.avrv .ok{color:#2a9d7f}.avrv .no{color:var(--bad,#d9534f)}
+.avpt{font:800 13px Nunito;color:#2a9d7f}.avpt.no{color:var(--bad,#d9534f)}.avpt.z{color:var(--mut)}
+.blq,.apq{font-size:19px}
+.blcard textarea{width:100%}
+.blw2{display:flex;flex-direction:column;gap:4px;text-align:start}.blt{font:800 13px Nunito;margin-top:6px}
+.blps{margin-top:8px}
+.bl2{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+.blan{display:flex;gap:10px;align-items:flex-start;text-align:start;padding:12px 14px;border-radius:16px;font:600 15px/1.35 Nunito,sans-serif;overflow-wrap:anywhere}
+.blmk{font-size:22px;line-height:1;flex:none;margin-inline-end:8px}
+.blan2,.blres,.apgr{border-radius:16px;background:var(--avb)}
+.blan2{padding:10px 12px;margin-top:10px}
+.blan2>p{display:flex;align-items:flex-start;margin:0;font:600 15px/1.35 Nunito,sans-serif;overflow-wrap:anywhere}
+.blan2.mine{outline:2px dashed color-mix(in srgb,var(--acc) 50%,transparent)}
+.blch{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.blc{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:99px;font:700 13px Nunito}
+.blby{margin:6px 0 0;display:flex;align-items:center;gap:6px;font:700 14px Nunito}
+.blres{padding:10px 12px;margin-top:10px;text-align:start}
+.blrl{margin:6px 0;overflow-wrap:anywhere}.blrl.tr{font-weight:800}
+.apyn{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0 4px}
+.apb{display:flex;flex-direction:column;align-items:center;gap:2px;padding:12px 6px;border-radius:16px;font:700 15px Nunito}
+.apb b{font-size:30px;line-height:1.1}
+.apbet{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:8px 0}
+.apn{min-width:44px;height:44px;padding:0 10px;border-radius:12px;font:800 18px Nunito}
+.apjk{display:block;margin:10px auto 0;padding:6px 16px;border-radius:99px;font-size:14px}
+.apbig{font:700 22px Fredoka,Nunito,sans-serif;margin:8px 0 4px}
+.apgg{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:8px 0}
+.apgg i,.tapb{display:block;width:22px;height:22px;border-radius:50%;border:2px solid #7fb9c9;background:transparent;animation:apB .5s var(--gease,ease) both}
+.apgg i.y,.tapb.y{background:radial-gradient(circle at 35% 30%,#fff,#7fd8e8 45%,#2f8f9d);border-color:#2f8f9d}
+@keyframes apB{from{transform:translateY(14px) scale(.4);opacity:0}}
+.apgr{display:flex;flex-wrap:wrap;align-items:center;gap:6px;justify-content:center;padding:6px 8px;margin-top:8px}
+.apgr>b{font-size:20px}
+.apme{margin:10px 0 0;font:700 14.5px Nunito}
+.apdp{margin:6px 0 0;font:800 14px Nunito;color:var(--ava)}
+@media (max-width:420px){.avrow{grid-template-columns:1fr}.avc.big p{font-size:16.5px}.apn{min-width:40px;height:40px}.blc{padding:4px 8px;font-size:12.5px}}
+@media (prefers-reduced-motion:reduce){.apgg i,.tapb{animation:none}.avpk .avc{transition:none}}
+`;(document.head||document.documentElement).appendChild(c)}
+/* /🔞 */
+/* 🔞 textes des jeux 18+ (9 langues) — formulations neutres en genre */
+const GAD=(l,o)=>Object.assign(GI18N[l].ui,o);
+GAD('fr',{gcat_a:`18+ · Entre adultes`,a18:`18+ : choisir le ton coquin ou trash`,xRdy:`Prêt`,
+n_avd:`Action ou Vérité sous l'eau`,d_avd:`Choisir en secret un défi pour quelqu'un, plus ou moins profond`,
+r_avd:`Chaque manche, en secret, tu choisis pour quelqu'un une vérité 💬 ou une action 🎬, plus ou moins profonde 🌊 (les paliers s'ouvrent au fil des manches). Chacun découvre sa carte et plonge : à voix haute, en visio ou par écrit. Les autres votent « relevé ». Relevé : +🌊 pour qui plonge, et autant pour qui a choisi la carte si c'est au palier choisi. Pas envie ? 🫧 un palier plus doux, 🛟 un joker par partie, ou passer (−1).`,
+r_avd2:`À deux : chaque manche, tu choisis en secret pour l'autre une vérité 💬 ou une action 🎬, plus ou moins profonde 🌊 (les paliers s'ouvrent au fil des manches). Puis chacun plonge : à voix haute, en visio ou par écrit. Plongée : +🌊, et autant pour qui a choisi si c'est au palier choisi. Pas de vote : on se fait confiance. Pas envie ? 🫧 plus doux, 🛟 un joker par partie, ou passer (−1).`,
+avV:`Vérité`,avA:`Action`,avWc:`Les autres choisissent une carte…`,avFor:`Une carte pour {n}`,
+avForD:`Relevée au palier choisi, elle vous rapporte autant à tous les deux. Trop profond, et l'autre remonte…`,
+avDone:`Carte choisie pour {n}. Elle reste secrète jusqu'à la révélation.`,avDoneF:`C'est noté. On attend les autres plongées…`,avYour:`Ta carte`,
+avOd:`Plonger`,avOs:`Plus doux`,avOj:`Joker`,avOp:`Passer`,avOx:`Pas de réponse`,
+avOdd:`Relève-la à voix haute, en visio ou par écrit, puis « C'est fait ».`,avOds:`Même type de carte, un palier plus doux : la voici.`,
+avOdj:`🛟 Remonter à la surface : 0 point, sans aucun coût. Un seul par partie.`,avOdp:`Passer : −1, sans rien à justifier.`,avO0:`Choisis comment tu plonges.`,
+avTxP:`Réponds à voix haute… ou écris ici (facultatif)`,avDid:`C'est fait`,avWv:`Les autres jugent les plongées…`,avDoneV:`Votes envoyés. On attend les autres…`,
+avVq:`Relevé ?`,avY:`Relevé`,avN:`Pas relevé`,avBy:`carte choisie par {n}`,avLgD:`profondeur relevée`,avLgR:`points des cartes choisies`,avLgJ:`joker utilisé`,
+tu_avd1:`Chaque manche, chacun choisit en secret une carte pour quelqu'un d'autre : vérité 💬 ou action 🎬.`,
+tu_avd2:`Les paliers 🌊 s'ouvrent au fil des manches. Plus c'est profond, plus ça rapporte.`,
+tu_avd3:`Tu découvres ta carte et tu plonges : à voix haute, en visio ou par écrit. Tout se fait à distance.`,
+tu_avd4:`Les autres votent : relevé ✓ ou pas. Relevé : tu gagnes la profondeur, et qui a choisi ta carte aussi, si tu as plongé au palier choisi.`,
+tu_avd5:`Pas envie ? 🫧 un palier plus doux, 🛟 un joker par partie, ou passer (−1). Personne n'est obligé de rien.`,
+tu_avd6:`À deux : pas de vote, on se fait confiance.`,
+lg_avdD:`{a} a plongé jusqu'au palier 🌊🌊🌊`,lg_avdR:`{a} a su lire les envies de chacun dans Action ou Vérité sous l'eau`,
+n_bal:`Le Bal masqué`,d_bal:`Des réponses osées et anonymes : qui se cache derrière le masque ?`,
+r_bal:`Une question osée pour tout le monde. Chacun répond en secret, en quelques mots. Les réponses arrivent masquées et mélangées : devine qui a écrit quoi (+1 par bonne réponse). Chaque personne qui se trompe sur la tienne te donne +1. 🎭 Pas envie de répondre ? Garde ton masque : tu devines quand même.`,
+r_bal2:`À deux : chacun écrit une réponse vraie et une inventée. Devine la vraie de l'autre : +2 si c'est juste, sinon +2 pour l'autre. 🎭 Pas envie ? Garde ton masque ce tour-ci.`,
+blQ:`Question du bal`,blPh:`Ta réponse, en quelques mots…`,blPhT:`Ta vraie réponse…`,blPhF:`Une réponse inventée, crédible…`,blTrue:`Vraie`,blFake:`Inventée`,
+blPs:`Garder mon masque`,blPsD:`Pas de réponse ce tour-ci : tu devines quand même, sans points pour ta réponse.`,blPsd:`Masque gardé pour ce tour : pas besoin de te justifier.`,
+blSent:`Réponse envoyée, bien masquée.`,blMin:`Écris quelques mots (ou garde ton masque).`,blMin2:`Écris les deux réponses (ou garde ton masque).`,
+blGuess:`Qui a écrit quoi ? Touche un nom sous chaque réponse.`,blWatch:`Les autres devinent…`,blMine:`ta réponse`,blDoneG:`Devinettes envoyées. On attend les autres…`,
+blWhichT:`Laquelle est la vraie réponse de {n} ?`,blNo2:`Pas de réponse à deviner cette fois.`,blSkip:`Trop de masques gardés : rien à deviner cette fois.`,
+blOf:`Les réponses de {n}`,blOk2:`{n} a trouvé la vraie !`,blFool:`{n} a bien bluffé !`,blLgF:`bonnes devinettes`,blLgM:`points de masque`,
+tu_bal1:`Une question osée pour tout le monde. Chacun répond en secret, en quelques mots.`,
+tu_bal2:`Les réponses arrivent masquées et mélangées.`,
+tu_bal3:`Devine qui a écrit quoi : +1 par bonne réponse.`,
+tu_bal4:`Chaque personne qui se trompe sur ta réponse te rapporte +1 : garde bien ton masque.`,
+tu_bal5:`Pas envie de répondre ? 🎭 Garde ton masque : tu devines quand même, sans points pour ta réponse.`,
+tu_bal6:`À deux : une réponse vraie, une inventée. Trouve la vraie : +2, sinon +2 pour l'autre.`,
+lg_balM:`{a} a gardé son masque toute la soirée au Bal masqué`,lg_balF:`{a} a démasqué presque tout le monde au Bal masqué`,
+n_apn:`Jamais je n'ai… en apnée`,d_apn:`Déjà fait ou jamais ? Parier sur le groupe, sans dévoiler qui`,
+r_apn:`Une phrase « Je n'ai jamais… ». En secret : 🙋🏻 déjà fait ou 🙅🏻 jamais. Et parie : parmi les autres, combien l'ont déjà fait ? Pari exact : +3 m d'apnée ; à un près : +1 m. Par défaut, on ne révèle que le nombre, jamais les noms. 🤐 Joker à volonté : ta réponse ne compte pas, ton pari non plus ce tour-ci.`,
+r_apn2:`À deux : une phrase « Je n'ai jamais… ». En secret : 🙋🏻 déjà fait ou 🙅🏻 jamais, et devine la réponse de l'autre : +3 m d'apnée si c'est juste. À deux, l'anonymat est impossible : vous verrez vos réponses. 🤐 Joker à volonté (0 ce tour-ci).`,
+apnNmT:`🫁 Révélation`,apnNm:`Montrer les noms`,apnNmD:`Par défaut, on ne révèle que le nombre, jamais qui : plus intime, plus sûr.`,apnNm0:`Seulement le nombre (anonyme)`,
+apY:`Déjà fait`,apN:`Jamais`,apJ:`Joker : je garde ça pour moi`,apJx:`Annuler le joker`,apJD:`Joker : ta réponse ne compte pas, ton pari non plus ce tour-ci.`,
+apBet:`Parmi les {t} autres, combien l'ont déjà fait ?`,apBetT:`Parmi les {t} autres (sans ton lien), combien l'ont déjà fait ?`,apBet2:`Et {n} ? 0 = jamais, 1 = déjà fait`,
+apDone:`C'est noté. On retient son souffle…`,apRes:`{y} sur {n} : déjà fait`,apMine:`ton pari {b} · en vrai {t}`,apDepth:`Ton apnée : {v} m`,
+apAnonD:`Anonyme : seulement le nombre. Tes points ne sont visibles que par toi jusqu'à la fin.`,apLgE:`paris exacts`,apLgM:`mètres d'apnée`,
+tu_apn1:`Une phrase « Je n'ai jamais… ». Chacun répond en secret : 🙋🏻 déjà fait, ou 🙅🏻 jamais.`,
+tu_apn2:`Et chacun parie : parmi les autres, combien l'ont déjà fait ?`,
+tu_apn3:`Révélation : seulement le nombre, pas les noms (sauf si l'hôte choisit de les montrer).`,
+tu_apn4:`Pari exact : +3 m d'apnée. À un près : +1 m.`,
+tu_apn5:`🤐 Joker à volonté : ta réponse ne compte pas, et ton pari non plus ce tour-ci.`,
+tu_apn6:`À deux : devine si l'autre l'a déjà fait. L'anonymat est impossible à deux.`,
+lg_apnE:`{a} a lu le groupe comme personne dans Jamais je n'ai… en apnée`});
+GAD('en',{gcat_a:`18+ · Adults only`,a18:`18+: pick the spicy or trash tone`,xRdy:`Ready`,
+n_avd:`Truth or Dare Underwater`,d_avd:`Secretly pick a challenge for someone, shallow or deep`,
+r_avd:`Each round, you secretly pick a truth 💬 or a dare 🎬 for someone, shallow or deep 🌊 (deeper levels open as rounds go by). Everyone discovers their card and dives in: out loud, on camera or in writing. The others vote "done". Done: +🌊 for the diver, and the same for whoever picked the card if it was played at that level. Not feeling it? 🫧 a gentler level, 🛟 one joker per game, or pass (−1).`,
+r_avd2:`For two: each round, you secretly pick a truth 💬 or a dare 🎬 for the other, shallow or deep 🌊 (deeper levels open as rounds go by). Then you both dive in: out loud, on camera or in writing. A dive scores +🌊, and the same for whoever picked it if played at that level. No vote: you trust each other. Not feeling it? 🫧 gentler, 🛟 one joker per game, or pass (−1).`,
+avV:`Truth`,avA:`Dare`,avWc:`The others are picking a card…`,avFor:`A card for {n}`,
+avForD:`Played at the level you pick, it scores the same for you both. Too deep, and they'll come back up…`,
+avDone:`Card picked for {n}. It stays secret until the reveal.`,avDoneF:`Got it. Waiting for the other dives…`,avYour:`Your card`,
+avOd:`Dive`,avOs:`Gentler`,avOj:`Joker`,avOp:`Pass`,avOx:`No answer`,
+avOdd:`Do it out loud, on camera or in writing, then tap "Done".`,avOds:`Same kind of card, one level gentler: here it is.`,
+avOdj:`🛟 Back to the surface: 0 points, no cost at all. Only one per game.`,avOdp:`Pass: −1, no explanation needed.`,avO0:`Choose how you dive.`,
+avTxP:`Answer out loud… or write here (optional)`,avDid:`Done`,avWv:`The others are judging the dives…`,avDoneV:`Votes sent. Waiting for the others…`,
+avVq:`Done?`,avY:`Done`,avN:`Not done`,avBy:`card picked by {n}`,avLgD:`depth reached`,avLgR:`points from picked cards`,avLgJ:`joker used`,
+tu_avd1:`Each round, everyone secretly picks a card for someone else: truth 💬 or dare 🎬.`,
+tu_avd2:`Deeper levels 🌊 open as rounds go by. The deeper, the more it scores.`,
+tu_avd3:`You discover your card and dive in: out loud, on camera or in writing. Everything works remotely.`,
+tu_avd4:`The others vote: done ✓ or not. Done: you score the depth, and so does whoever picked your card, if you dived at that level.`,
+tu_avd5:`Not feeling it? 🫧 a gentler level, 🛟 one joker per game, or pass (−1). Nobody has to do anything.`,
+tu_avd6:`For two: no vote, you trust each other.`,
+lg_avdD:`{a} dived all the way to level 🌊🌊🌊`,lg_avdR:`{a} read everyone's limits perfectly in Truth or Dare Underwater`,
+n_bal:`The Masked Ball`,d_bal:`Daring, anonymous answers: who's behind the mask?`,
+r_bal:`One daring question for everyone. Each person answers secretly, in a few words. The answers arrive masked and shuffled: guess who wrote what (+1 per right guess). Each person who gets yours wrong gives you +1. 🎭 Don't want to answer? Keep your mask on: you still guess.`,
+r_bal2:`For two: each of you writes one true answer and one made-up one. Guess the other's true one: +2 if right, otherwise +2 to them. 🎭 Not feeling it? Keep your mask on this round.`,
+blQ:`Tonight's question`,blPh:`Your answer, in a few words…`,blPhT:`Your true answer…`,blPhF:`A believable made-up answer…`,blTrue:`True`,blFake:`Made up`,
+blPs:`Keep my mask on`,blPsD:`No answer this round: you still guess, just no points for your answer.`,blPsd:`Mask kept on this round: no need to explain.`,
+blSent:`Answer sent, well masked.`,blMin:`Write a few words (or keep your mask on).`,blMin2:`Write both answers (or keep your mask on).`,
+blGuess:`Who wrote what? Tap a name under each answer.`,blWatch:`The others are guessing…`,blMine:`your answer`,blDoneG:`Guesses sent. Waiting for the others…`,
+blWhichT:`Which one is {n}'s true answer?`,blNo2:`Nothing to guess this time.`,blSkip:`Too many masks kept on: nothing to guess this time.`,
+blOf:`{n}'s answers`,blOk2:`{n} found the true one!`,blFool:`{n} bluffed well!`,blLgF:`right guesses`,blLgM:`mask points`,
+tu_bal1:`One daring question for everyone. Each person answers secretly, in a few words.`,
+tu_bal2:`The answers arrive masked and shuffled.`,
+tu_bal3:`Guess who wrote what: +1 per right guess.`,
+tu_bal4:`Each person who gets your answer wrong gives you +1: keep that mask on.`,
+tu_bal5:`Don't want to answer? 🎭 Keep your mask on: you still guess, just no points for your answer.`,
+tu_bal6:`For two: one true answer, one made up. Find the true one: +2, otherwise +2 to the other.`,
+lg_balM:`{a} kept the mask on all night at the Masked Ball`,lg_balF:`{a} unmasked almost everyone at the Masked Ball`,
+n_apn:`Never Have I Ever… Breath-Hold`,d_apn:`Done it or never? Bet on the group without revealing who`,
+r_apn:`A "Never have I ever…" line. Secretly: 🙋🏻 done it or 🙅🏻 never. Then bet: among the others, how many have done it? Exact bet: +3 m of breath-hold; off by one: +1 m. By default only the number is revealed, never the names. 🤐 Unlimited joker: your answer doesn't count, and neither does your bet this round.`,
+r_apn2:`For two: a "Never have I ever…" line. Secretly: 🙋🏻 done it or 🙅🏻 never, and guess the other's answer: +3 m of breath-hold if right. With two, anonymity is impossible: you'll see each other's answers. 🤐 Unlimited joker (0 this round).`,
+apnNmT:`🫁 Reveal`,apnNm:`Show names`,apnNmD:`By default only the number is revealed, never who: more private, safer.`,apnNm0:`Number only (anonymous)`,
+apY:`Done it`,apN:`Never`,apJ:`Joker: I'll keep that to myself`,apJx:`Cancel the joker`,apJD:`Joker: your answer doesn't count, and neither does your bet this round.`,
+apBet:`Among the {t} others, how many have done it?`,apBetT:`Among the {t} others (not counting your bond), how many have done it?`,apBet2:`And {n}? 0 = never, 1 = done it`,
+apDone:`Got it. Holding our breath…`,apRes:`{y} of {n}: done it`,apMine:`your bet {b} · actually {t}`,apDepth:`Your breath-hold: {v} m`,
+apAnonD:`Anonymous: number only. Your points are visible only to you until the end.`,apLgE:`exact bets`,apLgM:`metres of breath-hold`,
+tu_apn1:`A "Never have I ever…" line. Everyone answers secretly: 🙋🏻 done it, or 🙅🏻 never.`,
+tu_apn2:`And everyone bets: among the others, how many have done it?`,
+tu_apn3:`Reveal: just the number, not the names (unless the host chooses to show them).`,
+tu_apn4:`Exact bet: +3 m of breath-hold. Off by one: +1 m.`,
+tu_apn5:`🤐 Unlimited joker: your answer doesn't count, and neither does your bet this round.`,
+tu_apn6:`For two: guess whether the other has done it. Anonymity is impossible with two.`,
+lg_apnE:`{a} read the group like nobody else in Never Have I Ever… Breath-Hold`});
+GAD('es',{gcat_a:`18+ · Entre adultos`,a18:`18+: elige el tono picante o trash`,xRdy:`Listo`,
+n_avd:`Verdad o Reto bajo el agua`,d_avd:`Elegir en secreto un reto para alguien, más o menos profundo`,
+r_avd:`Cada ronda, en secreto, eliges para alguien una verdad 💬 o un reto 🎬, más o menos profundo 🌊 (los niveles se abren con las rondas). Cada cual descubre su carta y se zambulle: en voz alta, por videollamada o por escrito. Los demás votan «cumplido». Cumplido: +🌊 para quien se zambulle, y lo mismo para quien eligió la carta si se jugó en ese nivel. ¿Sin ganas? 🫧 un nivel más suave, 🛟 un comodín por partida, o pasar (−1).`,
+r_avd2:`A dos: cada ronda eliges en secreto para la otra persona una verdad 💬 o un reto 🎬, más o menos profundo 🌊 (los niveles se abren con las rondas). Luego cada cual se zambulle: en voz alta, por videollamada o por escrito. Zambullida: +🌊, y lo mismo para quien la eligió si se jugó en ese nivel. Sin voto: hay confianza. ¿Sin ganas? 🫧 más suave, 🛟 un comodín por partida, o pasar (−1).`,
+avV:`Verdad`,avA:`Reto`,avWc:`Los demás eligen una carta…`,avFor:`Una carta para {n}`,
+avForD:`Cumplida en el nivel elegido, os da lo mismo a los dos. Demasiado hondo, y la otra persona sube…`,
+avDone:`Carta elegida para {n}. Sigue en secreto hasta la revelación.`,avDoneF:`Anotado. Esperando las demás zambullidas…`,avYour:`Tu carta`,
+avOd:`Zambullirse`,avOs:`Más suave`,avOj:`Comodín`,avOp:`Pasar`,avOx:`Sin respuesta`,
+avOdd:`Cúmplela en voz alta, por videollamada o por escrito, y luego «Hecho».`,avOds:`El mismo tipo de carta, un nivel más suave: aquí la tienes.`,
+avOdj:`🛟 Volver a la superficie: 0 puntos, sin ningún coste. Solo uno por partida.`,avOdp:`Pasar: −1, sin tener que justificar nada.`,avO0:`Elige cómo te zambulles.`,
+avTxP:`Responde en voz alta… o escribe aquí (opcional)`,avDid:`Hecho`,avWv:`Los demás juzgan las zambullidas…`,avDoneV:`Votos enviados. Esperando a los demás…`,
+avVq:`¿Cumplido?`,avY:`Cumplido`,avN:`No cumplido`,avBy:`carta elegida por {n}`,avLgD:`profundidad cumplida`,avLgR:`puntos por cartas elegidas`,avLgJ:`comodín usado`,
+tu_avd1:`Cada ronda, cada cual elige en secreto una carta para otra persona: verdad 💬 o reto 🎬.`,
+tu_avd2:`Los niveles 🌊 se abren con las rondas. Cuanto más hondo, más puntos.`,
+tu_avd3:`Descubres tu carta y te zambulles: en voz alta, por videollamada o por escrito. Todo se hace a distancia.`,
+tu_avd4:`Los demás votan: cumplido ✓ o no. Cumplido: ganas la profundidad, y quien eligió tu carta también, si te zambulliste en ese nivel.`,
+tu_avd5:`¿Sin ganas? 🫧 un nivel más suave, 🛟 un comodín por partida, o pasar (−1). Nadie está obligado a nada.`,
+tu_avd6:`A dos: sin voto, hay confianza.`,
+lg_avdD:`{a} se zambulló hasta el nivel 🌊🌊🌊`,lg_avdR:`{a} supo leer los límites de cada cual en Verdad o Reto bajo el agua`,
+n_bal:`El Baile de máscaras`,d_bal:`Respuestas atrevidas y anónimas: ¿quién se esconde tras la máscara?`,
+r_bal:`Una pregunta atrevida para todo el mundo. Cada cual responde en secreto, en pocas palabras. Las respuestas llegan enmascaradas y mezcladas: adivina quién escribió qué (+1 por acierto). Cada persona que falla con la tuya te da +1. 🎭 ¿Sin ganas de responder? Quédate con la máscara: adivinas igual.`,
+r_bal2:`A dos: cada cual escribe una respuesta verdadera y una inventada. Adivina la verdadera de la otra persona: +2 si aciertas, si no +2 para ella. 🎭 ¿Sin ganas? Quédate con la máscara esta ronda.`,
+blQ:`La pregunta del baile`,blPh:`Tu respuesta, en pocas palabras…`,blPhT:`Tu respuesta verdadera…`,blPhF:`Una respuesta inventada y creíble…`,blTrue:`Verdadera`,blFake:`Inventada`,
+blPs:`Quedarme con la máscara`,blPsD:`Sin respuesta esta ronda: adivinas igual, sin puntos por tu respuesta.`,blPsd:`Máscara puesta esta ronda: no hace falta justificarse.`,
+blSent:`Respuesta enviada, bien enmascarada.`,blMin:`Escribe unas palabras (o quédate con la máscara).`,blMin2:`Escribe las dos respuestas (o quédate con la máscara).`,
+blGuess:`¿Quién escribió qué? Toca un nombre bajo cada respuesta.`,blWatch:`Los demás adivinan…`,blMine:`tu respuesta`,blDoneG:`Elecciones enviadas. Esperando a los demás…`,
+blWhichT:`¿Cuál es la respuesta verdadera de {n}?`,blNo2:`Nada que adivinar esta vez.`,blSkip:`Demasiadas máscaras puestas: nada que adivinar esta vez.`,
+blOf:`Las respuestas de {n}`,blOk2:`¡{n} encontró la verdadera!`,blFool:`¡Buen farol de {n}!`,blLgF:`aciertos`,blLgM:`puntos de máscara`,
+tu_bal1:`Una pregunta atrevida para todo el mundo. Cada cual responde en secreto, en pocas palabras.`,
+tu_bal2:`Las respuestas llegan enmascaradas y mezcladas.`,
+tu_bal3:`Adivina quién escribió qué: +1 por acierto.`,
+tu_bal4:`Cada persona que falla con tu respuesta te da +1: que no se te caiga la máscara.`,
+tu_bal5:`¿Sin ganas de responder? 🎭 Quédate con la máscara: adivinas igual, sin puntos por tu respuesta.`,
+tu_bal6:`A dos: una respuesta verdadera, una inventada. Encuentra la verdadera: +2; si no, +2 para la otra persona.`,
+lg_balM:`{a} no se quitó la máscara en toda la noche en el Baile de máscaras`,lg_balF:`{a} desenmascaró a casi todo el mundo en el Baile de máscaras`,
+n_apn:`Yo nunca… en apnea`,d_apn:`¿Ya lo hiciste o nunca? Apuesta por el grupo sin revelar quién`,
+r_apn:`Una frase «Yo nunca…». En secreto: 🙋🏻 ya lo hice o 🙅🏻 nunca. Y apuesta: entre los demás, ¿cuántos lo han hecho? Apuesta exacta: +3 m de apnea; por uno: +1 m. Por defecto solo se revela el número, nunca los nombres. 🤐 Comodín ilimitado: tu respuesta no cuenta, ni tu apuesta esta ronda.`,
+r_apn2:`A dos: una frase «Yo nunca…». En secreto: 🙋🏻 ya lo hice o 🙅🏻 nunca, y adivina la respuesta de la otra persona: +3 m de apnea si aciertas. A dos el anonimato es imposible: veréis vuestras respuestas. 🤐 Comodín ilimitado (0 esta ronda).`,
+apnNmT:`🫁 Revelación`,apnNm:`Mostrar los nombres`,apnNmD:`Por defecto solo se revela el número, nunca quién: más íntimo, más seguro.`,apnNm0:`Solo el número (anónimo)`,
+apY:`Ya lo hice`,apN:`Nunca`,apJ:`Comodín: me lo guardo`,apJx:`Anular el comodín`,apJD:`Comodín: tu respuesta no cuenta, ni tu apuesta esta ronda.`,
+apBet:`Entre los {t} demás, ¿cuántos lo han hecho?`,apBetT:`Entre los {t} demás (sin tu vínculo), ¿cuántos lo han hecho?`,apBet2:`¿Y {n}? 0 = nunca, 1 = ya lo hizo`,
+apDone:`Anotado. Aguantamos la respiración…`,apRes:`{y} de {n}: ya lo hicieron`,apMine:`tu apuesta {b} · en realidad {t}`,apDepth:`Tu apnea: {v} m`,
+apAnonD:`Anónimo: solo el número. Tus puntos solo los ves tú hasta el final.`,apLgE:`apuestas exactas`,apLgM:`metros de apnea`,
+tu_apn1:`Una frase «Yo nunca…». Cada cual responde en secreto: 🙋🏻 ya lo hice, o 🙅🏻 nunca.`,
+tu_apn2:`Y cada cual apuesta: entre los demás, ¿cuántos lo han hecho?`,
+tu_apn3:`Revelación: solo el número, no los nombres (salvo si el anfitrión decide mostrarlos).`,
+tu_apn4:`Apuesta exacta: +3 m de apnea. Por uno: +1 m.`,
+tu_apn5:`🤐 Comodín ilimitado: tu respuesta no cuenta, ni tu apuesta esta ronda.`,
+tu_apn6:`A dos: adivina si la otra persona lo ha hecho. A dos el anonimato es imposible.`,
+lg_apnE:`{a} leyó al grupo como nadie en Yo nunca… en apnea`});
+GAD('it',{gcat_a:`18+ · Tra adulti`,a18:`18+: scegli il tono piccante o trash`,xRdy:`Pronto`,
+n_avd:`Obbligo o Verità sott'acqua`,d_avd:`Scegliere in segreto una sfida per qualcuno, più o meno profonda`,
+r_avd:`A ogni turno, in segreto, scegli per qualcuno una verità 💬 o un obbligo 🎬, più o meno profondo 🌊 (i livelli si aprono man mano). Ognuno scopre la sua carta e si tuffa: a voce, in videochiamata o per iscritto. Gli altri votano «superato». Superato: +🌊 a chi si tuffa, e altrettanto a chi ha scelto la carta se giocata a quel livello. Non te la senti? 🫧 un livello più dolce, 🛟 un jolly a partita, o passa (−1).`,
+r_avd2:`In due: a ogni turno scegli in segreto per l'altra persona una verità 💬 o un obbligo 🎬, più o meno profondo 🌊 (i livelli si aprono man mano). Poi ci si tuffa: a voce, in videochiamata o per iscritto. Tuffo: +🌊, e altrettanto a chi l'ha scelta se giocata a quel livello. Niente voto: ci si fida. Non te la senti? 🫧 più dolce, 🛟 un jolly a partita, o passa (−1).`,
+avV:`Verità`,avA:`Obbligo`,avWc:`Gli altri scelgono una carta…`,avFor:`Una carta per {n}`,
+avForD:`Superata al livello scelto, vale uguale per entrambi. Troppo a fondo, e l'altra persona risale…`,
+avDone:`Carta scelta per {n}. Resta segreta fino alla rivelazione.`,avDoneF:`Fatto. Aspettiamo gli altri tuffi…`,avYour:`La tua carta`,
+avOd:`Tuffarsi`,avOs:`Più dolce`,avOj:`Jolly`,avOp:`Passo`,avOx:`Nessuna risposta`,
+avOdd:`Falla a voce, in videochiamata o per iscritto, poi «Fatto».`,avOds:`Stesso tipo di carta, un livello più dolce: eccola.`,
+avOdj:`🛟 Risalire in superficie: 0 punti, nessun costo. Uno solo a partita.`,avOdp:`Passare: −1, senza dover spiegare niente.`,avO0:`Scegli come tuffarti.`,
+avTxP:`Rispondi a voce… o scrivi qui (facoltativo)`,avDid:`Fatto`,avWv:`Gli altri giudicano i tuffi…`,avDoneV:`Voti inviati. Aspettiamo gli altri…`,
+avVq:`Superato?`,avY:`Superato`,avN:`Non superato`,avBy:`carta scelta da {n}`,avLgD:`profondità superata`,avLgR:`punti dalle carte scelte`,avLgJ:`jolly usato`,
+tu_avd1:`A ogni turno, ognuno sceglie in segreto una carta per qualcun altro: verità 💬 o obbligo 🎬.`,
+tu_avd2:`I livelli 🌊 si aprono man mano. Più è profondo, più vale.`,
+tu_avd3:`Scopri la tua carta e ti tuffi: a voce, in videochiamata o per iscritto. Tutto si fa a distanza.`,
+tu_avd4:`Gli altri votano: superato ✓ o no. Superato: guadagni la profondità, e anche chi ha scelto la tua carta, se il tuffo è a quel livello.`,
+tu_avd5:`Non te la senti? 🫧 un livello più dolce, 🛟 un jolly a partita, o passa (−1). Nessuno è obbligato a niente.`,
+tu_avd6:`In due: niente voto, ci si fida.`,
+lg_avdD:`{a} si è spinto fino al livello 🌊🌊🌊`,lg_avdR:`{a} ha saputo leggere i limiti di tutti in Obbligo o Verità sott'acqua`,
+n_bal:`Il Ballo in maschera`,d_bal:`Risposte audaci e anonime: chi si nasconde dietro la maschera?`,
+r_bal:`Una domanda audace per tutti. Ognuno risponde in segreto, in poche parole. Le risposte arrivano mascherate e mescolate: indovina chi ha scritto cosa (+1 per risposta giusta). Ogni persona che sbaglia sulla tua ti dà +1. 🎭 Non vuoi rispondere? Tieni la maschera: indovini lo stesso.`,
+r_bal2:`In due: ognuno scrive una risposta vera e una inventata. Indovina quella vera dell'altra persona: +2 se giusto, altrimenti +2 a lei. 🎭 Non te la senti? Tieni la maschera per questo turno.`,
+blQ:`La domanda del ballo`,blPh:`La tua risposta, in poche parole…`,blPhT:`La tua risposta vera…`,blPhF:`Una risposta inventata, credibile…`,blTrue:`Vera`,blFake:`Inventata`,
+blPs:`Tengo la maschera`,blPsD:`Nessuna risposta in questo turno: indovini lo stesso, senza punti per la tua risposta.`,blPsd:`Maschera tenuta per questo turno: nessun bisogno di giustificarsi.`,
+blSent:`Risposta inviata, ben mascherata.`,blMin:`Scrivi qualche parola (o tieni la maschera).`,blMin2:`Scrivi entrambe le risposte (o tieni la maschera).`,
+blGuess:`Chi ha scritto cosa? Tocca un nome sotto ogni risposta.`,blWatch:`Gli altri indovinano…`,blMine:`la tua risposta`,blDoneG:`Ipotesi inviate. Aspettiamo gli altri…`,
+blWhichT:`Qual è la risposta vera di {n}?`,blNo2:`Niente da indovinare stavolta.`,blSkip:`Troppe maschere tenute: niente da indovinare stavolta.`,
+blOf:`Le risposte di {n}`,blOk2:`{n} ha trovato quella vera!`,blFool:`Bel bluff di {n}!`,blLgF:`ipotesi giuste`,blLgM:`punti maschera`,
+tu_bal1:`Una domanda audace per tutti. Ognuno risponde in segreto, in poche parole.`,
+tu_bal2:`Le risposte arrivano mascherate e mescolate.`,
+tu_bal3:`Indovina chi ha scritto cosa: +1 per risposta giusta.`,
+tu_bal4:`Ogni persona che sbaglia sulla tua risposta ti dà +1: tieni ben stretta la maschera.`,
+tu_bal5:`Non vuoi rispondere? 🎭 Tieni la maschera: indovini lo stesso, senza punti per la tua risposta.`,
+tu_bal6:`In due: una risposta vera, una inventata. Trova quella vera: +2, altrimenti +2 all'altra persona.`,
+lg_balM:`{a} ha tenuto la maschera tutta la sera al Ballo in maschera`,lg_balF:`{a} ha smascherato quasi tutti al Ballo in maschera`,
+n_apn:`Non ho mai… in apnea`,d_apn:`Già fatto o mai? Scommetti sul gruppo senza svelare chi`,
+r_apn:`Una frase «Non ho mai…». In segreto: 🙋🏻 già fatto o 🙅🏻 mai. E scommetti: tra gli altri, quanti l'hanno già fatto? Scommessa esatta: +3 m di apnea; per uno: +1 m. Di base si rivela solo il numero, mai i nomi. 🤐 Jolly illimitato: la tua risposta non conta, e nemmeno la scommessa in questo turno.`,
+r_apn2:`In due: una frase «Non ho mai…». In segreto: 🙋🏻 già fatto o 🙅🏻 mai, e indovina la risposta dell'altra persona: +3 m di apnea se giusto. In due l'anonimato è impossibile: vedrete le vostre risposte. 🤐 Jolly illimitato (0 in questo turno).`,
+apnNmT:`🫁 Rivelazione`,apnNm:`Mostra i nomi`,apnNmD:`Di base si rivela solo il numero, mai chi: più intimo, più sicuro.`,apnNm0:`Solo il numero (anonimo)`,
+apY:`Già fatto`,apN:`Mai`,apJ:`Jolly: lo tengo per me`,apJx:`Annulla il jolly`,apJD:`Jolly: la tua risposta non conta, e nemmeno la scommessa in questo turno.`,
+apBet:`Tra gli altri {t}, quanti l'hanno già fatto?`,apBetT:`Tra gli altri {t} (senza il tuo legame), quanti l'hanno già fatto?`,apBet2:`E {n}? 0 = mai, 1 = già fatto`,
+apDone:`Fatto. Tratteniamo il fiato…`,apRes:`{y} su {n}: già fatto`,apMine:`la tua scommessa {b} · in realtà {t}`,apDepth:`La tua apnea: {v} m`,
+apAnonD:`Anonimo: solo il numero. I tuoi punti li vedi solo tu fino alla fine.`,apLgE:`scommesse esatte`,apLgM:`metri di apnea`,
+tu_apn1:`Una frase «Non ho mai…». Ognuno risponde in segreto: 🙋🏻 già fatto, o 🙅🏻 mai.`,
+tu_apn2:`E ognuno scommette: tra gli altri, quanti l'hanno già fatto?`,
+tu_apn3:`Rivelazione: solo il numero, non i nomi (a meno che l'host scelga di mostrarli).`,
+tu_apn4:`Scommessa esatta: +3 m di apnea. Per uno: +1 m.`,
+tu_apn5:`🤐 Jolly illimitato: la tua risposta non conta, e nemmeno la scommessa in questo turno.`,
+tu_apn6:`In due: indovina se l'altra persona l'ha già fatto. In due l'anonimato è impossibile.`,
+lg_apnE:`{a} ha letto il gruppo come nessuno in Non ho mai… in apnea`});
+GAD('de',{gcat_a:`18+ · Unter Erwachsenen`,a18:`18+: Ton frech oder Trash wählen`,xRdy:`Bereit`,
+n_avd:`Wahrheit oder Pflicht unter Wasser`,d_avd:`Heimlich eine Aufgabe für jemanden wählen, mal flach, mal tief`,
+r_avd:`Jede Runde wählst du heimlich für jemanden eine Wahrheit 💬 oder eine Pflicht 🎬, flach oder tief 🌊 (tiefere Stufen öffnen sich nach und nach). Alle sehen ihre Karte und tauchen ab: laut, per Video oder schriftlich. Die anderen stimmen ab: „geschafft“. Geschafft: +🌊 für die Person, die taucht, und genauso viel für die, die die Karte gewählt hat, wenn auf dieser Stufe gespielt. Keine Lust? 🫧 eine sanftere Stufe, 🛟 ein Joker pro Spiel oder passen (−1).`,
+r_avd2:`Zu zweit: Jede Runde wählst du heimlich für die andere Person eine Wahrheit 💬 oder eine Pflicht 🎬, flach oder tief 🌊 (tiefere Stufen öffnen sich nach und nach). Dann taucht ihr ab: laut, per Video oder schriftlich. Tauchgang: +🌊, und genauso viel für die, die gewählt hat, wenn auf dieser Stufe gespielt. Keine Abstimmung: ihr vertraut euch. Keine Lust? 🫧 sanfter, 🛟 ein Joker pro Spiel oder passen (−1).`,
+avV:`Wahrheit`,avA:`Pflicht`,avWc:`Die anderen wählen eine Karte…`,avFor:`Eine Karte für {n}`,
+avForD:`Auf der gewählten Stufe geschafft, bringt sie euch beiden gleich viel. Zu tief, und die andere Person taucht auf…`,
+avDone:`Karte für {n} gewählt. Sie bleibt bis zur Auflösung geheim.`,avDoneF:`Notiert. Warten auf die anderen Tauchgänge…`,avYour:`Deine Karte`,
+avOd:`Abtauchen`,avOs:`Sanfter`,avOj:`Joker`,avOp:`Passen`,avOx:`Keine Antwort`,
+avOdd:`Mach es laut, per Video oder schriftlich, dann „Geschafft“.`,avOds:`Gleiche Kartenart, eine Stufe sanfter: Hier ist sie.`,
+avOdj:`🛟 Auftauchen: 0 Punkte, ganz ohne Kosten. Nur einmal pro Spiel.`,avOdp:`Passen: −1, ohne Begründung.`,avO0:`Wähle, wie du abtauchst.`,
+avTxP:`Antworte laut… oder schreib hier (freiwillig)`,avDid:`Geschafft`,avWv:`Die anderen bewerten die Tauchgänge…`,avDoneV:`Stimmen gesendet. Warten auf die anderen…`,
+avVq:`Geschafft?`,avY:`Geschafft`,avN:`Nicht geschafft`,avBy:`Karte gewählt von {n}`,avLgD:`erreichte Tiefe`,avLgR:`Punkte für gewählte Karten`,avLgJ:`Joker genutzt`,
+tu_avd1:`Jede Runde wählen alle heimlich eine Karte für jemand anderen: Wahrheit 💬 oder Pflicht 🎬.`,
+tu_avd2:`Die Stufen 🌊 öffnen sich nach und nach. Je tiefer, desto mehr Punkte.`,
+tu_avd3:`Du siehst deine Karte und tauchst ab: laut, per Video oder schriftlich. Alles klappt aus der Ferne.`,
+tu_avd4:`Die anderen stimmen ab: geschafft ✓ oder nicht. Geschafft: Du bekommst die Tiefe, und wer deine Karte gewählt hat auch – wenn du auf dieser Stufe getaucht bist.`,
+tu_avd5:`Keine Lust? 🫧 eine sanftere Stufe, 🛟 ein Joker pro Spiel oder passen (−1). Niemand muss irgendetwas.`,
+tu_avd6:`Zu zweit: keine Abstimmung, ihr vertraut euch.`,
+lg_avdD:`{a} ist bis Stufe 🌊🌊🌊 abgetaucht`,lg_avdR:`{a} hat bei Wahrheit oder Pflicht unter Wasser alle Grenzen genau erkannt`,
+n_bal:`Der Maskenball`,d_bal:`Gewagte, anonyme Antworten: Wer steckt hinter der Maske?`,
+r_bal:`Eine gewagte Frage für alle. Alle antworten heimlich, in wenigen Worten. Die Antworten kommen maskiert und gemischt: Errate, wer was geschrieben hat (+1 pro Treffer). Jede Person, die bei deiner danebenliegt, bringt dir +1. 🎭 Keine Lust zu antworten? Behalte deine Maske auf: Raten darfst du trotzdem.`,
+r_bal2:`Zu zweit: Beide schreiben eine wahre und eine erfundene Antwort. Errate die wahre der anderen Person: +2 bei Treffer, sonst +2 für sie. 🎭 Keine Lust? Behalte die Maske diese Runde auf.`,
+blQ:`Die Frage des Abends`,blPh:`Deine Antwort, in wenigen Worten…`,blPhT:`Deine wahre Antwort…`,blPhF:`Eine glaubwürdige erfundene Antwort…`,blTrue:`Wahr`,blFake:`Erfunden`,
+blPs:`Maske aufbehalten`,blPsD:`Diese Runde keine Antwort: Du rätst trotzdem mit, nur ohne Punkte für deine Antwort.`,blPsd:`Maske bleibt diese Runde auf: Du musst nichts erklären.`,
+blSent:`Antwort gesendet, gut maskiert.`,blMin:`Schreib ein paar Worte (oder behalte die Maske auf).`,blMin2:`Schreib beide Antworten (oder behalte die Maske auf).`,
+blGuess:`Wer hat was geschrieben? Tippe unter jeder Antwort einen Namen an.`,blWatch:`Die anderen raten…`,blMine:`deine Antwort`,blDoneG:`Tipps gesendet. Warten auf die anderen…`,
+blWhichT:`Welche ist die wahre Antwort von {n}?`,blNo2:`Diesmal gibt es nichts zu raten.`,blSkip:`Zu viele Masken auf: Diesmal gibt es nichts zu raten.`,
+blOf:`Die Antworten von {n}`,blOk2:`{n} hat die wahre gefunden!`,blFool:`{n} hat gut geblufft!`,blLgF:`Treffer`,blLgM:`Maskenpunkte`,
+tu_bal1:`Eine gewagte Frage für alle. Alle antworten heimlich, in wenigen Worten.`,
+tu_bal2:`Die Antworten kommen maskiert und gemischt an.`,
+tu_bal3:`Errate, wer was geschrieben hat: +1 pro Treffer.`,
+tu_bal4:`Jede Person, die bei deiner Antwort danebenliegt, bringt dir +1: Behalte die Maske gut auf.`,
+tu_bal5:`Keine Lust zu antworten? 🎭 Behalte die Maske auf: Du rätst trotzdem, nur ohne Punkte für deine Antwort.`,
+tu_bal6:`Zu zweit: eine wahre Antwort, eine erfundene. Finde die wahre: +2, sonst +2 für die andere Person.`,
+lg_balM:`{a} hat beim Maskenball den ganzen Abend die Maske aufbehalten`,lg_balF:`{a} hat beim Maskenball fast alle entlarvt`,
+n_apn:`Ich hab noch nie… Luft anhalten`,d_apn:`Schon gemacht oder nie? Auf die Gruppe wetten, ohne zu verraten, wer`,
+r_apn:`Ein Satz „Ich hab noch nie…“. Heimlich: 🙋🏻 schon gemacht oder 🙅🏻 nie. Dann wetten: Wie viele der anderen haben es schon gemacht? Genau getroffen: +3 m Tauchtiefe; um eins daneben: +1 m. Standardmäßig wird nur die Zahl verraten, nie die Namen. 🤐 Joker unbegrenzt: Deine Antwort zählt nicht, deine Wette diese Runde auch nicht.`,
+r_apn2:`Zu zweit: ein Satz „Ich hab noch nie…“. Heimlich: 🙋🏻 schon gemacht oder 🙅🏻 nie, und errate die Antwort der anderen Person: +3 m Tauchtiefe bei Treffer. Zu zweit ist Anonymität unmöglich: Ihr seht eure Antworten. 🤐 Joker unbegrenzt (0 diese Runde).`,
+apnNmT:`🫁 Auflösung`,apnNm:`Namen zeigen`,apnNmD:`Standardmäßig wird nur die Zahl verraten, nie wer: intimer, sicherer.`,apnNm0:`Nur die Zahl (anonym)`,
+apY:`Schon gemacht`,apN:`Nie`,apJ:`Joker: Das behalte ich für mich`,apJx:`Joker zurücknehmen`,apJD:`Joker: Deine Antwort zählt nicht, deine Wette diese Runde auch nicht.`,
+apBet:`Wie viele der {t} anderen haben es schon gemacht?`,apBetT:`Wie viele der {t} anderen (ohne deine Verbindung) haben es schon gemacht?`,apBet2:`Und {n}? 0 = nie, 1 = schon gemacht`,
+apDone:`Notiert. Luft anhalten…`,apRes:`{y} von {n}: schon gemacht`,apMine:`deine Wette {b} · tatsächlich {t}`,apDepth:`Deine Tauchtiefe: {v} m`,
+apAnonD:`Anonym: nur die Zahl. Deine Punkte siehst nur du, bis zum Schluss.`,apLgE:`genaue Wetten`,apLgM:`Meter Tauchtiefe`,
+tu_apn1:`Ein Satz „Ich hab noch nie…“. Alle antworten heimlich: 🙋🏻 schon gemacht oder 🙅🏻 nie.`,
+tu_apn2:`Und alle wetten: Wie viele der anderen haben es schon gemacht?`,
+tu_apn3:`Auflösung: nur die Zahl, nicht die Namen (außer der Host will sie zeigen).`,
+tu_apn4:`Genau getroffen: +3 m Tauchtiefe. Um eins daneben: +1 m.`,
+tu_apn5:`🤐 Joker unbegrenzt: Deine Antwort zählt nicht, deine Wette diese Runde auch nicht.`,
+tu_apn6:`Zu zweit: Errate, ob die andere Person es schon gemacht hat. Zu zweit ist Anonymität unmöglich.`,
+lg_apnE:`{a} hat die Gruppe bei Ich hab noch nie… Luft anhalten gelesen wie niemand sonst`});
+GAD('ru',{gcat_a:`18+ · Для взрослых`,a18:`18+: выберите тон «пикантный» или «треш»`,xRdy:`Готово`,
+n_avd:`Правда или действие под водой`,d_avd:`Тайно выбрать испытание для другого игрока — мельче или глубже`,
+r_avd:`Каждый раунд ты тайно выбираешь для кого-то правду 💬 или действие 🎬, мельче или глубже 🌊 (уровни открываются по ходу игры). Каждый видит свою карту и ныряет: вслух, по видео или письменно. Остальные голосуют: «засчитано». Засчитано: +🌊 нырнувшему и столько же тому, кто выбрал карту, если она сыграна на этом уровне. Не хочется? 🫧 уровень помягче, 🛟 один джокер за игру или пас (−1).`,
+r_avd2:`Вдвоём: каждый раунд ты тайно выбираешь для другого правду 💬 или действие 🎬, мельче или глубже 🌊 (уровни открываются по ходу игры). Потом оба ныряют: вслух, по видео или письменно. Нырок: +🌊 и столько же тому, кто выбрал, если сыграно на этом уровне. Без голосования: вы доверяете друг другу. Не хочется? 🫧 помягче, 🛟 один джокер за игру или пас (−1).`,
+avV:`Правда`,avA:`Действие`,avWc:`Остальные выбирают карту…`,avFor:`Карта для {n}`,
+avForD:`Если её сыграют на выбранном уровне, вы оба получите поровну. Слишком глубоко — и человек всплывёт…`,
+avDone:`Карта для {n} выбрана. Она останется тайной до раскрытия.`,avDoneF:`Принято. Ждём остальных…`,avYour:`Твоя карта`,
+avOd:`Нырнуть`,avOs:`Помягче`,avOj:`Джокер`,avOp:`Пас`,avOx:`Нет ответа`,
+avOdd:`Выполни вслух, по видео или письменно, затем нажми «Сделано».`,avOds:`Та же карта по типу, на уровень мягче: вот она.`,
+avOdj:`🛟 Всплыть на поверхность: 0 очков, без потерь. Только один раз за игру.`,avOdp:`Пас: −1, объяснять ничего не нужно.`,avO0:`Выбери, как нырнёшь.`,
+avTxP:`Ответь вслух… или напиши здесь (необязательно)`,avDid:`Сделано`,avWv:`Остальные оценивают нырки…`,avDoneV:`Голоса отправлены. Ждём остальных…`,
+avVq:`Засчитано?`,avY:`Засчитано`,avN:`Не засчитано`,avBy:`карту выбрал(а) {n}`,avLgD:`засчитанная глубина`,avLgR:`очки за выбранные карты`,avLgJ:`джокер использован`,
+tu_avd1:`Каждый раунд все тайно выбирают карту для кого-то другого: правду 💬 или действие 🎬.`,
+tu_avd2:`Уровни 🌊 открываются по ходу игры. Чем глубже, тем больше очков.`,
+tu_avd3:`Ты видишь свою карту и ныряешь: вслух, по видео или письменно. Всё можно делать на расстоянии.`,
+tu_avd4:`Остальные голосуют: засчитано ✓ или нет. Засчитано — ты получаешь глубину, и тот, кто выбрал карту, тоже, если ты нырнул(а) на этом уровне.`,
+tu_avd5:`Не хочется? 🫧 уровень помягче, 🛟 один джокер за игру или пас (−1). Никто ничего не обязан.`,
+tu_avd6:`Вдвоём: без голосования, вы доверяете друг другу.`,
+lg_avdD:`{a}: нырок до уровня 🌊🌊🌊`,lg_avdR:`{a} точно угадывает чужие границы в «Правде или действии под водой»`,
+n_bal:`Бал-маскарад`,d_bal:`Смелые анонимные ответы: кто скрывается под маской?`,
+r_bal:`Один смелый вопрос для всех. Каждый тайно отвечает парой слов. Ответы приходят под масками и вперемешку: угадай, кто что написал (+1 за каждое попадание). Каждый, кто ошибся насчёт твоего ответа, приносит тебе +1. 🎭 Не хочется отвечать? Оставь маску: угадывать всё равно можно.`,
+r_bal2:`Вдвоём: каждый пишет один правдивый ответ и один выдуманный. Угадай правдивый ответ другого: +2 за попадание, иначе +2 ему. 🎭 Не хочется? Оставь маску в этом раунде.`,
+blQ:`Вопрос бала`,blPh:`Твой ответ, в паре слов…`,blPhT:`Твой правдивый ответ…`,blPhF:`Правдоподобный выдуманный ответ…`,blTrue:`Правда`,blFake:`Выдумка`,
+blPs:`Оставить маску`,blPsD:`В этом раунде без ответа: угадываешь всё равно, просто без очков за свой ответ.`,blPsd:`Маска остаётся в этом раунде: объяснять ничего не нужно.`,
+blSent:`Ответ отправлен под надёжной маской.`,blMin:`Напиши пару слов (или оставь маску).`,blMin2:`Напиши оба ответа (или оставь маску).`,
+blGuess:`Кто что написал? Нажми на имя под каждым ответом.`,blWatch:`Остальные угадывают…`,blMine:`твой ответ`,blDoneG:`Догадки отправлены. Ждём остальных…`,
+blWhichT:`Какой ответ {n} правдивый?`,blNo2:`В этот раз угадывать нечего.`,blSkip:`Слишком много масок: в этот раз угадывать нечего.`,
+blOf:`Ответы: {n}`,blOk2:`{n}: правда найдена!`,blFool:`{n}: отличный блеф!`,blLgF:`верные догадки`,blLgM:`очки маски`,
+tu_bal1:`Один смелый вопрос для всех. Каждый тайно отвечает парой слов.`,
+tu_bal2:`Ответы приходят под масками и вперемешку.`,
+tu_bal3:`Угадай, кто что написал: +1 за каждое попадание.`,
+tu_bal4:`Каждый, кто ошибся насчёт твоего ответа, приносит тебе +1: держи маску крепче.`,
+tu_bal5:`Не хочется отвечать? 🎭 Оставь маску: угадываешь всё равно, просто без очков за свой ответ.`,
+tu_bal6:`Вдвоём: один ответ правдивый, другой выдуманный. Найди правдивый: +2, иначе +2 другому.`,
+lg_balM:`{a} весь вечер не снимает маску на Бале-маскараде`,lg_balF:`{a} разоблачает почти всех на Бале-маскараде`,
+n_apn:`Я никогда не… на задержке дыхания`,d_apn:`Уже было или никогда? Ставка на группу — без имён`,
+r_apn:`Фраза «Я никогда не…». Тайно: 🙋🏻 уже было или 🙅🏻 никогда. И ставка: сколько из остальных это делали? Точная ставка: +3 м задержки дыхания; ошибка на один: +1 м. По умолчанию раскрывается только число, никогда — имена. 🤐 Джокер без ограничений: твой ответ не считается, и ставка в этом раунде тоже.`,
+r_apn2:`Вдвоём: фраза «Я никогда не…». Тайно: 🙋🏻 уже было или 🙅🏻 никогда, и угадай ответ другого: +3 м задержки дыхания за попадание. Вдвоём анонимность невозможна: вы увидите ответы друг друга. 🤐 Джокер без ограничений (0 в этом раунде).`,
+apnNmT:`🫁 Раскрытие`,apnNm:`Показывать имена`,apnNmD:`По умолчанию раскрывается только число, никогда — кто: так интимнее и безопаснее.`,apnNm0:`Только число (анонимно)`,
+apY:`Уже было`,apN:`Никогда`,apJ:`Джокер: оставлю это при себе`,apJx:`Отменить джокер`,apJD:`Джокер: твой ответ не считается, и ставка в этом раунде тоже.`,
+apBet:`Сколько из {t} остальных это делали?`,apBetT:`Сколько из {t} остальных (не считая твою связь) это делали?`,apBet2:`А {n}? 0 = никогда, 1 = уже было`,
+apDone:`Принято. Задерживаем дыхание…`,apRes:`{y} из {n}: уже было`,apMine:`твоя ставка {b} · на самом деле {t}`,apDepth:`Твоя задержка дыхания: {v} м`,
+apAnonD:`Анонимно: только число. Твои очки видишь только ты — до самого конца.`,apLgE:`точные ставки`,apLgM:`метры задержки дыхания`,
+tu_apn1:`Фраза «Я никогда не…». Каждый тайно отвечает: 🙋🏻 уже было или 🙅🏻 никогда.`,
+tu_apn2:`И каждый делает ставку: сколько из остальных это делали?`,
+tu_apn3:`Раскрытие: только число, без имён (если хост не решит их показать).`,
+tu_apn4:`Точная ставка: +3 м задержки дыхания. Ошибка на один: +1 м.`,
+tu_apn5:`🤐 Джокер без ограничений: твой ответ не считается, и ставка в этом раунде тоже.`,
+tu_apn6:`Вдвоём: угадай, было ли это у другого. Вдвоём анонимность невозможна.`,
+lg_apnE:`{a} читает группу как никто в «Я никогда не… на задержке дыхания»`});
+GAD('zh',{gcat_a:`18+ · 成年人专区`,a18:`18+：请选择暧昧或重口风格`,xRdy:`准备好了`,
+n_avd:`水下真心话大冒险`,d_avd:`偷偷为别人挑一个挑战，可浅可深`,
+r_avd:`每一轮，你偷偷为某人挑一张真心话 💬 或大冒险 🎬，可浅可深 🌊（深度随轮次逐步开放）。每个人翻开自己的卡就下潜：大声说、视频做或者打字。其他人投票“完成”。完成：下潜的人 +🌊，如果按选定深度完成，选卡的人也得同样分数。不想做？🫧 换浅一级，🛟 每局一次免死金牌，或者跳过（−1）。`,
+r_avd2:`两人局：每一轮，你偷偷为对方挑一张真心话 💬 或大冒险 🎬，可浅可深 🌊（深度随轮次逐步开放）。然后两人下潜：大声说、视频做或者打字。下潜 +🌊，按选定深度完成的话选卡的人也得同样分数。不投票：彼此信任。不想做？🫧 浅一级，🛟 每局一次免死金牌，或者跳过（−1）。`,
+avV:`真心话`,avA:`大冒险`,avWc:`其他人正在挑卡…`,avFor:`给 {n} 的一张卡`,
+avForD:`按你选的深度完成，你们俩得分一样多。太深的话，对方会浮上水面…`,
+avDone:`已为 {n} 选好卡，揭晓前保密。`,avDoneF:`收到。等其他人下潜…`,avYour:`你的卡`,
+avOd:`下潜`,avOs:`浅一点`,avOj:`免死金牌`,avOp:`跳过`,avOx:`没有回应`,
+avOdd:`大声说、视频做或者打字完成，然后点“完成了”。`,avOds:`同类型、浅一级的卡：就是这张。`,
+avOdj:`🛟 浮上水面：0 分，没有任何代价。每局只有一次。`,avOdp:`跳过：−1，不用解释。`,avO0:`选择你的下潜方式。`,
+avTxP:`大声回答…或在这里写（可选）`,avDid:`完成了`,avWv:`其他人正在评判下潜…`,avDoneV:`已投票，等其他人…`,
+avVq:`完成了吗？`,avY:`完成`,avN:`没完成`,avBy:`选卡的人：{n}`,avLgD:`完成的深度`,avLgR:`选卡得分`,avLgJ:`已用免死金牌`,
+tu_avd1:`每一轮，每个人偷偷为另一个人挑一张卡：真心话 💬 或大冒险 🎬。`,
+tu_avd2:`深度 🌊 随轮次开放。越深，得分越高。`,
+tu_avd3:`翻开你的卡就下潜：大声说、视频做或者打字。全程都能远程玩。`,
+tu_avd4:`其他人投票：完成 ✓ 或没完成。完成：你得到深度分；如果你按选定深度下潜，选卡的人也得分。`,
+tu_avd5:`不想做？🫧 浅一级，🛟 每局一次免死金牌，或者跳过（−1）。没有人必须做任何事。`,
+tu_avd6:`两人局：不投票，彼此信任。`,
+lg_avdD:`{a} 一路潜到了 🌊🌊🌊`,lg_avdR:`{a} 在水下真心话大冒险里把每个人的底线拿捏得刚刚好`,
+n_bal:`假面舞会`,d_bal:`大胆又匿名的回答：面具后面是谁？`,
+r_bal:`所有人回答同一个大胆的问题，每人偷偷写几个字。答案戴着面具、打乱出现：猜猜谁写了什么（猜对一个 +1）。每有一个人猜错你的答案，你 +1。🎭 不想回答？戴好面具：照样可以猜。`,
+r_bal2:`两人局：每人写一个真实答案和一个编的答案。猜出对方的真答案：猜对 +2，猜错对方 +2。🎭 不想回答？这一轮戴好面具。`,
+blQ:`舞会问题`,blPh:`你的答案，几个字就行…`,blPhT:`你的真实答案…`,blPhF:`一个编得像真的答案…`,blTrue:`真的`,blFake:`编的`,
+blPs:`戴好面具`,blPsD:`这一轮不回答：照样可以猜，只是你的答案不得分。`,blPsd:`这一轮戴着面具：不用解释。`,
+blSent:`答案已送出，面具戴得很好。`,blMin:`写几个字（或者戴好面具）。`,blMin2:`两个答案都要写（或者戴好面具）。`,
+blGuess:`谁写了什么？在每个答案下面点一个名字。`,blWatch:`其他人正在猜…`,blMine:`你的答案`,blDoneG:`已提交猜测，等其他人…`,
+blWhichT:`哪一个是 {n} 的真答案？`,blNo2:`这次没有可猜的。`,blSkip:`戴面具的人太多：这次没有可猜的。`,
+blOf:`{n} 的答案`,blOk2:`{n} 找到了真答案！`,blFool:`{n} 骗得漂亮！`,blLgF:`猜对次数`,blLgM:`面具分`,
+tu_bal1:`所有人回答同一个大胆的问题，每人偷偷写几个字。`,
+tu_bal2:`答案戴着面具、打乱后出现。`,
+tu_bal3:`猜猜谁写了什么：猜对一个 +1。`,
+tu_bal4:`每有一个人猜错你的答案，你就 +1：把面具戴牢。`,
+tu_bal5:`不想回答？🎭 戴好面具：照样可以猜，只是你的答案不得分。`,
+tu_bal6:`两人局：一个真答案，一个编的。找出真的：+2，否则对方 +2。`,
+lg_balM:`{a} 在假面舞会上整晚都没摘下面具`,lg_balF:`{a} 在假面舞会上几乎揭穿了所有人`,
+n_apn:`我从来没有…憋气版`,d_apn:`做过还是从没？押注整个群体，不透露是谁`,
+r_apn:`一句“我从来没有…”。偷偷选：🙋🏻 做过，或 🙅🏻 从没。再押注：其他人里有几个做过？押中 +3 米憋气；差一个 +1 米。默认只公布人数，从不公布名字。🤐 免死金牌随便用：你的答案不计入，本轮押注也不算。`,
+r_apn2:`两人局：一句“我从来没有…”。偷偷选：🙋🏻 做过，或 🙅🏻 从没，再猜对方的答案：猜对 +3 米憋气。两人局无法匿名：你们会看到彼此的答案。🤐 免死金牌随便用（本轮 0 分）。`,
+apnNmT:`🫁 揭晓方式`,apnNm:`显示名字`,apnNmD:`默认只公布人数，不公布是谁：更私密，更安心。`,apnNm0:`只显示人数（匿名）`,
+apY:`做过`,apN:`从没`,apJ:`免死金牌：这个我不说`,apJx:`取消免死金牌`,apJD:`免死金牌：你的答案不计入，本轮押注也不算。`,
+apBet:`其他 {t} 人里，有几个做过？`,apBetT:`其他 {t} 人里（不算和你有关系的人），有几个做过？`,apBet2:`那 {n} 呢？0 = 从没，1 = 做过`,
+apDone:`收到。大家憋住气…`,apRes:`{n} 人中 {y} 人做过`,apMine:`你押 {b} · 实际 {t}`,apDepth:`你的憋气：{v} 米`,
+apAnonD:`匿名：只显示人数。你的分数到最后之前只有你自己看得到。`,apLgE:`押中次数`,apLgM:`憋气米数`,
+tu_apn1:`一句“我从来没有…”。每个人偷偷回答：🙋🏻 做过，或 🙅🏻 从没。`,
+tu_apn2:`然后每个人押注：其他人里有几个做过？`,
+tu_apn3:`揭晓：只有人数，没有名字（除非房主选择显示）。`,
+tu_apn4:`押中：+3 米憋气。差一个：+1 米。`,
+tu_apn5:`🤐 免死金牌随便用：你的答案不计入，本轮押注也不算。`,
+tu_apn6:`两人局：猜对方有没有做过。两人局无法匿名。`,
+lg_apnE:`{a} 在“我从来没有…憋气版”里把大家看得最透`});
+GAD('he',{gcat_a:`18+ · בין מבוגרים`,a18:`18+: לבחור טון שובב או טראש`,xRdy:`מוכן`,
+n_avd:`אמת או חובה מתחת למים`,d_avd:`לבחור בסוד אתגר בשביל מישהו, רדוד או עמוק`,
+r_avd:`בכל סבב בוחרים בסוד בשביל מישהו אמת 💬 או חובה 🎬, רדודה או עמוקה 🌊 (הדרגות נפתחות לאורך המשחק). כל אחד מגלה את הקלף שלו וצולל: בקול, בווידאו או בכתב. האחרים מצביעים „בוצע“. בוצע: +🌊 למי שצולל, ואותו דבר למי שבחר את הקלף אם שוחק בדרגה שנבחרה. אין חשק? 🫧 דרגה עדינה יותר, 🛟 ג'וקר אחד למשחק, או לוותר (−1).`,
+r_avd2:`בשניים: בכל סבב בוחרים בסוד בשביל השני אמת 💬 או חובה 🎬, רדודה או עמוקה 🌊 (הדרגות נפתחות לאורך המשחק). ואז שניכם צוללים: בקול, בווידאו או בכתב. צלילה: +🌊, ואותו דבר למי שבחר אם שוחק בדרגה שנבחרה. בלי הצבעה: סומכים זה על זה. אין חשק? 🫧 עדין יותר, 🛟 ג'וקר אחד למשחק, או לוותר (−1).`,
+avV:`אמת`,avA:`חובה`,avWc:`האחרים בוחרים קלף…`,avFor:`קלף בשביל {n}`,
+avForD:`אם יבוצע בדרגה שבחרתם, שניכם מקבלים אותו דבר. עמוק מדי – והצד השני יעלה לפני המים…`,
+avDone:`נבחר קלף בשביל {n}. הוא נשאר סודי עד החשיפה.`,avDoneF:`נרשם. מחכים לשאר הצלילות…`,avYour:`הקלף שלך`,
+avOd:`לצלול`,avOs:`עדין יותר`,avOj:`ג'וקר`,avOp:`לוותר`,avOx:`אין תשובה`,
+avOdd:`לבצע בקול, בווידאו או בכתב, ואז „בוצע“.`,avOds:`אותו סוג קלף, דרגה אחת עדינה יותר: הנה הוא.`,
+avOdj:`🛟 לעלות לפני המים: 0 נקודות, בלי שום מחיר. רק פעם אחת במשחק.`,avOdp:`לוותר: −1, בלי צורך להסביר.`,avO0:`לבחור איך צוללים.`,
+avTxP:`לענות בקול… או לכתוב כאן (לא חובה)`,avDid:`בוצע`,avWv:`האחרים שופטים את הצלילות…`,avDoneV:`ההצבעות נשלחו. מחכים לאחרים…`,
+avVq:`בוצע?`,avY:`בוצע`,avN:`לא בוצע`,avBy:`הקלף נבחר על ידי {n}`,avLgD:`עומק שבוצע`,avLgR:`נקודות על קלפים שנבחרו`,avLgJ:`ג'וקר נוצל`,
+tu_avd1:`בכל סבב, כל אחד בוחר בסוד קלף בשביל מישהו אחר: אמת 💬 או חובה 🎬.`,
+tu_avd2:`הדרגות 🌊 נפתחות לאורך המשחק. ככל שעמוק יותר, שווה יותר.`,
+tu_avd3:`מגלים את הקלף וצוללים: בקול, בווידאו או בכתב. הכול עובד מרחוק.`,
+tu_avd4:`האחרים מצביעים: בוצע ✓ או לא. בוצע: מקבלים את העומק, וגם מי שבחר את הקלף – אם צללתם בדרגה שנבחרה.`,
+tu_avd5:`אין חשק? 🫧 דרגה עדינה יותר, 🛟 ג'וקר אחד למשחק, או לוותר (−1). אף אחד לא חייב שום דבר.`,
+tu_avd6:`בשניים: בלי הצבעה, סומכים זה על זה.`,
+lg_avdD:`{a}: צלילה עד דרגה 🌊🌊🌊`,lg_avdR:`{a}: קריאה מדויקת של הגבולות של כולם באמת או חובה מתחת למים`,
+n_bal:`נשף המסכות`,d_bal:`תשובות נועזות ואנונימיות: מי מסתתר מאחורי המסכה?`,
+r_bal:`שאלה נועזת אחת לכולם. כל אחד עונה בסוד, בכמה מילים. התשובות מגיעות עם מסכות ומעורבבות: לנחש מי כתב מה (+1 על כל ניחוש נכון). כל מי שטועה לגבי התשובה שלך נותן לך +1. 🎭 אין חשק לענות? להשאיר את המסכה: מנחשים בכל זאת.`,
+r_bal2:`בשניים: כל אחד כותב תשובה אמיתית אחת ותשובה מומצאת אחת. לנחש את האמיתית של השני: +2 אם צדקתם, אחרת +2 לשני. 🎭 אין חשק? להשאיר את המסכה בסבב הזה.`,
+blQ:`שאלת הנשף`,blPh:`התשובה שלך, בכמה מילים…`,blPhT:`התשובה האמיתית שלך…`,blPhF:`תשובה מומצאת ואמינה…`,blTrue:`אמיתית`,blFake:`מומצאת`,
+blPs:`להשאיר את המסכה`,blPsD:`בלי תשובה בסבב הזה: מנחשים בכל זאת, רק בלי נקודות על התשובה שלך.`,blPsd:`המסכה נשארת בסבב הזה: אין צורך להסביר.`,
+blSent:`התשובה נשלחה, מוסווית היטב.`,blMin:`לכתוב כמה מילים (או להשאיר את המסכה).`,blMin2:`לכתוב את שתי התשובות (או להשאיר את המסכה).`,
+blGuess:`מי כתב מה? להקיש על שם מתחת לכל תשובה.`,blWatch:`האחרים מנחשים…`,blMine:`התשובה שלך`,blDoneG:`הניחושים נשלחו. מחכים לאחרים…`,
+blWhichT:`איזו מהן התשובה האמיתית של {n}?`,blNo2:`אין מה לנחש הפעם.`,blSkip:`יותר מדי מסכות: אין מה לנחש הפעם.`,
+blOf:`התשובות של {n}`,blOk2:`{n}: נמצאה האמיתית!`,blFool:`{n}: בלוף מוצלח!`,blLgF:`ניחושים נכונים`,blLgM:`נקודות מסכה`,
+tu_bal1:`שאלה נועזת אחת לכולם. כל אחד עונה בסוד, בכמה מילים.`,
+tu_bal2:`התשובות מגיעות עם מסכות ומעורבבות.`,
+tu_bal3:`לנחש מי כתב מה: +1 על כל ניחוש נכון.`,
+tu_bal4:`כל מי שטועה לגבי התשובה שלך נותן לך +1: לשמור על המסכה.`,
+tu_bal5:`אין חשק לענות? 🎭 להשאיר את המסכה: מנחשים בכל זאת, בלי נקודות על התשובה שלך.`,
+tu_bal6:`בשניים: תשובה אחת אמיתית, אחת מומצאת. למצוא את האמיתית: +2, אחרת +2 לשני.`,
+lg_balM:`{a}: המסכה נשארה כל הערב בנשף המסכות`,lg_balF:`{a}: חשיפה של כמעט כולם בנשף המסכות`,
+n_apn:`אף פעם לא… בעצירת נשימה`,d_apn:`עשיתם או אף פעם? להמר על הקבוצה בלי לחשוף מי`,
+r_apn:`משפט „אף פעם לא…“. בסוד: 🙋🏻 כבר עשיתי או 🙅🏻 אף פעם. ולהמר: כמה מהאחרים כבר עשו את זה? הימור מדויק: ‎+3 מ׳ עצירת נשימה; בהפרש של אחד: ‎+1 מ׳. כברירת מחדל נחשף רק המספר, אף פעם לא השמות. 🤐 ג'וקר בלי הגבלה: התשובה שלך לא נספרת, וגם ההימור לא בסבב הזה.`,
+r_apn2:`בשניים: משפט „אף פעם לא…“. בסוד: 🙋🏻 כבר עשיתי או 🙅🏻 אף פעם, ולנחש את התשובה של השני: ‎+3 מ׳ עצירת נשימה אם צדקתם. בשניים אי אפשר להישאר אנונימיים: תראו את התשובות זה של זה. 🤐 ג'וקר בלי הגבלה (0 בסבב הזה).`,
+apnNmT:`🫁 חשיפה`,apnNm:`להציג שמות`,apnNmD:`כברירת מחדל נחשף רק המספר, אף פעם לא מי: אינטימי ובטוח יותר.`,apnNm0:`רק המספר (אנונימי)`,
+apY:`כבר עשיתי`,apN:`אף פעם`,apJ:`ג'וקר: את זה אשמור לעצמי`,apJx:`לבטל את הג'וקר`,apJD:`ג'וקר: התשובה שלך לא נספרת, וגם ההימור לא בסבב הזה.`,
+apBet:`מתוך {t} האחרים, כמה כבר עשו את זה?`,apBetT:`מתוך {t} האחרים (בלי הקשר שלך), כמה כבר עשו את זה?`,apBet2:`ו{n}? 0 = אף פעם, 1 = כבר עשה`,
+apDone:`נרשם. עוצרים את הנשימה…`,apRes:`{y} מתוך {n}: כבר עשו`,apMine:`ההימור שלך {b} · בפועל {t}`,apDepth:`עצירת הנשימה שלך: {v} מ׳`,
+apAnonD:`אנונימי: רק המספר. הנקודות שלך גלויות רק לך עד הסוף.`,apLgE:`הימורים מדויקים`,apLgM:`מטרים של עצירת נשימה`,
+tu_apn1:`משפט „אף פעם לא…“. כל אחד עונה בסוד: 🙋🏻 כבר עשיתי, או 🙅🏻 אף פעם.`,
+tu_apn2:`וכל אחד מהמר: כמה מהאחרים כבר עשו את זה?`,
+tu_apn3:`חשיפה: רק המספר, בלי שמות (אלא אם המארח בוחר להציג אותם).`,
+tu_apn4:`הימור מדויק: ‎+3 מ׳ עצירת נשימה. בהפרש של אחד: ‎+1 מ׳.`,
+tu_apn5:`🤐 ג'וקר בלי הגבלה: התשובה שלך לא נספרת, וגם ההימור לא בסבב הזה.`,
+tu_apn6:`בשניים: לנחש אם השני כבר עשה את זה. בשניים אי אפשר להישאר אנונימיים.`,
+lg_apnE:`{a}: קריאה מושלמת של הקבוצה באף פעם לא… בעצירת נשימה`});
+GAD('pt',{gcat_a:`18+ · Entre adultos`,a18:`18+: escolha o tom picante ou trash`,xRdy:`Pronto`,
+n_avd:`Verdade ou Desafio debaixo d'água`,d_avd:`Escolher em segredo um desafio para alguém, mais raso ou mais fundo`,
+r_avd:`A cada rodada, em segredo, você escolhe para alguém uma verdade 💬 ou um desafio 🎬, mais raso ou mais fundo 🌊 (os níveis se abrem ao longo das rodadas). Cada um descobre sua carta e mergulha: em voz alta, por vídeo ou por escrito. Os outros votam «cumprido». Cumprido: +🌊 para quem mergulha, e o mesmo para quem escolheu a carta se jogada nesse nível. Sem vontade? 🫧 um nível mais leve, 🛟 um curinga por partida, ou passar (−1).`,
+r_avd2:`A dois: a cada rodada você escolhe em segredo para a outra pessoa uma verdade 💬 ou um desafio 🎬, mais raso ou mais fundo 🌊 (os níveis se abrem ao longo das rodadas). Depois cada um mergulha: em voz alta, por vídeo ou por escrito. Mergulho: +🌊, e o mesmo para quem escolheu se jogado nesse nível. Sem voto: vocês confiam um no outro. Sem vontade? 🫧 mais leve, 🛟 um curinga por partida, ou passar (−1).`,
+avV:`Verdade`,avA:`Desafio`,avWc:`Os outros estão escolhendo uma carta…`,avFor:`Uma carta para {n}`,
+avForD:`Cumprida no nível escolhido, vale o mesmo para vocês dois. Fundo demais, e a pessoa volta à superfície…`,
+avDone:`Carta escolhida para {n}. Fica em segredo até a revelação.`,avDoneF:`Anotado. Esperando os outros mergulhos…`,avYour:`Sua carta`,
+avOd:`Mergulhar`,avOs:`Mais leve`,avOj:`Curinga`,avOp:`Passar`,avOx:`Sem resposta`,
+avOdd:`Cumpra em voz alta, por vídeo ou por escrito, depois «Feito».`,avOds:`Mesmo tipo de carta, um nível mais leve: aqui está.`,
+avOdj:`🛟 Voltar à superfície: 0 ponto, sem custo nenhum. Só um por partida.`,avOdp:`Passar: −1, sem precisar explicar nada.`,avO0:`Escolha como mergulhar.`,
+avTxP:`Responda em voz alta… ou escreva aqui (opcional)`,avDid:`Feito`,avWv:`Os outros estão julgando os mergulhos…`,avDoneV:`Votos enviados. Esperando os outros…`,
+avVq:`Cumprido?`,avY:`Cumprido`,avN:`Não cumprido`,avBy:`carta escolhida por {n}`,avLgD:`profundidade cumprida`,avLgR:`pontos das cartas escolhidas`,avLgJ:`curinga usado`,
+tu_avd1:`A cada rodada, cada um escolhe em segredo uma carta para outra pessoa: verdade 💬 ou desafio 🎬.`,
+tu_avd2:`Os níveis 🌊 se abrem ao longo das rodadas. Quanto mais fundo, mais pontos.`,
+tu_avd3:`Você descobre sua carta e mergulha: em voz alta, por vídeo ou por escrito. Tudo funciona à distância.`,
+tu_avd4:`Os outros votam: cumprido ✓ ou não. Cumprido: você ganha a profundidade, e quem escolheu sua carta também, se você mergulhou nesse nível.`,
+tu_avd5:`Sem vontade? 🫧 um nível mais leve, 🛟 um curinga por partida, ou passar (−1). Ninguém é obrigado a nada.`,
+tu_avd6:`A dois: sem voto, vocês confiam um no outro.`,
+lg_avdD:`{a} mergulhou até o nível 🌊🌊🌊`,lg_avdR:`{a} soube ler os limites de cada um em Verdade ou Desafio debaixo d'água`,
+n_bal:`O Baile de máscaras`,d_bal:`Respostas ousadas e anônimas: quem está por trás da máscara?`,
+r_bal:`Uma pergunta ousada para todo mundo. Cada um responde em segredo, em poucas palavras. As respostas chegam mascaradas e embaralhadas: adivinhe quem escreveu o quê (+1 por acerto). Cada pessoa que erra a sua te dá +1. 🎭 Sem vontade de responder? Fique de máscara: você adivinha mesmo assim.`,
+r_bal2:`A dois: cada um escreve uma resposta verdadeira e uma inventada. Adivinhe a verdadeira da outra pessoa: +2 se acertar, senão +2 para ela. 🎭 Sem vontade? Fique de máscara nesta rodada.`,
+blQ:`A pergunta do baile`,blPh:`Sua resposta, em poucas palavras…`,blPhT:`Sua resposta verdadeira…`,blPhF:`Uma resposta inventada e convincente…`,blTrue:`Verdadeira`,blFake:`Inventada`,
+blPs:`Ficar de máscara`,blPsD:`Sem resposta nesta rodada: você adivinha mesmo assim, só sem pontos pela sua resposta.`,blPsd:`De máscara nesta rodada: não precisa se justificar.`,
+blSent:`Resposta enviada, bem mascarada.`,blMin:`Escreva algumas palavras (ou fique de máscara).`,blMin2:`Escreva as duas respostas (ou fique de máscara).`,
+blGuess:`Quem escreveu o quê? Toque num nome embaixo de cada resposta.`,blWatch:`Os outros estão adivinhando…`,blMine:`sua resposta`,blDoneG:`Palpites enviados. Esperando os outros…`,
+blWhichT:`Qual é a resposta verdadeira de {n}?`,blNo2:`Nada para adivinhar desta vez.`,blSkip:`Máscaras demais: nada para adivinhar desta vez.`,
+blOf:`As respostas de {n}`,blOk2:`{n} achou a verdadeira!`,blFool:`Belo blefe de {n}!`,blLgF:`palpites certos`,blLgM:`pontos de máscara`,
+tu_bal1:`Uma pergunta ousada para todo mundo. Cada um responde em segredo, em poucas palavras.`,
+tu_bal2:`As respostas chegam mascaradas e embaralhadas.`,
+tu_bal3:`Adivinhe quem escreveu o quê: +1 por acerto.`,
+tu_bal4:`Cada pessoa que erra a sua resposta te dá +1: segure bem a máscara.`,
+tu_bal5:`Sem vontade de responder? 🎭 Fique de máscara: você adivinha mesmo assim, sem pontos pela sua resposta.`,
+tu_bal6:`A dois: uma resposta verdadeira, uma inventada. Ache a verdadeira: +2, senão +2 para a outra pessoa.`,
+lg_balM:`{a} ficou de máscara a noite toda no Baile de máscaras`,lg_balF:`{a} desmascarou quase todo mundo no Baile de máscaras`,
+n_apn:`Eu nunca… em apneia`,d_apn:`Já fez ou nunca? Aposte no grupo sem revelar quem`,
+r_apn:`Uma frase «Eu nunca…». Em segredo: 🙋🏻 já fiz ou 🙅🏻 nunca. E aposte: entre os outros, quantos já fizeram? Aposta exata: +3 m de apneia; por um: +1 m. Por padrão só o número é revelado, nunca os nomes. 🤐 Curinga à vontade: sua resposta não conta, nem sua aposta nesta rodada.`,
+r_apn2:`A dois: uma frase «Eu nunca…». Em segredo: 🙋🏻 já fiz ou 🙅🏻 nunca, e adivinhe a resposta da outra pessoa: +3 m de apneia se acertar. A dois o anonimato é impossível: vocês verão as respostas um do outro. 🤐 Curinga à vontade (0 nesta rodada).`,
+apnNmT:`🫁 Revelação`,apnNm:`Mostrar os nomes`,apnNmD:`Por padrão só o número é revelado, nunca quem: mais íntimo, mais seguro.`,apnNm0:`Só o número (anônimo)`,
+apY:`Já fiz`,apN:`Nunca`,apJ:`Curinga: isso eu guardo para mim`,apJx:`Cancelar o curinga`,apJD:`Curinga: sua resposta não conta, nem sua aposta nesta rodada.`,
+apBet:`Entre os {t} outros, quantos já fizeram?`,apBetT:`Entre os {t} outros (sem o seu laço), quantos já fizeram?`,apBet2:`E {n}? 0 = nunca, 1 = já fez`,
+apDone:`Anotado. Prendendo a respiração…`,apRes:`{y} de {n}: já fizeram`,apMine:`sua aposta {b} · na real {t}`,apDepth:`Sua apneia: {v} m`,
+apAnonD:`Anônimo: só o número. Seus pontos só você vê até o fim.`,apLgE:`apostas exatas`,apLgM:`metros de apneia`,
+tu_apn1:`Uma frase «Eu nunca…». Cada um responde em segredo: 🙋🏻 já fiz, ou 🙅🏻 nunca.`,
+tu_apn2:`E cada um aposta: entre os outros, quantos já fizeram?`,
+tu_apn3:`Revelação: só o número, não os nomes (a não ser que o anfitrião escolha mostrá-los).`,
+tu_apn4:`Aposta exata: +3 m de apneia. Por um: +1 m.`,
+tu_apn5:`🤐 Curinga à vontade: sua resposta não conta, nem sua aposta nesta rodada.`,
+tu_apn6:`A dois: adivinhe se a outra pessoa já fez. A dois o anonimato é impossível.`,
+lg_apnE:`{a} leu o grupo como ninguém em Eu nunca… em apneia`});
+/* /🔞 i18n */
 })();
