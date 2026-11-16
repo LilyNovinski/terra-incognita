@@ -3289,4 +3289,418 @@ tu_coq7:`A dois, cada um conhece dois preços: o blefe vira um duelo.`,
 lg_coqS:`{a} reuniu as 5 espécies de conchas`,lg_coqF:`{a} vendeu fumaça: nenhum anúncio verdadeiro em Mercadores de conchas`,lg_coqT:`{a} só disse a verdade em Mercadores de conchas`,lg_coqB:`{a} arrematou um lote gigante de conchas`},
 {coqL:`O cesto da mariscagem|Achado da maré baixa|A caixinha de tesouros da avó|Sacola esquecida no píer|Colheita do amanhecer|Presente de uma foca|O saque de um caranguejo|Vitrine do museu fechado|Os bolsos de um marinheiro|Um baldinho de praia|Coleção de um velho capitão|Pescado depois da tempestade|Pote da cabana|Tesouro de uma sereia distraída|Amostras do professor|Lembranças das férias|Caixa sem etiqueta|Rede embaraçada|A gaveta do farol|Conchas de domingo|Colar desfeito|A bolsa de uma gaivota|O estoque da concorrência|Coleta clandestina|Herança de um pirata|Fundo do porão|Cesto da peixaria|Mergulho da meia-noite|Deixado pela espuma|Última caixa do porto`});
 /* /🐚 i18n */
+/* =====================================================================
+   🫧 MÉMOIRE DES ABYSSES — fiche (mémoire, 2 à 8, ~8 min)
+   9 manches, une épreuve chacune, de plus en plus longues (plan fixe, contenu tiré au hasard) :
+     🔁 Écho 3 · ✨ Lucioles 4 · 🔍 Changement 5 (1 case) · 🔁 Écho 5 · ↩️ Reflux 4 · 👀 Intrus 6 · ✨ Lucioles 6 ·
+     🔍 Changement 7 (2 cases) · ↩️ Reflux 6 (répétitions permises).
+     Écho : des créatures passent une à une, on les rend dans l'ordre. Reflux : à l'envers. Lucioles : des lumières
+     s'allument sur une grille 3×3, dans l'ordre. Changement : un décor 4×3, puis le même avec des cases changées
+     (apparition, disparition ou substitution) à toucher. Intrus : une suite passe, puis tout revient mélangé avec une
+     créature jamais passée.
+   Anti-latence : pendant l'étape « montrer », l'état ne contient qu'une GRAINE (g.sd). Chaque appareil en tire la même
+     suite (abGen, PRNG déterministe) et la joue LOCALEMENT dès que l'étape lui arrive, puis envoie « vu » tout seul ; le
+     rappel s'ouvre quand tout le monde a vu (sablier jamais plus court que la séquence, même en mode rapide). La graine
+     sort de l'état dès la fin de l'étape (hide) : pendant le rappel, chacun ne reçoit que SES données (palette, décor
+     modifié ou candidats). On juge la JUSTESSE ; le temps (mesuré sur l'appareil, de l'ouverture du rappel à la réponse
+     complète) ne sert qu'à départager une égalité en tête à la fin (+1 ⚡ au plus rapide).
+   Points : suites = plus longue sous-suite commune avec la bonne réponse (un oubli coûte 1, pas tout le reste) + 1 si
+     sans faute ; changement / intrus = 4 par case trouvée. Réponses modifiables jusqu'à la fin de l'étape.
+   🤿 Plongée profonde (choisie en secret pendant la révélation précédente ; 2 par partie, 3 à deux ; seulement si on
+     n'est PAS en tête, ex æquo compris, donc jamais à la 1re manche) : la même épreuve avec +2 éléments (créatures /
+     lumières, ou 2 créatures de plus dans le décor), points ×1,5 (arrondi) si au moins la moitié est juste, sinon 0.
+     Un pari à espérance presque neutre mais risqué : de la variance pour qui est derrière, jamais pour la tête.
+   À deux : duel, 3 plongées chacun ; seul·e celui / celle qui est derrière peut plonger.
+   Pas d'élimination, pas de premier joueur : tout est simultané et secret jusqu'à la révélation.
+   SIM (.sim/aby.js, 4000 parties/taille ; modèle : empan 5 / 6 / 7 (faible / moyen / fort) ± bruit, chaque élément retenu
+     selon une logistique (longueur − empan), −1 à l'envers, −0,5 pour les lumières ; changement / intrus selon le nombre de créatures) :
+     styles de plongée, niveau égal, tables mixtes (victoire relative à 1/n), n=2/3/4/6/8 : jamais 98/94/91/83/79 ·
+     dès que possible 101/102/105/111/109 · tard (manches 6+) 100/102/101/102/104 · si 4 pts de retard 102/100/99/97/98 ·
+     au hasard 100/102/103/108/110 → plonger aide un peu, aucun moment ne domine ; 44 % de plongées réussies.
+     Sièges (tous pareils) : 48.4/51.6 · n=4 24.1–25.6 · n=8 12.1–13.5 (attendu 12.5).
+     Niveaux : faible / moyen / fort ≈ 23 / 29 / 35 points (le faible garde ~80 % du score grâce aux points partiels) ;
+     la tête change après la manche 4 dans 46 % des parties ; un·e fort·e contre des moyens gagne 80 % à 2, 62 % à 4, 51 % à 6.
+     Rejetés : ×2 dès la moitié (plonger dès que possible écrasait tout : « jamais » 23–81 %), plongée permise aux ex æquo
+     en tête (tout le monde plongeait à la manche 1, la plus facile), ×2 aux deux tiers (19 % de réussite, frustrant).
+     Vraie logique (.sim/aby_run.js, 600 parties de 2 à 8, dont avec absent) : 0 blocage, 0 fuite (graine, réponses,
+     plongées, temps), jamais de plongée en tête.
+   ===================================================================== */
+const ABY={PL:['🐙','🦑','🪼','🐡','🦀','🐠','🦈','🐚','🦐','🐢','🐳'],TY:'erlci',IC:{e:'🔁',r:'↩️',l:'✨',c:'🔍',i:'👀'},
+ R:[{t:'e',n:3,k:6,v:900},{t:'l',n:4,v:900},{t:'c',n:5,c:1},{t:'e',n:5,k:8,v:800},{t:'r',n:4,k:7,v:800},{t:'i',n:6,c:1,v:750},
+  {t:'l',n:6,v:750},{t:'c',n:7,c:2},{t:'r',n:6,k:8,rep:1,v:750}],
+ X:2,DV:n=>n==2?3:2,DM:1.5,DT:.5,CP:4,LEAD:1800,GAP:260,CS:n=>2400+450*n,AT:m=>14+2*m,RT:25,PT:30,
+ HZ:[392,440,494,523,587,659,698,784,880]};
+/* PRNG déterministe (mulberry32) : même graine → même suite sur tous les appareils */
+const abRng=sd=>{let a=sd>>>0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}};
+const abSh=(a,r)=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+/* contenu d'une manche : D = version plongée profonde (+2), B = version de base (préfixe / sous-ensemble de D) */
+function abGen(sd,R){const r=abRng(sd),X=ABY.X,N=R.n+X,P=abSh([...ABY.PL.keys()],r);
+ if(R.t=='l'){const s=[];while(s.length<N){const v=Math.floor(r()*9);if(v!==s[s.length-1])s.push(v)}return{D:{s},B:{s:s.slice(0,R.n)}}}
+ if(R.t=='e'||R.t=='r'){const pal=P.slice(0,Math.max(R.k,R.rep?0:N));let s;
+  if(R.rep){s=[];while(s.length<N){const v=pal[Math.floor(r()*pal.length)];if(v!==s[s.length-1])s.push(v)}}else s=abSh(pal,r).slice(0,N);
+  return{pal:pal.slice().sort((a,b)=>a-b),D:{s},B:{s:s.slice(0,R.n)}}}
+ if(R.t=='i'){const s=P.slice(0,N),x=P.slice(N,N+R.c),b=s.slice(0,R.n);return{D:{s,x,cand:abSh(s.concat(x),r)},B:{s:b,x,cand:abSh(b.concat(x),r)}}}
+ /* changement : décor 4×3 (-1 = vide) ; les 2 créatures en plus de D ne changent jamais */
+ const cells=abSh([...Array(12).keys()],r),B=Array(12).fill(-1);cells.slice(0,R.n).forEach((c,j)=>B[c]=P[j]);
+ const D=B.slice();cells.slice(R.n,N).forEach((c,j)=>D[c]=P[R.n+j]);
+ const bc=abSh(cells.slice(0,R.n),r),fc=cells.slice(N),Ba=B.slice(),Da=D.slice(),ch=[];let nx=N;
+ for(let j=0;j<R.c;j++){const ty=r();let c;
+  if(ty<.5){c=bc.pop();Ba[c]=Da[c]=P[nx++]}/* substitution */
+  else if(ty<.75||!fc.length){c=bc.pop();Ba[c]=Da[c]=-1}/* disparition */
+  else{c=fc.pop();Ba[c]=Da[c]=P[nx++]}/* apparition */
+  ch.push(c)}
+ return{D:{sc:D,alt:Da,ch},B:{sc:B,alt:Ba,ch}}}
+/* plus longue sous-suite commune + éléments de la réponse qui en font partie */
+function abLcs(a,b){const m=a.length,n=b.length,T=[...Array(m+1)].map(()=>Array(n+1).fill(0));
+ for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)T[i][j]=a[i-1]===b[j-1]?T[i-1][j-1]+1:Math.max(T[i-1][j],T[i][j-1]);
+ const mk=Array(m).fill(0);let i=m,j=n;while(i&&j){if(a[i-1]===b[j-1]){mk[i-1]=1;i--;j--}else if(T[i-1][j]>=T[i][j-1])i--;else j--}return{c:T[m][n],mk}}
+function abScore(R,v,a,dv){a=a||[];let c,N,mk,base,perf;
+ if(R.t=='e'||R.t=='r'||R.t=='l'){const tg=R.t=='r'?v.s.slice().reverse():v.s,L=abLcs(a,tg);c=L.c;N=tg.length;mk=L.mk;perf=c==N&&a.length==N;base=c+(perf?1:0)}
+ else{const S=R.t=='c'?v.ch:v.x;mk=a.map(x=>S.includes(x)?1:0);c=mk.reduce((x,y)=>x+y,0);N=R.c;perf=c==N;base=ABY.CP*c}
+ const ok=!dv||c>=Math.ceil(ABY.DT*N-1e-9);return{c,N,mk,perf:perf?1:0,pts:dv?(ok?Math.round(ABY.DM*base):0):base,fail:ok?0:1}}
+const abLen=(R,dv)=>ABY.LEAD+(R.t=='c'?ABY.CS(R.n):(R.n+(dv?ABY.X:0))*(R.v+ABY.GAP));
+const AG={};/* affichage local (jamais envoyé) : départ de la séquence, brouillon de réponse */
+const abC=(i,cl)=>`<span class="abc ${cl||''}">${ABY.PL[i]}</span>`;
+const abM=(c,cl)=>`<i class="abmg ${cl||''}" dir="ltr">${[...Array(9).keys()].map(j=>`<b class="${j==c?'on':''}"></b>`).join('')}</i>`;
+GAMES.aby={icon:'🫧',min:2,max:8,dur:8,tags:['skill'],ABY,gen:abGen,score:abScore,
+ init(s){const g=s.game,n=s.order.length;g.n=ABY.R.length;g.tk={};g.tt={};g.pf={};g.dok={};g.du={};g.dv={};g.dn=[];g.hist=[];
+  s.order.forEach(p=>{g.tk[p]=ABY.DV(n);g.tt[p]=0;g.pf[p]=0;g.dok[p]=0;g.du[p]=0});gWait(g,ABY.PT,'p',1)},
+ lead(s,p){const g=s.game,mx=Math.max(...s.order.map(x=>g.sc[x]||0));return (g.sc[p]||0)==mx},
+ can(s,p){const g=s.game,ri=g.st=='p'?g.r:g.r+1;return ri<g.n&&(g.tk[p]||0)>0&&!this.lead(s,p)},
+ act(s,from,a){const g=s.game;
+  if(g.rv){if(a.dv==null)return;const v=a.dv?1:0;if(v&&!this.can(s,from))return;g.dv[from]=v;return true}
+  if(g.st=='s'){if(!a.seen)return;g.done[from]=1;return true}
+  if(g.st=='a'){const R=ABY.R[g.r],q=(g.q||{})[from];if(!q||!Array.isArray(a.a))return;const A=a.a.slice(0,q.m).map(x=>+x);
+   if(A.some(x=>!Number.isInteger(x)))return;
+   if(R.t=='l'){if(A.some(x=>x<0||x>8))return}
+   else if(R.t=='c'){if(A.some(x=>x<0||x>11)||new Set(A).size<A.length)return}
+   else if(R.t=='i'){if(A.some(x=>!q.cand.includes(x))||new Set(A).size<A.length)return}
+   else if(A.some(x=>!q.pal.includes(x)))return;
+   g.ans[from]=A;if(A.length==q.m){g.done[from]=1;g.ms[from]=Math.max(0,Math.min(+a.ms||0,(g.sec||60)*1000))}else delete g.ms[from];return true}},
+ next(s){const g=s.game;
+  if(g.st=='p')return this.show(s);
+  if(g.st=='s'){const R=ABY.R[g.r],G=abGen(g.sd,R);g.q={};g.ans={};g.ms={};let mx=0;
+   s.order.forEach(p=>{const v=g.dn.includes(p)?G.D:G.B,q={m:R.t=='c'||R.t=='i'?R.c:v.s.length};if(G.pal)q.pal=G.pal;if(R.t=='c')q.alt=v.alt;if(R.t=='i')q.cand=v.cand;g.q[p]=q;mx=Math.max(mx,R.t=='c'||R.t=='i'?4:q.m)});
+   gWait(g,ABY.AT(mx),'a');return}
+  if(g.st=='a')return this.judge(s);
+  if(g.st=='r'){g.r++;if(g.r>=g.n){g.over=1;return}this.show(s)}},
+ /* nouvelle manche : plongeurs validés (jeton + pas en tête), nouvelle graine, sablier ≥ durée de la séquence */
+ show(s){const g=s.game,R=ABY.R[g.r];g.dn=s.order.filter(p=>g.dv[p]&&(g.tk[p]||0)>0&&!this.lead(s,p));g.dn.forEach(p=>{g.tk[p]--;g.du[p]++});
+  g.dv={};g.res=null;g.q=null;g.ans={};g.sd=Math.floor(Math.random()*4294967296);
+  const need=Math.ceil(abLen(R,1)/1000)+5;gWait(g,need,'s');if(g.dl>0&&g.sec<need){g.sec=need;g.dl=Date.now()+need*1000}},
+ judge(s){const g=s.game,R=ABY.R[g.r],G=abGen(g.sd,R),P={};
+  s.order.forEach(p=>{const dv=g.dn.includes(p),sc=abScore(R,dv?G.D:G.B,g.ans[p],dv);sc.a=(g.ans[p]||[]).slice();sc.dv=dv?1:0;
+   g.sc[p]=(g.sc[p]||0)+sc.pts;if(sc.perf)g.pf[p]++;if(dv&&!sc.fail)g.dok[p]++;
+   g.tt[p]+=g.ms[p]!=null?g.ms[p]:(g.sec||60)*1000;P[p]=sc});
+  g.res={B:G.B,D:G.D,p:P};g.hist.push(Object.fromEntries(s.order.map(p=>[p,P[p].pts])));g.dv={};gWait(g,ABY.RT,'r',1)},
+ /* secrets : la graine seulement pendant « montrer » ; chacun ne reçoit que SES données de rappel, SA réponse, SON choix de plongée */
+ hide(g,n){const o={...g};if(g.st!='s')delete o.sd;delete o.ms;delete o.tt;
+  if(g.q)o.q={[n]:g.q[n]};if(g.st=='a')o.ans={[n]:(g.ans||{})[n]};if(g.rv)o.dv={[n]:(g.dv||{})[n]};return o},
+ /* fin : égalité en tête → +1 ⚡ au plus rapide (temps cumulé mesuré sur chaque appareil) */
+ fin(s){const g=s.game;if(!g.fz){g.fz=1;const mx=Math.max(...s.order.map(p=>g.sc[p]||0)),T=s.order.filter(p=>(g.sc[p]||0)==mx);g.tb=null;
+   if(T.length>1&&mx>0){const t=T.map(p=>g.tt[p]||0),mn=Math.min(...t);if(t.filter(x=>x==mn).length==1){g.tb=T[t.indexOf(mn)];g.sc[g.tb]++}}}return{pts:g.sc}},
+ log(s){const g=s.game,L=[];s.order.forEach(p=>{if((g.pf[p]||0)>=6)L.push({k:'abyP',n:[p]});if((g.dok[p]||0)>=2)L.push({k:'abyD',n:[p]})});
+  const h=g.hist||[];if(h.length>=g.n&&s.order.length>2){const c={};s.order.forEach(p=>c[p]=0);h.slice(0,4).forEach(r=>{for(const p in r)if(p in c)c[p]+=r[p]});
+   const mn=Math.min(...Object.values(c)),last=s.order.filter(p=>c[p]==mn),mx=Math.max(...s.order.map(p=>g.sc[p]||0));
+   if(last.length==1&&(g.sc[last[0]]||0)==mx&&s.order.filter(p=>(g.sc[p]||0)==mx).length==1)L.push({k:'abyC',n:last})}return L},/* 📜 */
+ /* ---------- vue ---------- */
+ tn(R,k){return GT(k,{v:R.c||''}).split('|')[ABY.TY.indexOf(R.t)]||''},
+ top(R,k,dv){return `<div class="abhd"><span class="abti">${ABY.IC[R.t]}</span><b>${this.tn(R,'abT')}</b>${dv?'<span class="abdvt">🤿 +2</span>':''}</div><p class="abins">${this.tn(R,k)}</p>`},
+ nx(R){return `<div class="abnx ga" ${dl(1)}><span class="abti">${ABY.IC[R.t]}</span><span><b>${this.tn(R,'abT')}</b><small>${this.tn(R,'abS')} · ${GT('abN',{v:R.n})}</small></span></div>`},
+ /* seuil concret de la plongée pour l'épreuve R : au moins k justes sur n */
+ dvk(R){const n=R.t=='c'||R.t=='i'?R.c:R.n+ABY.X;return{n,k:Math.ceil(ABY.DT*n-1e-9)}},
+ dive(s,g,m){if(!s.order.includes(m))return '';const ri=g.st=='p'?g.r:g.r+1;if(ri>=g.n)return '';const t=g.tk[m]||0,on=!!(g.dv||{})[m];
+  if(!t)return `<p class="abdv0">🤿 ${GT('abDv0')}</p>`;if(!this.can(s,m))return `<p class="abdv0">🤿 ${GT('abDvL')}</p>`;
+  return `<button class="abdvb ga ${on?'sel':''}" ${dl(2)} data-abdv="${on?0:1}" aria-pressed="${on}"><span class="abdvi">🤿</span><span class="abdvx"><b>${GT('abDv')}</b><small>${GT('abDvD',this.dvk(ABY.R[ri]))}</small></span><span class="abtk" aria-label="${t}">${'🫧'.repeat(t)}</span></button>`},
+ crew(s,g,m,sh){return `<div class="abcr">${s.order.map(p=>`<span class="abm ${p==m?'me':''}">${DT(p)}<b>${p==m?esc(GT('me')):esc(p)}</b>${sh&&(g.dn||[]).includes(p)?'<i>🤿</i>':''}<em dir="ltr">${g.sc[p]||0}</em>${g.done[p]&&!g.rv?'<i class="tpok" aria-hidden="true"></i>':''}</span>`).join('')}</div>`},
+ /* la séquence, jouée localement : délais négatifs → un nouveau rendu continue l'animation sans la relancer */
+ stage(R,v,e){const L=ABY.LEAD,d=t=>((t-e)/1000).toFixed(2)+'s',at=j=>L+j*(R.v+ABY.GAP);let h='';
+  if(R.t=='l')h=`<div class="abgl" dir="ltr">${[...Array(9).keys()].map(c=>`<span class="abln">${v.s.map((x,j)=>x==c?`<i class="abfl" style="animation-duration:${R.v}ms;animation-delay:${d(at(j))}"></i>`:'').join('')}</span>`).join('')}</div>`;
+  else if(R.t=='c')h=`<div class="abgc abshow" dir="ltr" style="animation-duration:${ABY.CS(R.n)}ms;animation-delay:${d(L)}">${v.sc.map(x=>`<span class="abcl">${x>=0?ABY.PL[x]:''}</span>`).join('')}</div>`;
+  else h=v.s.map((x,j)=>`<span class="abit" style="animation-duration:${R.v}ms;animation-delay:${d(at(j))};--x:${((j*37)%5-2)*16}px;--y:${((j*53)%3-1)*10}px"><b>${ABY.PL[x]}</b></span>`).join('');
+  const dots=R.t=='c'?'':`<div class="abdots">${v.s.map((_,j)=>`<i style="animation-delay:${d(at(j))}"></i>`).join('')}</div>`;
+  return `<div class="abs ${R.t=='l'?'l':''}" aria-hidden="true"><i class="abb"></i><i class="abb b2"></i><i class="abb b3"></i><span class="abcd" style="animation-delay:${d(0)};animation-duration:${L}ms"><b>👁️</b></span>${h}${dots}</div>`},
+ showV(s,g,m){const R=ABY.R[g.r],play=s.order.includes(m),dv=(g.dn||[]).includes(m),K=s.gid+'.'+g.k;
+  if(g.sd==null)return{html:`<div class="card c">${this.top(R,'abS')}${this.crew(s,g,m,1)}</div>`};
+  const G=abGen(g.sd,R),v=dv?G.D:G.B,T=abLen(R,dv);
+  if(AG.sk!==K){AG.sk=K;AG.st=Date.now();AG.sent=0;clearTimeout(AG.to);
+   if(typeof tone=='function'&&R.t!='c')try{tone(v.s.map((x,j)=>[R.t=='l'?ABY.HZ[x]:523,(ABY.LEAD+j*(R.v+ABY.GAP))/1000,R.t=='l'?.32:.12]))}catch(e){}
+   if(play)AG.to=setTimeout(()=>{if(AG.sk===K&&!AG.sent){AG.sent=1;try{gs({seen:1})}catch(e){}}},T+150)}
+  const e=Date.now()-AG.st,dvs=(g.dn||[]).filter(p=>p!=m);
+  return{html:`<div class="card c abcard">${this.top(R,'abS',dv)}${this.stage(R,v,e)}
+   <p class="abok" style="animation-delay:${((T-e)/1000).toFixed(2)}s">✓ ${GT('abSeen')}</p>${dvs.length?`<p class="abdvs">🤿 ${GT('abDvs',{n:dvs.map(B).join(', ')})}</p>`:''}${this.crew(s,g,m,1)}</div>`,
+   ...(play&&!g.done[m]?{hint:GT('abWatch'),mine:false}:{})}},
+ recV(s,g,m){const R=ABY.R[g.r],q=(g.q||{})[m],K=s.gid+'.'+g.k,dv=(g.dn||[]).includes(m);
+  if(!q)return{html:`<div class="card c">${this.top(R,'abA')}${this.crew(s,g,m,1)}</div>`};
+  if(AG.ak!==K){AG.ak=K;AG.t0=Date.now();AG.a=((g.ans||{})[m]||[]).slice();AG.fl=null}
+  const A=AG.a,need=q.m,seq=R.t=='e'||R.t=='r'||R.t=='l',it=x=>R.t=='l'?abM(x):ABY.PL[x];
+  let body;
+  if(seq){const hit=AG.fl&&Date.now()-AG.fl.t<450?AG.fl.c:-1;
+   body=`<div class="abslots">${[...Array(need).keys()].map(j=>A[j]!=null?`<span class="absl f">${it(A[j])}</span>`:`<span class="absl ${j==A.length?'nx':''}"><small dir="ltr">${j+1}</small></span>`).join('')}</div>
+    ${R.t=='l'?`<div class="abgl abpick" dir="ltr">${[...Array(9).keys()].map(c=>`<button class="abln ${c==hit?'hit':''}" data-abp="${c}" aria-label="${c+1}" ${A.length>=need?'disabled':''}></button>`).join('')}</div>`
+     :`<div class="abpal">${q.pal.map(x=>`<button data-abp="${x}" ${A.length>=need?'disabled':''}>${ABY.PL[x]}</button>`).join('')}</div>`}
+    <div class="abctl"><button class="ghost" data-abu="1" ${A.length?'':'disabled'} aria-label="⌫">⌫</button><button class="ghost" data-abu="0" ${A.length?'':'disabled'}>${GT('abClr')}</button></div>`}
+  else if(R.t=='c')body=`<div class="abgc abpick" dir="ltr">${q.alt.map((x,c)=>`<button class="abcl ${A.includes(c)?'sel':''}" data-abt="${c}" aria-pressed="${A.includes(c)}">${x>=0?ABY.PL[x]:''}</button>`).join('')}</div><p class="abcnt" dir="ltr">${A.length} / ${need}</p>`;
+  else body=`<div class="abpal abcand">${q.cand.map(x=>`<button class="${A.includes(x)?'sel':''}" data-abt="${x}" aria-pressed="${A.includes(x)}">${ABY.PL[x]}</button>`).join('')}</div><p class="abcnt" dir="ltr">${A.length} / ${need}</p>`;
+  const put=a=>{AG.a=a;render();gs({a,ms:Date.now()-AG.t0})};
+  return{html:`<div class="card c abcard">${this.top(R,'abA',dv)}${body}${this.crew(s,g,m,1)}</div>`,
+   bind(){$$('[data-abp]').forEach(b=>b.onclick=()=>{const x=+b.dataset.abp;if(AG.a.length>=need)return;if(R.t=='l'){AG.fl={c:x,t:Date.now()};if(typeof tone=='function')try{tone([[ABY.HZ[x],0,.25]])}catch(e){}}put([...AG.a,x])});
+    $$('[data-abu]').forEach(b=>b.onclick=()=>put(b.dataset.abu=='1'?AG.a.slice(0,-1):[]));
+    $$('[data-abt]').forEach(b=>b.onclick=()=>{const x=+b.dataset.abt;let a=AG.a.includes(x)?AG.a.filter(y=>y!=x):[...AG.a,x];if(a.length>need)a=a.slice(-need);put(a)})}}},
+ /* révélation : la bonne réponse (de MA version), ma réponse, puis tout le monde ; et la prochaine épreuve */
+ revV(s,g,m){const R=ABY.R[g.r],X=g.res||{p:{}},me=X.p[m],v=me&&me.dv?X.D:X.B;let h='';
+  if(!v)return{html:''};
+  if(R.t=='e'||R.t=='r'||R.t=='l'){const tg=R.t=='r'?v.s.slice().reverse():v.s,it=x=>R.t=='l'?abM(x):abC(x);
+   h=`<p class="gpre">${GT('abAns')}</p><div class="abrow">${tg.map((x,j)=>`<span class="abrc ga" ${dl(j)}>${it(x)}</span>`).join('')}</div>`+
+    (me?`<p class="gpre">${GT('abMine')}</p><div class="abrow">${me.a.length?me.a.map((x,j)=>`<span class="abrc ga ${me.mk[j]?'ok':'no'}" ${dl(j,.3)}>${it(x)}</span>`).join(''):`<span class="mut">${GT('abNone')}</span>`}</div>`:'')}
+  else if(R.t=='c')h=`<div class="abgc abrv" dir="ltr">${v.alt.map((x,c)=>{const ch=v.ch.includes(c),pk=me&&me.a.includes(c);
+   return `<span class="abcl ${ch?'chg':''} ${pk?(ch?'ok':'no'):''}">${ch?`<small>${v.sc[c]>=0?ABY.PL[v.sc[c]]:'·'}</small><i>›</i>`:''}${x>=0?ABY.PL[x]:ch?'·':''}</span>`}).join('')}</div>`;
+  else h=`<div class="abpal abrv">${v.cand.map(x=>{const xi=v.x.includes(x),pk=me&&me.a.includes(x);return `<span class="abrc ${xi?'chg':''} ${pk?(xi?'ok':'no'):''}">${ABY.PL[x]}</span>`}).join('')}</div>`;
+  const msg=me?(me.fail?`<p class="abmsg no ga" ${dl(3)}>🤿 ${GT('abFail')}</p>`:me.perf?`<p class="abmsg ok ga" ${dl(3)}>✨ ${GT('abPerf')}</p>`:''):'';
+  const rows=[...s.order].sort((a,b)=>(g.sc[b]||0)-(g.sc[a]||0)).map((p,i)=>{const r=X.p[p]||{c:0,N:0,pts:0};
+   return `<div class="abrr ga ${p==m?'me':''}" ${dl(i,.4)}>${DT(p)}<b class="abnm">${p==m?esc(GT('me')):esc(p)}</b>${r.dv?'<span>🤿</span>':''}${r.perf?'<span>✨</span>':''}<span class="abac" dir="ltr">${r.c}/${r.N}</span><span class="abpt ${r.pts?'':'z'}" dir="ltr">+${r.pts}</span><b class="abto" dir="ltr">${g.sc[p]||0}</b></div>`}).join('');
+  const nr=ABY.R[g.r+1];
+  return{html:`<div class="card c abcard">${this.top(R,'abA',me&&me.dv)}${h}${msg}<div class="abres">${rows}</div>
+   ${nr?`<p class="gpre abnxh">${GT('abNx')}</p>${this.nx(nr)}${this.dive(s,g,m)}`:''}</div>`,
+   bind(){$$('[data-abdv]').forEach(b=>b.onclick=()=>gs({dv:+b.dataset.abdv}));if(me&&me.perf&&!RM()&&GV.abp!=='abp'+s.gid+g.k){GV.abp='abp'+s.gid+g.k;try{sparkles($('.abmsg'),12)}catch(e){}}}}},
+ view(s){const g=s.game,m=meN();
+  if(g.st=='p')return{html:`<div class="card c abcard"><div class="gbig ga gfloat">🫧</div><p class="gpre">${GT('abNx')}</p>${this.nx(ABY.R[g.r])}${this.crew(s,g,m)}</div>`,
+   bind(){$$('[data-abdv]').forEach(b=>b.onclick=()=>gs({dv:+b.dataset.abdv}))}};
+  if(g.st=='s')return this.showV(s,g,m);
+  if(g.st=='a')return this.recV(s,g,m);
+  return this.revV(s,g,m)},
+ endView(s){const g=s.game,m=meN();
+  return `${g.tb?`<p class="gnote ga">⚡ ${GT('abTb',{n:B(g.tb)})}</p>`:''}<div class="abres abfin">${[...s.order].sort((a,b)=>(g.sc[b]||0)-(g.sc[a]||0)).map((p,i)=>
+   `<div class="abrr ga ${p==m?'me':''}" ${dl(i,.3)}>${DT(p)}<b class="abnm">${esc(p)}</b><span class="abac" dir="ltr">✨ ${g.pf[p]||0} · 🤿 ${g.dok[p]||0}/${g.du[p]||0}</span><b class="abto" dir="ltr">${g.sc[p]||0}</b></div>`).join('')}</div>
+   <p class="mut cqlg">✨ ${GT('abPf')} · 🤿 ${GT('abDk')}</p>`}};
+/* 🫧 tutoriel : créatures qui passent, réponses simultanées, points partiels, épreuves, plongée profonde */
+const tuAb3=()=>[0,1,2].map(i=>TU.e(60+90*i,152,TU.av(i))).join('');
+GAMES.aby.tut=[
+ {k:'tu_aby1',d:6,s:()=>'<i class="tcave"></i>'+['🐙','🦀','🪼'].map((x,i)=>TU.e(150,66,x,.3+1.1*i,'p big o','--o:'+(1.2+1.1*i).toFixed(1)+'s')).join('')+[0,1,2].map(i=>TU.e(130+20*i,128,'<i class="tudt"></i>',.3+1.1*i,'p')).join('')},
+ {k:'tu_aby2',d:6,s:()=>tuAb3()+[0,1,2].map(i=>['🐙','🦀','🪼'].map((x,j)=>TU.e(60+90*i+(j-1)*25,108,x,.4+.5*j+.15*i,'p')).join('')).join('')+TU.e(150,36,'👆🏻',.2,'p big')},
+ {k:'tu_aby3',d:6,s:()=>TU.e(150,26,TU.cd('🐙 🦀 🪼 🐡','ok'),0,'p')+TU.e(80,150,TU.av(0))+TU.e(220,150,TU.av(1))+TU.e(80,98,TU.cd('🐙 🦀 🪼 🐡'),.4,'p')+TU.e(220,98,TU.cd('🐙 <s>🐠</s> 🪼 🐡'),.7,'p')+TU.e(80,62,TU.pt('+5'),1.5,'p')+TU.e(220,62,TU.pt('+3'),1.8,'p')},
+ {k:'tu_aby4',d:6,s:()=>[['↩️','🪼 🦀 🐙'],['✨','💡💡'],['🔍','🐙 › 🦈'],['👀','🐢 ?']].map(([a,b],i)=>TU.e(42+72*i,70,'<span class="tuab">'+a+'</span>',.2+.4*i,'p big')+TU.e(42+72*i,124,TU.cd(b),.5+.4*i,'p')).join('')},
+ {k:'tu_aby5',d:7,s:()=>TU.e(80,150,TU.av(0))+TU.e(80,104,'🤿',.3,'p big')+TU.e(150,40,TU.cd('🐙 🦀 🪼 <b>🐡 🦈</b>'),.8,'p')+TU.e(220,96,TU.pt('×1½'),1.8,'p')+TU.e(220,132,TU.pt('&lt;½ → 0','no'),3,'p')},
+ {k:'tu_aby6',x:'2',s:()=>TU.e(80,150,TU.av(0))+TU.e(220,150,TU.av(1))+TU.e(80,104,'🥇',.3,'p')+TU.e(220,104,'🤿',.8,'p big')+TU.e(220,62,TU.cd('🫧🫧🫧'),1.3,'p')}];
+if(typeof document!='undefined'){const c=document.createElement('style');c.id='aby-css';c.textContent=`
+.abcard{--abA:#0d2a45;--abB:#04101e;--abG:#7ff3e0}
+.abhd{display:flex;align-items:center;justify-content:center;gap:8px;font:600 18px Fredoka,Nunito,sans-serif;color:var(--deep)}
+.abti{font-size:22px;line-height:1}.abdvt{font:800 12px Nunito;padding:2px 8px;border-radius:99px;background:color-mix(in srgb,var(--ink) 18%,transparent);color:var(--ink)}
+.abins{font:700 14px Nunito;color:var(--mut);margin:2px 0 10px}
+.abs{position:relative;height:200px;border-radius:20px;overflow:hidden;background:radial-gradient(120% 90% at 50% 0%,var(--abA),var(--abB));box-shadow:inset 0 0 0 2px #ffffff14,inset 0 -30px 60px #0008;isolation:isolate}
+.abb{position:absolute;bottom:-14px;inset-inline-start:18%;width:8px;height:8px;border-radius:50%;border:1.5px solid #bfefff55;animation:abBub 7s linear infinite}
+.abb.b2{inset-inline-start:72%;width:6px;height:6px;animation-duration:9s;animation-delay:-3s}.abb.b3{inset-inline-start:46%;width:5px;height:5px;animation-duration:11s;animation-delay:-6s}
+@keyframes abBub{to{transform:translateY(-230px)}}
+.abcd{position:absolute;inset:0;display:grid;place-items:center;opacity:0;animation-name:abCd;animation-fill-mode:both;animation-timing-function:ease-in}
+.abcd b{font-size:34px;width:74px;height:74px;display:grid;place-items:center;border-radius:50%;box-shadow:0 0 0 3px #7ff3e066,0 0 24px #7ff3e033}
+@keyframes abCd{0%{opacity:0;transform:scale(1.2)}15%{opacity:1;transform:none}80%{opacity:1;transform:scale(.9)}100%{opacity:0;transform:scale(.6)}}
+.abit{position:absolute;inset:0 0 22px;display:grid;place-items:center;opacity:0;animation-name:abIt;animation-fill-mode:both;animation-timing-function:ease-out;pointer-events:none}
+.abit b{font-size:66px;line-height:1;filter:drop-shadow(0 0 14px #7ff3e055)}
+@keyframes abIt{0%{opacity:0;transform:translate(var(--x),var(--y)) scale(.55)}14%{opacity:1;transform:translate(var(--x),var(--y)) scale(1)}84%{opacity:1;transform:translate(var(--x),var(--y)) scale(1)}100%{opacity:0;transform:translate(var(--x),var(--y)) scale(1.08)}}
+.abdots{position:absolute;inset-inline:0;bottom:10px;display:flex;justify-content:center;gap:6px}
+.abdots i{width:8px;height:8px;border-radius:50%;background:var(--abG);opacity:.22;animation:abDot .25s ease-out both}
+@keyframes abDot{from{opacity:.22;transform:scale(.7)}to{opacity:.95;transform:none}}
+.abgl{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:min(156px,62%);margin:0 auto}
+.abs .abgl{position:absolute;inset:16px 0 auto;margin:0 auto}
+.abln{position:relative;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 40% 35%,#2b5878,#123048);box-shadow:inset 0 0 0 2px #ffffff12;display:block;padding:0;border:0;min-width:0}
+.abfl{position:absolute;inset:-3px;border-radius:50%;background:radial-gradient(circle,#fff 0,#b6fff2 30%,#4fe0c8 60%,#4fe0c800 72%);opacity:0;animation-name:abFl;animation-fill-mode:both;animation-timing-function:ease-out}
+@keyframes abFl{0%{opacity:0;transform:scale(.6)}15%{opacity:1;transform:scale(1.08)}82%{opacity:1;transform:none}100%{opacity:0;transform:scale(.9)}}
+.abgc{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;width:min(280px,100%);margin:0 auto}
+.abs .abgc{position:absolute;inset:14px 0 auto;margin:0 auto;width:min(250px,86%)}
+.abshow{opacity:0;animation-name:abScn;animation-fill-mode:both;animation-timing-function:linear}
+@keyframes abScn{0%{opacity:0;transform:scale(.97)}6%{opacity:1;transform:none}94%{opacity:1}100%{opacity:0}}
+.abcl{position:relative;aspect-ratio:1.25;display:grid;place-items:center;border-radius:12px;background:#ffffff0d;box-shadow:inset 0 0 0 1.5px #ffffff14;font-size:28px;line-height:1;padding:0;min-width:0}
+.abok{font:700 13px Nunito;color:var(--ink);margin:8px 0 0;opacity:0;animation:abIn .4s ease-out both}
+@keyframes abIn{from{opacity:0;transform:translateY(6px)}}
+.abdvs{font-size:12.5px;color:var(--mut);margin:6px 0 0}
+.abcr{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px}
+.abm{position:relative;display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border:1.5px solid var(--edge);border-radius:99px;background:var(--paper2);font-size:13px;max-width:100%}
+.abm.me{border-color:var(--acc)}.abm b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:9em}.abm em{font:600 13px Fredoka,Nunito,sans-serif;font-style:normal;color:var(--ink)}.abm i{font-style:normal}
+.abslots{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:2px 0 12px;min-height:46px}
+.absl{width:44px;height:44px;display:grid;place-items:center;border-radius:12px;border:2px dashed var(--edge);font-size:26px;line-height:1;color:var(--mut)}
+.absl small{font:700 12px Nunito;opacity:.6}.absl.nx{border-color:var(--acc)}
+.absl.f{border-style:solid;border-color:color-mix(in srgb,var(--acc) 55%,var(--edge));background:var(--paper2);animation:abPop .25s var(--gease) both}
+@keyframes abPop{from{transform:scale(.6);opacity:.3}}
+.abpal{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-width:340px;margin:0 auto}
+.abpal button,.abpal .abrc{font-size:30px;line-height:1;padding:9px 0;border-radius:14px;min-width:0;height:auto}
+.abpal button:disabled{opacity:.45}
+.abcand button.sel,.abgc button.sel{outline:3px solid var(--acc);outline-offset:1px}
+.abpick.abgl{width:min(210px,66%)}.abpick .abln{cursor:pointer;transition:transform .15s var(--gease)}.abpick .abln:not(:disabled):active{transform:scale(.9)}
+.abpick .abln.hit::after{content:'';position:absolute;inset:-3px;border-radius:50%;background:radial-gradient(circle,#fff 0,#b6fff2 30%,#4fe0c8 60%,#4fe0c800 72%);animation:abHit .45s ease-out both}
+@keyframes abHit{from{opacity:1}to{opacity:0;transform:scale(1.15)}}
+.abpick .abln:disabled{opacity:.6}
+.abpick.abgc,.abrv.abgc{padding:10px;border-radius:18px;background:radial-gradient(120% 90% at 50% 0%,var(--abA),var(--abB))}
+.abpick .abcl{cursor:pointer;border:0;color:inherit}
+.abctl{display:flex;gap:8px;justify-content:center;margin-top:10px}.abctl button{padding:7px 16px;font-size:15px}
+.abcnt{font:700 13px Nunito;color:var(--mut);margin:8px 0 0}
+.abmg{display:inline-grid;grid-template-columns:repeat(3,1fr);gap:2px;width:26px;height:26px;vertical-align:middle}
+.abmg b{border-radius:50%;background:color-mix(in srgb,var(--mut) 30%,transparent)}.abmg b.on{background:#2fc7ae;box-shadow:0 0 5px #4fe0c8}
+.abrow{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin:4px 0 10px}
+.abrc{display:inline-grid;place-items:center;min-width:42px;height:42px;padding:0 4px;border-radius:12px;background:var(--paper2);border:2px solid var(--edge);font-size:24px;line-height:1}
+.abrc.ok{border-color:var(--ink);background:color-mix(in srgb,var(--ink) 14%,var(--paper2))}.abrc.no{border-color:var(--bad);opacity:.7}
+.abrc.chg{box-shadow:0 0 0 3px #f2c94c}
+.abc{display:inline-block;line-height:1}
+.abrv .abcl{font-size:24px}.abrv .abcl small{font-size:13px;opacity:.75;position:absolute;top:3px;inset-inline-start:4px}.abrv .abcl i{position:absolute;top:2px;inset-inline-start:21px;font-size:11px;font-style:normal;color:#f2c94c}
+.abrv .abcl.chg{box-shadow:inset 0 0 0 2.5px #f2c94c}.abrv .abcl.ok{box-shadow:inset 0 0 0 3px #4fe0c8}.abrv .abcl.no{box-shadow:inset 0 0 0 3px var(--bad)}
+.abmsg{font:600 17px Fredoka,Nunito,sans-serif;margin:4px 0 8px}.abmsg.ok{color:var(--ink)}.abmsg.no{color:var(--bad)}
+.abres{display:flex;flex-direction:column;gap:5px;margin-top:10px}
+.abrr{display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:12px;background:var(--paper2);font-size:13.5px;text-align:start;min-width:0}
+.abrr.me{outline:2px solid var(--acc)}.abnm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.abac{color:var(--mut);font-weight:700;font-size:12px}.abpt{font:700 13px Nunito;color:var(--ink);min-width:2.2em;text-align:end}.abpt.z{color:var(--mut)}
+.abto{font:600 18px Fredoka,Nunito,sans-serif;color:var(--deep);min-width:1.6em;text-align:end}
+.abnxh{margin-top:16px}
+.abnx{display:flex;align-items:center;gap:10px;justify-content:center;text-align:start;padding:8px 14px;border-radius:14px;background:var(--paper2);margin:6px auto 0;width:fit-content;max-width:100%}
+.abnx .abti{font-size:26px}.abnx b{display:block;font:600 16px Fredoka,Nunito,sans-serif}.abnx small{display:block;font-size:12.5px;color:var(--mut)}
+.abdvb{display:flex;align-items:center;gap:10px;width:100%;max-width:380px;margin:10px auto 0;padding:10px 12px;text-align:start;border-radius:16px}
+.abdvb .abdvi{font-size:26px}.abdvx{flex:1;min-width:0}.abdvx b{display:block;font-size:15px}.abdvx small{display:block;font-size:12px;color:var(--mut);font-weight:600}
+.abtk{font-size:13px;letter-spacing:-1px;white-space:nowrap}
+.abdv0{font-size:12.5px;color:var(--mut);margin:10px 0 0}
+.tudt{display:block;width:8px;height:8px;border-radius:50%;background:#4fe0c8;box-shadow:0 0 6px #4fe0c8}
+.tuab{font-size:28px}
+[data-theme=dark] .abcard{--abA:#0f3150;--abB:#020a14}
+[data-theme=dark] .abdvt{color:#7ff3e0}
+@media (max-width:420px){.abs{height:184px}.abit b{font-size:58px}.abpal{gap:6px}.abpal button,.abpal .abrc{font-size:26px;padding:8px 0}.absl{width:38px;height:38px;font-size:22px}.abcl{font-size:24px}.abrc{min-width:36px;height:36px;font-size:20px}.abmg{width:22px;height:22px}}
+@media (prefers-reduced-motion:reduce){.abb{display:none}.abit,.abfl,.abcd,.abshow{animation-name:abItR}.abdots i,.absl.f,.abok,.abpick .abln.hit::after{animation-duration:.01s}}
+@keyframes abItR{0%,100%{opacity:0}2%,96%{opacity:1}}
+`;(document.head||document.documentElement).appendChild(c)}
+/* /🫧 */
+
+/* 🫧 textes de Mémoire des abysses (9 langues) ; abT/abS/abA : listes alignées sur ABY.TY (Écho, Reflux, Lucioles, Changement, Intrus) */
+const GAB=(l,o)=>Object.assign(GI18N[l].ui,o);
+GAB('fr',{n_aby:`Mémoire des abysses`,d_aby:`Retenir créatures et lumières, tous en même temps`,
+r_aby:`Des créatures et des lumières passent dans l'abysse : retiens-les, puis tout le monde répond en même temps. Chaque élément juste rapporte, sans faute +1. Les épreuves changent : à l'envers, ce qui a changé, l'intrus. 🤿 Plongée profonde (2 fois, seulement si tu n'es pas en tête) : +2 éléments, points ×1,5 si au moins la moitié est juste, sinon 0.`,
+r_aby2:`À deux, c'est un duel de mémoire : l'abysse montre, vous répondez en même temps. Chaque élément juste rapporte, sans faute +1. 🤿 Plongée profonde (3 fois chacun, pas quand tu mènes) : +2 éléments, points ×1,5 si au moins la moitié est juste, sinon 0.`,
+abT:`Écho|Reflux|Lucioles|Le changement|L'intrus`,abS:`Retiens l'ordre|Retiens l'ordre, tu le rendras à l'envers|Retiens les lumières dans l'ordre|Retiens le décor|Retiens qui passe`,
+abA:`Dans le même ordre|À l'envers : du dernier au premier|Les lumières, dans l'ordre|Touche ce qui a changé ({v})|Qui n'est jamais passé ? ({v})`,abN:`{v} à retenir`,
+abSeen:`Mémorisé ! On attend les autres…`,abWatch:`Regarde bien : l'abysse ne montre qu'une fois`,abClr:`Effacer`,abDv:`Plongée profonde`,abDvD:`+2 éléments · ×1,5 si au moins {k} sur {n} sont justes, sinon 0`,
+abDvL:`En tête : pas de plongée profonde`,abDv0:`Plus de plongée profonde`,abDvs:`En plongée profonde : {n}`,abNx:`Prochaine épreuve`,abAns:`La bonne réponse`,abMine:`Ta réponse`,
+abPerf:`Sans faute !`,abFail:`Plongée ratée : moins de la moitié, 0 cette fois`,abNone:`pas de réponse`,abTb:`Égalité en tête : {n} a répondu le plus vite (+1)`,abPf:`sans-faute`,abDk:`plongées profondes réussies`,
+tu_aby1:`Des créatures passent une à une dans l'abysse. Retiens-les dans l'ordre : elles ne passent qu'une fois.`,
+tu_aby2:`Puis tout le monde répond en même temps, en touchant les créatures dans l'ordre. On peut corriger jusqu'à la fin.`,
+tu_aby3:`Chaque créature à sa place rapporte 1 : un oubli ne coûte qu'un point. Sans faute : +1 en plus.`,
+tu_aby4:`Les épreuves changent : à l'envers, des lumières, ce qui a changé dans un décor, l'intrus jamais passé.`,
+tu_aby5:`🤿 Plongée profonde, quelques fois par partie, seulement si tu n'es pas en tête : +2 éléments, points ×1,5 si au moins la moitié est juste, sinon 0.`,
+tu_aby6:`À deux : 3 plongées chacun. Qui mène ne peut pas plonger : le duel se rattrape.`,
+lg_abyP:`{a} n'a presque rien oublié dans les abysses`,lg_abyD:`{a} a réussi deux plongées profondes`,lg_abyC:`{a} est {g.a:remonté|remontée|remonté·e} de la dernière place jusqu'à la victoire dans les abysses`});
+GAB('en',{n_aby:`Memory of the Deep`,d_aby:`Remember creatures and lights, all at once`,
+r_aby:`Creatures and lights pass through the deep: remember them, then everyone answers at the same time. Every right element scores, a perfect answer +1. The trials change: backwards, what changed, the odd one out. 🤿 Deep dive (twice, only when you're not in the lead): +2 elements, points ×1.5 if at least half is right, otherwise 0.`,
+r_aby2:`For two, it's a memory duel: the deep shows, you both answer at once. Every right element scores, a perfect answer +1. 🤿 Deep dive (3 times each, not while you lead): +2 elements, points ×1.5 if at least half is right, otherwise 0.`,
+abT:`Echo|Ebb|Fireflies|Spot the change|Odd one out`,abS:`Remember the order|Remember the order, you'll give it backwards|Remember the lights in order|Remember the scene|Remember who passes`,
+abA:`In the same order|Backwards: from last to first|The lights, in order|Tap what changed ({v})|Who never passed? ({v})`,abN:`{v} to remember`,
+abSeen:`Memorised! Waiting for the others…`,abWatch:`Watch closely: the deep only shows once`,abClr:`Clear`,abDv:`Deep dive`,abDvD:`+2 elements · ×1.5 if at least {k} of {n} are right, otherwise 0`,
+abDvL:`In the lead: no deep dive`,abDv0:`No deep dives left`,abDvs:`Deep diving: {n}`,abNx:`Next trial`,abAns:`The right answer`,abMine:`Your answer`,
+abPerf:`Perfect!`,abFail:`Dive failed: less than half, 0 this time`,abNone:`no answer`,abTb:`Tied at the top: {n} answered fastest (+1)`,abPf:`perfect rounds`,abDk:`deep dives landed`,
+tu_aby1:`Creatures pass one by one through the deep. Remember them in order: they only pass once.`,
+tu_aby2:`Then everyone answers at the same time, tapping the creatures in order. You can fix it until the end.`,
+tu_aby3:`Each creature in its place scores 1: forgetting one only costs a point. Perfect: +1 more.`,
+tu_aby4:`The trials change: backwards, lights, what changed in a scene, the odd one out that never passed.`,
+tu_aby5:`🤿 Deep dive, a few times per game, only when you're not in the lead: +2 elements, points ×1.5 if at least half is right, otherwise 0.`,
+tu_aby6:`For two: 3 dives each. Whoever leads can't dive, so the duel swings back.`,
+lg_abyP:`{a} forgot almost nothing in the deep`,lg_abyD:`{a} landed two deep dives`,lg_abyC:`{a} climbed from last place to victory in the deep`});
+GAB('es',{n_aby:`Memoria del abismo`,d_aby:`Recordar criaturas y luces, todos a la vez`,
+r_aby:`Criaturas y luces pasan por el abismo: recuérdalas y luego todos responden a la vez. Cada elemento correcto puntúa, sin fallos +1. Las pruebas cambian: al revés, qué ha cambiado, el intruso. 🤿 Inmersión profunda (2 veces, solo si no vas en cabeza): +2 elementos, puntos ×1,5 si aciertas al menos la mitad, si no 0.`,
+r_aby2:`A dos es un duelo de memoria: el abismo muestra y respondéis a la vez. Cada elemento correcto puntúa, sin fallos +1. 🤿 Inmersión profunda (3 veces cada uno, no cuando vas en cabeza): +2 elementos, puntos ×1,5 si aciertas al menos la mitad, si no 0.`,
+abT:`Eco|Resaca|Luciérnagas|El cambio|El intruso`,abS:`Recuerda el orden|Recuerda el orden, lo darás al revés|Recuerda las luces en orden|Recuerda el decorado|Recuerda quién pasa`,
+abA:`En el mismo orden|Al revés: del último al primero|Las luces, en orden|Toca lo que ha cambiado ({v})|¿Quién no ha pasado nunca? ({v})`,abN:`{v} por recordar`,
+abSeen:`¡Memorizado! Esperando a los demás…`,abWatch:`Mira bien: el abismo solo lo muestra una vez`,abClr:`Borrar`,abDv:`Inmersión profunda`,abDvD:`+2 elementos · ×1,5 si aciertas al menos {k} de {n}, si no 0`,
+abDvL:`En cabeza: sin inmersión profunda`,abDv0:`No quedan inmersiones profundas`,abDvs:`En inmersión profunda: {n}`,abNx:`Próxima prueba`,abAns:`La respuesta correcta`,abMine:`Tu respuesta`,
+abPerf:`¡Sin fallos!`,abFail:`Inmersión fallida: menos de la mitad, 0 esta vez`,abNone:`sin respuesta`,abTb:`Empate en cabeza: {n} respondió más rápido (+1)`,abPf:`sin fallos`,abDk:`inmersiones profundas logradas`,
+tu_aby1:`Las criaturas pasan una a una por el abismo. Recuérdalas en orden: solo pasan una vez.`,
+tu_aby2:`Luego todos responden a la vez, tocando las criaturas en orden. Se puede corregir hasta el final.`,
+tu_aby3:`Cada criatura en su sitio da 1: un olvido solo cuesta un punto. Sin fallos: +1 más.`,
+tu_aby4:`Las pruebas cambian: al revés, luces, qué ha cambiado en un decorado, el intruso que nunca pasó.`,
+tu_aby5:`🤿 Inmersión profunda, pocas veces por partida, solo si no vas en cabeza: +2 elementos, puntos ×1,5 si aciertas al menos la mitad, si no 0.`,
+tu_aby6:`A dos: 3 inmersiones cada uno. Quien va en cabeza no puede bajar: el duelo se equilibra.`,
+lg_abyP:`{a} casi no olvidó nada en el abismo`,lg_abyD:`{a} logró dos inmersiones profundas`,lg_abyC:`{a} pasó del último puesto a la victoria en el abismo`});
+GAB('it',{n_aby:`Memoria degli abissi`,d_aby:`Ricordare creature e luci, tutti insieme`,
+r_aby:`Creature e luci passano negli abissi: ricordale, poi tutti rispondono insieme. Ogni elemento giusto vale, senza errori +1. Le prove cambiano: al contrario, cosa è cambiato, l'intruso. 🤿 Immersione profonda (2 volte, solo se non sei in testa): +2 elementi, punti ×1,5 se almeno metà è giusta, altrimenti 0.`,
+r_aby2:`In due è un duello di memoria: l'abisso mostra, rispondete insieme. Ogni elemento giusto vale, senza errori +1. 🤿 Immersione profonda (3 volte a testa, non quando sei in testa): +2 elementi, punti ×1,5 se almeno metà è giusta, altrimenti 0.`,
+abT:`Eco|Risacca|Lucciole|Il cambiamento|L'intruso`,abS:`Ricorda l'ordine|Ricorda l'ordine, lo darai al contrario|Ricorda le luci in ordine|Ricorda la scena|Ricorda chi passa`,
+abA:`Nello stesso ordine|Al contrario: dall'ultimo al primo|Le luci, in ordine|Tocca cosa è cambiato ({v})|Chi non è mai passato? ({v})`,abN:`{v} da ricordare`,
+abSeen:`Memorizzato! Si aspettano gli altri…`,abWatch:`Guarda bene: l'abisso mostra una volta sola`,abClr:`Cancella`,abDv:`Immersione profonda`,abDvD:`+2 elementi · ×1,5 se almeno {k} su {n} sono giusti, altrimenti 0`,
+abDvL:`In testa: niente immersione profonda`,abDv0:`Niente più immersioni profonde`,abDvs:`In immersione profonda: {n}`,abNx:`Prossima prova`,abAns:`La risposta giusta`,abMine:`La tua risposta`,
+abPerf:`Senza errori!`,abFail:`Immersione fallita: meno della metà, 0 stavolta`,abNone:`nessuna risposta`,abTb:`Pari in testa: {n} ha risposto più in fretta (+1)`,abPf:`senza errori`,abDk:`immersioni profonde riuscite`,
+tu_aby1:`Le creature passano una alla volta negli abissi. Ricordale in ordine: passano una volta sola.`,
+tu_aby2:`Poi tutti rispondono insieme, toccando le creature in ordine. Si può correggere fino alla fine.`,
+tu_aby3:`Ogni creatura al suo posto vale 1: una dimenticanza costa solo un punto. Senza errori: +1 in più.`,
+tu_aby4:`Le prove cambiano: al contrario, luci, cosa è cambiato in una scena, l'intruso mai passato.`,
+tu_aby5:`🤿 Immersione profonda, poche volte a partita, solo se non sei in testa: +2 elementi, punti ×1,5 se almeno metà è giusta, altrimenti 0.`,
+tu_aby6:`In due: 3 immersioni a testa. Chi è in testa non può scendere: il duello si riequilibra.`,
+lg_abyP:`{a} non ha dimenticato quasi niente negli abissi`,lg_abyD:`{a} ha completato due immersioni profonde`,lg_abyC:`{a} è {g.a:passato|passata|passato/a} dall'ultimo posto alla vittoria negli abissi`});
+GAB('de',{n_aby:`Gedächtnis der Tiefe`,d_aby:`Wesen und Lichter merken, alle gleichzeitig`,
+r_aby:`Wesen und Lichter ziehen durch die Tiefe: Merk sie dir, dann antworten alle gleichzeitig. Jedes richtige Element zählt, fehlerfrei +1. Die Prüfungen wechseln: rückwärts, was sich verändert hat, der Eindringling. 🤿 Tieftauchen (2-mal, nur wenn du nicht führst): +2 Elemente, Punkte ×1,5, wenn mindestens die Hälfte stimmt, sonst 0.`,
+r_aby2:`Zu zweit ist es ein Gedächtnisduell: Die Tiefe zeigt, ihr antwortet gleichzeitig. Jedes richtige Element zählt, fehlerfrei +1. 🤿 Tieftauchen (je 3-mal, nicht wenn du führst): +2 Elemente, Punkte ×1,5, wenn mindestens die Hälfte stimmt, sonst 0.`,
+abT:`Echo|Ebbe|Glühwürmchen|Die Veränderung|Der Eindringling`,abS:`Merk dir die Reihenfolge|Merk dir die Reihenfolge, du gibst sie rückwärts wieder|Merk dir die Lichter der Reihe nach|Merk dir das Bild|Merk dir, wer vorbeizieht`,
+abA:`In derselben Reihenfolge|Rückwärts: vom letzten zum ersten|Die Lichter, der Reihe nach|Tippe an, was sich verändert hat ({v})|Wer ist nie vorbeigezogen? ({v})`,abN:`{v} zum Merken`,
+abSeen:`Gemerkt! Warten auf die anderen…`,abWatch:`Schau genau hin: Die Tiefe zeigt es nur einmal`,abClr:`Löschen`,abDv:`Tieftauchen`,abDvD:`+2 Elemente · ×1,5, wenn mindestens {k} von {n} stimmen, sonst 0`,
+abDvL:`In Führung: kein Tieftauchen`,abDv0:`Kein Tieftauchen mehr`,abDvs:`Beim Tieftauchen: {n}`,abNx:`Nächste Prüfung`,abAns:`Die richtige Antwort`,abMine:`Deine Antwort`,
+abPerf:`Fehlerfrei!`,abFail:`Tauchgang gescheitert: weniger als die Hälfte, diesmal 0`,abNone:`keine Antwort`,abTb:`Gleichstand an der Spitze: {n} hat am schnellsten geantwortet (+1)`,abPf:`fehlerfreie Runden`,abDk:`gelungene Tieftauchgänge`,
+tu_aby1:`Wesen ziehen eins nach dem anderen durch die Tiefe. Merk sie dir der Reihe nach: Sie kommen nur einmal.`,
+tu_aby2:`Dann antworten alle gleichzeitig und tippen die Wesen der Reihe nach an. Korrigieren geht bis zum Schluss.`,
+tu_aby3:`Jedes Wesen am richtigen Platz bringt 1: Ein vergessenes kostet nur einen Punkt. Fehlerfrei: +1 dazu.`,
+tu_aby4:`Die Prüfungen wechseln: rückwärts, Lichter, was sich in einem Bild verändert hat, der Eindringling, der nie vorbeikam.`,
+tu_aby5:`🤿 Tieftauchen, ein paarmal pro Partie, nur wenn du nicht führst: +2 Elemente, Punkte ×1,5, wenn mindestens die Hälfte stimmt, sonst 0.`,
+tu_aby6:`Zu zweit: je 3 Tauchgänge. Wer führt, darf nicht tauchen: So holt man im Duell auf.`,
+lg_abyP:`{a} hat in der Tiefe fast nichts vergessen`,lg_abyD:`{a} hat zwei Tieftauchgänge geschafft`,lg_abyC:`{a} ist in der Tiefe vom letzten Platz bis zum Sieg aufgestiegen`});
+GAB('ru',{n_aby:`Память бездны`,d_aby:`Запоминать существ и огни, все одновременно`,
+r_aby:`Через бездну проплывают существа и огни: запомни их, потом все отвечают одновременно. Каждый верный элемент приносит очко, без ошибок +1. Испытания меняются: задом наперёд, что изменилось, лишний. 🤿 Глубокое погружение (2 раза, только если ты не впереди): +2 элемента, очки ×1,5, если верна хотя бы половина, иначе 0.`,
+r_aby2:`Вдвоём — дуэль памяти: бездна показывает, вы отвечаете одновременно. Каждый верный элемент приносит очко, без ошибок +1. 🤿 Глубокое погружение (по 3 раза, но не когда ты впереди): +2 элемента, очки ×1,5, если верна хотя бы половина, иначе 0.`,
+abT:`Эхо|Отлив|Светлячки|Что изменилось|Лишний`,abS:`Запомни порядок|Запомни порядок, ответишь задом наперёд|Запомни огни по порядку|Запомни картину|Запомни, кто проплывает`,
+abA:`В том же порядке|Задом наперёд: с последнего до первого|Огни, по порядку|Отметь, что изменилось ({v})|Кто ни разу не проплывал? ({v})`,abN:`запомнить: {v}`,
+abSeen:`Запомнено! Ждём остальных…`,abWatch:`Смотри внимательно: бездна показывает только раз`,abClr:`Стереть`,abDv:`Глубокое погружение`,abDvD:`+2 элемента · ×1,5, если верны хотя бы {k} из {n}, иначе 0`,
+abDvL:`Ты впереди: без глубокого погружения`,abDv0:`Глубоких погружений больше нет`,abDvs:`В глубоком погружении: {n}`,abNx:`Следующее испытание`,abAns:`Правильный ответ`,abMine:`Твой ответ`,
+abPerf:`Без ошибок!`,abFail:`Погружение не удалось: меньше половины, в этот раз 0`,abNone:`нет ответа`,abTb:`Ничья на первом месте: {n} {g.n:ответил|ответила|ответил(а)} быстрее (+1)`,abPf:`без ошибок`,abDk:`удачные погружения`,
+tu_aby1:`Существа проплывают через бездну по одному. Запомни их по порядку: они проплывают только раз.`,
+tu_aby2:`Потом все отвечают одновременно, нажимая на существ по порядку. Исправлять можно до самого конца.`,
+tu_aby3:`Каждое существо на своём месте приносит 1: забытое стоит лишь одного очка. Без ошибок: ещё +1.`,
+tu_aby4:`Испытания меняются: задом наперёд, огни, что изменилось в картине, лишний, который не проплывал.`,
+tu_aby5:`🤿 Глубокое погружение, несколько раз за игру и только если ты не впереди: +2 элемента, очки ×1,5, если верна хотя бы половина, иначе 0.`,
+tu_aby6:`Вдвоём: по 3 погружения. Лидер нырять не может, поэтому дуэль выравнивается.`,
+lg_abyP:`{a} почти ничего не {g.a:забыл|забыла|забыл(а)} в бездне`,lg_abyD:`{a} {g.a:совершил|совершила|совершил(а)} два удачных глубоких погружения`,lg_abyC:`{a} {g.a:поднялся|поднялась|поднялся(ась)} с последнего места до победы в бездне`});
+GAB('zh',{n_aby:`深渊记忆`,d_aby:`记住生物和光点，大家同时作答`,
+r_aby:`生物和光点在深渊中依次出现：记住它们，然后大家同时作答。每个正确的元素都得分，全对 +1。挑战会变化：倒序、哪里变了、找出闯入者。🤿 深潜（2 次，仅在未领先时可用）：+2 个元素，至少对一半则得分 ×1.5，否则 0。`,
+r_aby2:`两人对局是一场记忆对决：深渊展示，你们同时作答。每个正确的元素都得分，全对 +1。🤿 深潜（每人 3 次，领先时不可用）：+2 个元素，至少对一半则得分 ×1.5，否则 0。`,
+abT:`回声|退潮|萤火|哪里变了|闯入者`,abS:`记住顺序|记住顺序，之后倒着答|按顺序记住光点|记住画面|记住谁游过`,
+abA:`按相同顺序|倒序：从最后一个到第一个|光点，按顺序|点出变化的格子（{v}）|谁从没出现过？（{v}）`,abN:`要记 {v} 个`,
+abSeen:`记住了！等待其他人……`,abWatch:`看仔细：深渊只展示一次`,abClr:`清除`,abDv:`深潜`,abDvD:`+2 个元素 · 至少对 {k}/{n} 则 ×1.5，否则 0`,
+abDvL:`领先中：不能深潜`,abDv0:`深潜次数已用完`,abDvs:`正在深潜：{n}`,abNx:`下一项挑战`,abAns:`正确答案`,abMine:`你的答案`,
+abPerf:`全对！`,abFail:`深潜失败：不到一半，这次 0 分`,abNone:`没有作答`,abTb:`并列第一：{n} 答得最快（+1）`,abPf:`全对轮数`,abDk:`成功深潜`,
+tu_aby1:`生物在深渊中一个接一个游过。按顺序记住它们：只出现一次。`,
+tu_aby2:`然后大家同时作答，按顺序点选生物。结束前都可以修改。`,
+tu_aby3:`每个位置正确的生物得 1 分：忘了一个只扣一分。全对：再 +1。`,
+tu_aby4:`挑战会变化：倒序、光点、画面里哪里变了、从没出现过的闯入者。`,
+tu_aby5:`🤿 深潜，每局几次，仅在未领先时可用：+2 个元素，至少对一半则得分 ×1.5，否则 0。`,
+tu_aby6:`两人对局：每人 3 次深潜。领先者不能深潜，对决因此此消彼长。`,
+lg_abyP:`{a} 在深渊里几乎什么都没忘`,lg_abyD:`{a} 成功完成了两次深潜`,lg_abyC:`{a} 在深渊里从最后一名逆袭夺冠`});
+GAB('he',{n_aby:`זיכרון המעמקים`,d_aby:`לזכור יצורים ואורות, כולם בבת אחת`,
+r_aby:`יצורים ואורות חולפים במעמקים: {g:זכור|זכרי|לזכור} אותם, ואז כולם עונים בו־זמנית. כל פריט נכון מזכה, בלי טעויות +1. המשימות משתנות: הפוך, מה השתנה, הזר. 🤿 צלילה עמוקה (פעמיים, רק למי שלא מוביל): +2 פריטים, נקודות ×1.5 אם לפחות חצי נכון, אחרת 0.`,
+r_aby2:`בשניים זה דו־קרב זיכרון: המעמקים מראים, ושניכם עונים בו־זמנית. כל פריט נכון מזכה, בלי טעויות +1. 🤿 צלילה עמוקה (3 פעמים לכל אחד, לא למי שמוביל): +2 פריטים, נקודות ×1.5 אם לפחות חצי נכון, אחרת 0.`,
+abT:`הד|שפל|גחליליות|מה השתנה|הזר`,abS:`{g:זכור|זכרי|לזכור} את הסדר|{g:זכור|זכרי|לזכור} את הסדר, התשובה הפוכה|{g:זכור|זכרי|לזכור} את האורות לפי הסדר|{g:זכור|זכרי|לזכור} את התמונה|{g:זכור|זכרי|לזכור} מי חולף`,
+abA:`באותו סדר|הפוך: מהאחרון לראשון|האורות, לפי הסדר|{g:גע|געי|לגעת} במה שהשתנה ({v})|מי אף פעם לא חלף? ({v})`,abN:`{v} לזכור`,
+abSeen:`בזיכרון! מחכים לאחרים…`,abWatch:`{g:הסתכל|הסתכלי|להסתכל} היטב: המעמקים מראים רק פעם אחת`,abClr:`מחיקה`,abDv:`צלילה עמוקה`,abDvD:`+2 פריטים · ×1.5 אם לפחות {k} מתוך {n} נכונים, אחרת 0`,
+abDvL:`{g:מוביל|מובילה|מוביל/ה}: אין צלילה עמוקה`,abDv0:`לא נשארו צלילות עמוקות`,abDvs:`בצלילה עמוקה: {n}`,abNx:`המשימה הבאה`,abAns:`התשובה הנכונה`,abMine:`התשובה שלך`,
+abPerf:`בלי טעויות!`,abFail:`הצלילה נכשלה: פחות מחצי, הפעם 0`,abNone:`אין תשובה`,abTb:`תיקו בראש: {n} {g.n:ענה|ענתה|ענה/תה} הכי מהר (+1)`,abPf:`סבבים בלי טעויות`,abDk:`צלילות עמוקות מוצלחות`,
+tu_aby1:`יצורים חולפים אחד אחד במעמקים. {g:זכור|זכרי|לזכור} אותם לפי הסדר: הם חולפים רק פעם אחת.`,
+tu_aby2:`ואז כולם עונים בו־זמנית ונוגעים ביצורים לפי הסדר. אפשר לתקן עד הסוף.`,
+tu_aby3:`כל יצור במקומו מזכה ב־1: שכחה עולה רק נקודה. בלי טעויות: עוד +1.`,
+tu_aby4:`המשימות משתנות: הפוך, אורות, מה השתנה בתמונה, הזר שאף פעם לא חלף.`,
+tu_aby5:`🤿 צלילה עמוקה, כמה פעמים במשחק ורק למי שלא מוביל: +2 פריטים, נקודות ×1.5 אם לפחות חצי נכון, אחרת 0.`,
+tu_aby6:`בשניים: 3 צלילות לכל אחד. מי שמוביל לא יכול לצלול, כך הדו־קרב מתאזן.`,
+lg_abyP:`{a} כמעט לא {g.a:שכח|שכחה|שכח/ה} כלום במעמקים`,lg_abyD:`{a} {g.a:הצליח|הצליחה|הצליח/ה} בשתי צלילות עמוקות`,lg_abyC:`{a} {g.a:טיפס|טיפסה|טיפס/ה} מהמקום האחרון עד הניצחון במעמקים`});
+GAB('pt',{n_aby:`Memória do abismo`,d_aby:`Lembrar criaturas e luzes, todos ao mesmo tempo`,
+r_aby:`Criaturas e luzes passam pelo abismo: memorize-as e depois todos respondem ao mesmo tempo. Cada elemento certo pontua, sem erros +1. As provas mudam: ao contrário, o que mudou, o intruso. 🤿 Mergulho profundo (2 vezes, só se você não estiver na frente): +2 elementos, pontos ×1,5 se acertar pelo menos metade, senão 0.`,
+r_aby2:`A dois é um duelo de memória: o abismo mostra e vocês respondem ao mesmo tempo. Cada elemento certo pontua, sem erros +1. 🤿 Mergulho profundo (3 vezes cada, não quando você lidera): +2 elementos, pontos ×1,5 se acertar pelo menos metade, senão 0.`,
+abT:`Eco|Refluxo|Vaga-lumes|A mudança|O intruso`,abS:`Memorize a ordem|Memorize a ordem, você vai dar ao contrário|Memorize as luzes em ordem|Memorize o cenário|Memorize quem passa`,
+abA:`Na mesma ordem|Ao contrário: do último ao primeiro|As luzes, em ordem|Toque no que mudou ({v})|Quem nunca passou? ({v})`,abN:`{v} para lembrar`,
+abSeen:`Memorizado! Esperando os outros…`,abWatch:`Olhe bem: o abismo só mostra uma vez`,abClr:`Apagar`,abDv:`Mergulho profundo`,abDvD:`+2 elementos · ×1,5 se acertar pelo menos {k} de {n}, senão 0`,
+abDvL:`Na liderança: sem mergulho profundo`,abDv0:`Sem mergulhos profundos restantes`,abDvs:`Em mergulho profundo: {n}`,abNx:`Próxima prova`,abAns:`A resposta certa`,abMine:`Sua resposta`,
+abPerf:`Sem erros!`,abFail:`Mergulho falhou: menos da metade, 0 desta vez`,abNone:`sem resposta`,abTb:`Empate na liderança: {n} respondeu mais rápido (+1)`,abPf:`rodadas sem erros`,abDk:`mergulhos profundos certeiros`,
+tu_aby1:`As criaturas passam uma a uma pelo abismo. Memorize-as em ordem: elas só passam uma vez.`,
+tu_aby2:`Depois todos respondem ao mesmo tempo, tocando as criaturas em ordem. Dá para corrigir até o fim.`,
+tu_aby3:`Cada criatura no lugar certo vale 1: um esquecimento custa só um ponto. Sem erros: +1 a mais.`,
+tu_aby4:`As provas mudam: ao contrário, luzes, o que mudou num cenário, o intruso que nunca passou.`,
+tu_aby5:`🤿 Mergulho profundo, poucas vezes por partida, só se você não estiver na liderança: +2 elementos, pontos ×1,5 se acertar pelo menos metade, senão 0.`,
+tu_aby6:`A dois: 3 mergulhos cada. Quem lidera não pode mergulhar: o duelo se equilibra.`,
+lg_abyP:`{a} quase não esqueceu nada no abismo`,lg_abyD:`{a} acertou dois mergulhos profundos`,lg_abyC:`{a} foi do último lugar à vitória no abismo`});
+/* /🫧 i18n */
 })();
