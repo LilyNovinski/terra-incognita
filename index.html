@@ -52,7 +52,7 @@
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="i18n.js?v=20261116s"></script>
 <script src="decks.js?v=5"></script>
-<script src="games.js?v=28"></script><!-- @games -->
+<script src="games.js?v=29"></script><!-- @games -->
 <script src="games-pools.js?v=2"></script><!-- @games -->
 <style>
 :root{--sea1:#bdeef0;--sea2:#69c9d3;--deep:#0e5866;--deep2:#0a4652;--paper:#fffaf0;--paper2:#fbf0d9;--edge:#ead6ae;--edge2:#d8bd88;--txt:#3b2a1b;--mut:#8a7660;--acc:#ff8a3d;--acc-d:#d9661f;--acc2:#ffb15c;--ink:#1d8e6c;--sur:#d9661f;--ear:#5869b5;--bad:#d64b3c;--gold:#f2b84b}
@@ -1996,7 +1996,7 @@ document.addEventListener('contextmenu',ev=>{if(ev.target.closest&&ev.target.clo
 document.addEventListener('click',ev=>{const b=ev.detail===0&&ev.target.closest&&ev.target.closest('.reacts [data-e]');if(b)react(b.dataset.e,b)});
 /* double-tap sur une carte : ❤️ à l'endroit du tap, visible par tout le monde */
 /* sur PC : le vrai double-clic du système (délai réglé par Windows/macOS) et pas de sélection de texte au 2e clic */
-const dtOk=tg=>tg&&tg.closest&&tg.closest('.card,.guess,.banner')&&!tg.closest('button,input,textarea,a,.reacts,.dd,[contenteditable],select,label,canvas,.gw svg')&&$('.reacts');
+const dtOk=tg=>tg&&tg.closest&&tg.closest('.card,.guess,.banner,section>.gw')&&!tg.closest('button,input,textarea,a,.reacts,.dd,[contenteditable],select,label,canvas,.gw svg')&&$('.reacts');
 const dtFire=ev=>{try{getSelection().removeAllRanges()}catch(e){}if(me&&st&&(isHost||(hostConn&&hostConn.open)))react('❤️',null,{k:'tap',x:+(ev.clientX/innerWidth).toFixed(3),y:+(ev.clientY/innerHeight).toFixed(3)})};
 document.addEventListener('mousedown',ev=>{if(ev.detail>1&&dtOk(ev.target))ev.preventDefault()});
 document.addEventListener('dblclick',ev=>{if(dtOk(ev.target))dtFire(ev)});
@@ -2353,13 +2353,19 @@ function kick(name,ban){const p=P(name);if(!isHost||!p||name==st.host)return;
  for(const id in conns){const c=conns[id];if(c.pname==name){try{c.send({t:'err',k:ban?'kicked':'g2Out'})}catch(e){}delete conns[id];setTimeout(()=>{try{c.close()}catch(e){}},500)}}
  st.players=st.players.filter(x=>x!=p);delete st.votes[name];
  if((st.phase=='game'||st.phase=='gend')&&st.order.includes(name))GKick(st,name);/* @games */
- else if(st.phase!='lobby'&&st.order.includes(name)){const n=st.order.length,left=Math.max(0,st.total-st.turn),xi=st.order.indexOf(name),L=st.L||st.length,b=Math.floor(st.turn/L)%n;
+ else if(st.phase!='lobby'&&st.order.includes(name))orderOut(name);
+ toast(T(ban?'g2BanT':'kickedT',{n:name}));bump()}
+/* Expédition : retirer quelqu'un de l'ordre de jeu sans casser l'étape (exclusion, ou 👀 passage spectateur) */
+function orderOut(name){const n=st.order.length,left=Math.max(0,st.total-st.turn),xi=st.order.indexOf(name),L=st.L||st.length,b=Math.floor(st.turn/L)%n;
   st.order=st.order.filter(x=>x!=name);if(MODE()=='por'){/* @qa2 : l'île en cours reste la même */if(xi<b){st.turn-=L;if(st.pf!=null)st.pf-=L}else if(xi==b){st.turn=b*L;st.pf=st.turn}st.total=Math.max(st.turn,st.total-L)}else st.total=st.turn+Math.round(left*(n-1)/n);
   if(st.cur&&(st.cur.explorer==name||st.cur.terr==name)){st.cur=null;if(!['end','carnet'].includes(st.phase))st.phase='map'}
   if(st.order.length<2&&!['end','carnet'].includes(st.phase)){st.cur=null;st.phase='end'}
   else if(st.phase=='map'&&st.turn>=st.total)st.phase='end';
   if(st.phase=='question'&&st.cur)checkAll();gFlagsCheck(st);g3Hurry()}
- toast(T(ban?'g2BanT':'kickedT',{n:name}));bump()}
+/* Expédition : (re)prendre place dans l'ordre de jeu (arrivée en cours de partie, ou 👀 retour de spectateur) */
+function orderIn(name){if(st.order.includes(name))return;const n=st.order.length,L=st.L||st.length;st.order.push(name);st.bottles[name]=st.bottles[name]??1;
+ if(st.mode=='mir'&&st.order.length!=2)st.mode='exp';
+ st.total=MODE()=='por'?st.total+L:st.turn+Math.round(Math.max(0,st.total-st.turn)*(n+1)/n)}
 function hostDrop(c){if(!conns[c.peer])return;delete conns[c.peer];
  const p=st.players.find(x=>x.peer==c.peer);if(!p)return;
  if(st.phase=='lobby'){st.players=st.players.filter(x=>x!=p);delete st.votes[p.name]}else{p.online=false;if(st.phase=='question')checkAll();gFlagsCheck(st);g3Hurry()}
@@ -2422,8 +2428,11 @@ function loadBestSave(){const k=saveKey(st.order);const cands=[LS.get(k,null)];f
  /* game2 : chaque partie repart de cartes vierges ; les anciennes restent dans le carnet (log), les questions déjà vues sont évitées */
  const qs=st.qseen||{};for(const src of [best&&best.used,best&&best.qseen,st.used])for(const t in src||{})qs[t]=[...new Set([...(qs[t]||[]),...src[t]])].slice(-120);
  st.qseen=qs;st.maps={};st.used={};const bl=best&&best.log||[];st.log=bl.length>(st.log||[]).length?bl:(st.log||[])}
-function act(from,a){const s=st;if(!P(from))return;if(GAct(s,from,a))return;/* @games */g2Resp(from,a);
+function act(from,a){const s=st;if(!P(from))return;if(GAct(s,from,a))return;/* @games */
+ if(GEXA.includes(s.phase)&&!s.order.includes(from)&&['pick','answer','guess','judge','door','listened','name','note','who'].includes(a.t))return;/* 👀 spectateur : on regarde */
+ g2Resp(from,a);
  switch(a.t){
+ case 'watch':if(!GEXA.includes(s.phase)||!P(from))return;if(a.v){if(!s.order.includes(from))return;orderOut(from)}else{if(s.order.includes(from))return;orderIn(from)}break;
  case 'ownq':if(a.o&&typeof a.o.q=='string')ownAdd([{...a.o,by:from,d:['base','coquin','trash'][s.tone||0]}]);break;
  case 'vote':if(s.phase=='lobby'&&[0,1,2].includes(a.v))s.votes[from]=a.v;break;
  case 'length':if(from==s.host&&s.phase=='lobby'&&[3,5,7].includes(a.v))s.length=a.v;break;
@@ -2660,9 +2669,7 @@ function g2Admit(name,yes){const r=G2REQ[name];delete G2REQ[name];g2ReqDraw();if
  if(!yes||P(name)||(st.banned||[]).includes(name)||st.players.length>=8){try{c.send({t:'err',k:yes&&P(name)?'errTaken':'g2Nope'})}catch(e){}setTimeout(()=>{try{c.close()}catch(e){}},400);return}
  let color=PAL.includes(r.color)?r.color:PAL[0];if(st.players.some(x=>x.color==color))color=PAL.find(x=>!st.players.some(y=>y.color==x))||color;
  st.players.push({name,color,g:GN(r.g),online:true,peer:c.peer});GMEM[name]=GN(r.g);conns[c.peer]=c;c.pname=name;clientSaves[name]=r.saves;
- if(!['lobby','end','recap','carnet','game','gend'/* @games : en partie, on regarde (👀) et on joue à la suivante */].includes(st.phase)&&!st.order.includes(name)){const n=st.order.length,L=st.L||st.length;st.order.push(name);st.bottles[name]=1;
-  if(st.mode=='mir'&&st.order.length!=2)st.mode='exp';
-  st.total=MODE()=='por'?st.total+L:st.turn+Math.round(Math.max(0,st.total-st.turn)*(n+1)/n)}
+ if(!['lobby','end','recap','carnet','game','gend'/* @games : en partie, on regarde (👀) et on joue à la suivante */].includes(st.phase)&&!st.order.includes(name))orderIn(name);
  toast(T('joined',{n:name}));bump();try{c.send({t:'chatlog',log:chatLog})}catch(e){}}
 function g2ReqDraw(){let w=$('#g2req');for(const n in G2REQ)if(!G2REQ[n].c.open)delete G2REQ[n];
  const ks=isHost&&st?Object.keys(G2REQ):[];if(!ks.length){w&&w.remove();return}
@@ -2746,6 +2753,7 @@ function render(){
  if(!st){home();return}
  const f=captureFocus();
  const v=view();
+ if(GEXA.includes(st.phase)&&!st.order.includes(me.name)){v.html=`<p class="gspc0">👀 ${GT('specX')} <button class="ghost gwb" data-watch="0">🎮 ${GT('wOff')}</button></p>`+(v.html||'');v.mine=false;v.hintBtn=''}/* @games : 👀 */
  const mine=v.mine,key=st.phase+'|'+(st.cur&&st.cur.id)+'|'+st.turn+(st.game?'|'+st.gid+'.'+st.game.k:'');/* @games */
  app.classList.toggle('still',key==lastPhaseKey);
  let tb=$('#tb',app),sec=app.querySelector(':scope>section');
@@ -2774,9 +2782,9 @@ function copyInvite(){const url=/^https?:/.test(location.protocol)?'\n'+location
  try{navigator.clipboard.writeText(t).then(()=>toast(T('copied')),()=>toast(T('codeIs',{code:st.code})))}catch(e){toast(T('codeIs',{code:st.code}))}}
 function topbar(){
  const ex=st.order.length&&!['lobby','end','recap','carnet','game','gend'/* @games */].includes(st.phase)?explorer():null,tr=st.cur&&st.cur.terr;
- const gp=st.phase=='game'||st.phase=='gend',list=(gp?[...st.order.map(P),...st.players.filter(p=>p.online&&!st.order.includes(p.name))]:st.order.length&&st.phase!='lobby'?st.order.map(P):st.players).filter(Boolean);/* @games : 👀 spectateurs aussi */
+ const gp=st.phase=='game'||st.phase=='gend'||GEXA.includes(st.phase),ws=window.GWatchSt&&GWatchSt(),list=(gp?[...st.order.map(P),...st.players.filter(p=>p.online&&!st.order.includes(p.name))]:st.order.length&&st.phase!='lobby'?st.order.map(P):st.players).filter(Boolean);/* @games : 👀 spectateurs aussi */
  return `<div class="top"><div class="brand" id="homebtn" role="button" tabindex="0" data-tip="${esc(T('home'))}" aria-label="${esc(T('home'))}">${LOGO(40,'t')}<span>Terra <i>Incognita</i></span>${SIG}</div><button class="code" id="codebtn" data-tip="${esc(T('copyInv'))}" aria-label="${esc(T('copyInv'))}">${st.code}</button>
- <button class="icon" id="mute" data-tip="${esc(T('sound'))}" aria-label="${esc(T('sound'))}">${muted?'🔇':'🔊'}</button>${thmBtn()}${spBtn()}<button class="icon" id="help" data-tip="${esc(T('help'))}" aria-label="${esc(T('help'))}">?</button></div>
+ <button class="icon" id="mute" data-tip="${esc(T('sound'))}" aria-label="${esc(T('sound'))}">${muted?'🔇':'🔊'}</button>${thmBtn()}${spBtn()}${ws?`<button class="icon wtb ${ws=='on'?'':'on'}" data-watch="${ws=='off'?0:1}" data-tip="${esc(GT(ws=='on'?'wOn':ws=='off'?'wOff':'wQ'))}" aria-label="${esc(GT(ws=='on'?'wOn':ws=='off'?'wOff':'wQ'))}">${ws=='off'?'🎮':'👀'}</button>`:''}<button class="icon" id="help" data-tip="${esc(T('help'))}" aria-label="${esc(T('help'))}">?</button></div>
  <div class="players">${list.map(p=>`<span data-p="${esc(p.name)}" class="chip pc ${p.name==me.name?'me':''} ${p.online?'':'off'} ${p.name==ex?'turn':''}" style="--pc:${p.color}">${esc(p.name)}${p.name==ex?` <span class="role" data-tip="${esc(T('explores'))}" aria-label="${esc(T('explores'))}">⛵</span>`:''}${p.name==tr?` <span class="role" data-tip="${esc(T('explored'))}" aria-label="${esc(T('explored'))}">🏝️</span>`:''}${window.GSpec&&GSpec(st,p.name)?` <span class="role" data-tip="${esc(GT('specB'))}" aria-label="${esc(GT('specB'))}">👀</span>`:''}${p.name==st.host?` <span class="role hostico" data-tip="${esc(T('host'))}" aria-label="${esc(T('host'))}">${LIGHT}</span>`:''}${isHost&&p.name!=me.name?`<button class="kick" data-kick="${esc(p.name)}" aria-label="${esc(T('kick'))} ${esc(p.name)}"></button>`:''}</span>`).join('')}</div>`}
 
 function view(){
@@ -2900,6 +2908,7 @@ function vQuestion(){const c=st.cur,terr=c.terr==me.name,key=c.id+':'+me.name;
    bind(){$('#done').onclick=()=>send({t:'listened',kw:drafts[c.id+':kw']||''});bindDoor()}}
   :{mine:false,hint:T('listenHint',{n:B(c.terr)}),
    html:qHead(c)+`<div class="card c"><p class="serif" style="font-size:20px">${T('listenT',{n:esc(c.terr)})}</p><p class="mut" style="margin-top:6px">${c.r=='grottes'?T('fearLine'):c.explorer==me.name?T('curioYou'):T('pastLine')}</p>${reactBar()}</div>`}}
+ if(!st.order.includes(me.name))return {mine:false,hint:'👀 '+GT('specH'),html:qHead(c)+`<div class="card c">${progress(c)}${reactBar()}</div>`};/* @games : 👀 spectateur */
  const done=terr?(c.type=='libre'||!!c.answered):(c.sent||[]).includes(me.name);
  if(c.type=='libre'){
   if(terr)return {mine:false,hint:T('imagHint'),html:qHead(c)+`<div class="card c"><p class="serif" style="font-size:20px">${T('imagT')}</p><p class="mut" style="margin-top:6px">${T('prepReal')}</p>${progress(c)}</div>${doorBtn}`,bind:bindDoor};
