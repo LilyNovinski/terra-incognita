@@ -3135,7 +3135,7 @@ function home(){
  const h=$('.hint');h&&h.remove();
  const code=(location.hash||'').replace('#','').toUpperCase().replace(/[^A-Z]/g,'').slice(0,4);
  app.innerHTML=`${langSel()}<div class="hero">${LOGO(128,'h')}<h1 style="margin-top:18px"><span class="wave-t">${waveText('Terra',0)} <i>${waveText('Incognita',5)}</i></span>${SIG}</h1><p class="tagline">${T('tagline')}</p></div>
- <div class="card"><label style="margin-top:0" for="nm">${T('yourName')}</label><input id="nm" maxlength="20" value="${esc(me.name)}" placeholder="${esc(T('namePh'))}">
+ <div class="card"><label style="margin-top:0" for="nm">${T('yourName')}</label><input id="nm" maxlength="20" autocomplete="off" value="${esc(me.name)}" placeholder="${esc(T('namePh'))}">
  <label>${T('yourColor')}</label><div class="sw">${PAL.map(c=>`<button data-c="${c}" style="--c:${c};--c2:${GRAD[c]}" class="${me.color==c?'on':''}" aria-label="${esc(T('colorAria'))}"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`).join('')}</div>
  <label>${T('gT')}</label>${gPick()}
  <div class="me-prev">${T('preview')} <span class="chip"><span class="dot" id="mydot" style="background:${grad(me.color)}"></span><span id="myname">${esc(me.name||T('you'))}</span></span></div></div>
