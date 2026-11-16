@@ -63,37 +63,51 @@ function gLogGame(s,r){if(typeof localStorage=='undefined')return;const g=s.game
 
 /* ---------- moteur ---------- */
 const gOn=s=>s.order.filter(n=>{const p=P(n);return p&&p.online!==false});
+/* attente : une coupure brève (téléphone en veille, changement d'appli, réseau) ne fait pas sauter quelqu'un — on l'attend
+   encore GGR ms après sa déconnexion (le sablier, lui, court toujours). Jamais compté comme « fini » pour autant. */
+const GOFF={},GGR=60000;
+const gWt=s=>s.order.filter(n=>{const p=P(n);if(!p)return false;if(p.online!==false){delete GOFF[n];return true}const t=GOFF[n]||(GOFF[n]=Date.now());return Date.now()-t<GGR});
+/* spectateurs 👀 : au salon, chacun peut choisir de regarder (s.gspec) ; en partie, toute personne hors s.order regarde
+   (arrivée en cours de partie → elle joue à la suivante). gPl = qui jouera la prochaine partie. */
+const gPl=s=>s.players.filter(p=>p.online&&!(s.gspec||[]).includes(p.name)).map(p=>p.name);
+W.GSpec=(s,n)=>!!(s&&P(n)&&(s.phase=='game'||s.phase=='gend'?s.order&&!s.order.includes(n):s.phase=='lobby'&&s.gsel&&(s.gspec||[]).includes(n)));
+/* scores toujours propres : nombre fini, arrondi au dixième, 0 pour qui n'en a pas */
+const gNum=v=>{v=+v;return isFinite(v)?Math.round(v*10)/10:0};
+function gScl(s){const g=s.game;if(!g)return;g.sc=g.sc||{};s.order.forEach(n=>g.sc[n]=gNum(g.sc[n]))}
 /* sablier : durée de base × facteur de l'hôte (TF : 1,5 / 1 / 0,7, comme l'Expédition). TF 0 = pas de sablier : g.dl=-1,
    on avance seulement quand tout le monde a fini. Toutes les durées de jeu passent par gWait. */
 const gTF=()=>{try{return typeof st!='undefined'&&st?+(st.timer??1):1}catch(e){return 1}};/* = TF() hors mode éclair (propre à l'Expédition) */
-function gWait(g,sec,st,rv){const f=gTF();sec=Math.round(sec*(f||1));g.st=st;g.k++;g.done={};g.need=null;g.dl=f?Date.now()+sec*1000:-1;g.sec=sec;g.rv=rv?1:0}
+function gWait(g,sec,st,rv){const f=gTF();sec=Math.round(sec*(f||1));g.st=st;g.k++;g.done={};g.need=null;g.dl=f?Date.now()+sec*1000:-1;g.sec=sec;g.rv=rv?1:0;g.edt=null}
 const gLate=g=>g.dl>0&&Date.now()>g.dl;
-const gNeed=s=>{const g=s.game;return gOn(s).filter(n=>!g.need||g.need.includes(n))};
+const gNeed=s=>{const g=s.game;return gWt(s).filter(n=>!g.need||g.need.includes(n))};
 const gAll=s=>gNeed(s).every(n=>s.game.done[n]);
-function gFin(s){const g=s.game,r=GAMES[g.id].fin(s)||{};s.gres={pts:r.pts||g.sc,coop:r.coop||null};g.dl=0;s.phase='gend';if(g.over)try{gLogGame(s,r)}catch(e){}}
+function gFin(s){const g=s.game;gScl(s);const r=GAMES[g.id].fin(s)||{},rp=r.pts||g.sc,pts={};s.order.forEach(n=>pts[n]=gNum(rp[n]));s.gres={pts,coop:r.coop?{...r.coop,v:gNum(r.coop.v),max:gNum(r.coop.max)}:null};g.dl=0;s.phase='gend';if(g.over)try{gLogGame(s,r)}catch(e){}}
 function gCheck(s){const g=s.game;let i=0;
- while(s.phase=='game'&&g.dl&&(gAll(s)||gLate(g))&&i++<6){g.dl=0;GAMES[g.id].next(s);if(g.over){gFin(s);break}}}
+ while(s.phase=='game'&&g.dl&&(gAll(s)||gLate(g))&&i++<6){g.dl=0;GAMES[g.id].next(s);gScl(s);if(g.over){gFin(s);break}}}
 function gStart(s){const id=s.gsel;s.game={id,k:0,r:0,n:0,sc:{},done:{},rx:{}};s.order.forEach(n=>s.game.sc[n]=0);s.gres=null;s.phase='game';s.gid=Date.now().toString(36);GAMES[id].init(s);
  /* 📜 clin d'œil : le dernier temps fort de CE jeu entre ces personnes, en tête de la 1re étape (sauf si Le Phare en pose déjà un) */
  try{const g=s.game,e=!g.lq&&typeof localStorage!='undefined'&&gLogFor(s.order).find(e=>e.g==id);if(e)g.nod={k:e.k,n:e.n}}catch(e){}gCheck(s)}
 /* @games : appelé en tête de act() ; true = géré ici */
 W.GAct=function(s,from,a){const t=a&&a.t;
  if(t=='gsel'){if(from==s.host&&s.phase=='lobby'&&(!a.v||GAMES[a.v])){s.gsel=a.v||null;bump()}return true}
- if(t=='start'&&s.gsel&&s.phase=='lobby'){const G=GAMES[s.gsel],on=s.players.filter(p=>p.online);
-  if(from==s.host&&G&&on.length>=G.min&&on.length<=G.max){s.order=on.map(p=>p.name);gStart(s);bump()}return true}
+ if(t=='start'&&s.gsel&&s.phase=='lobby'){const G=GAMES[s.gsel],on=gPl(s);
+  if(from==s.host&&G&&on.length>=G.min&&on.length<=G.max){s.order=on;gStart(s);bump()}return true}
+ if(t=='gspec'){if(s.phase=='lobby'&&P(from)){const L=(s.gspec||[]).filter(n=>n!=from&&P(n));s.gspec=a.v?[...L,from]:L;bump()}return true}
  if(t=='gtie'){/* liens connus (couples…) : n'importe qui peut lier deux personnes ; seul·es les autres peuvent délier */
   if(s.phase=='lobby'&&s.players.some(p=>p.name==from)&&Array.isArray(a.v)&&a.v.length==2&&a.v[0]!==a.v[1]&&a.v.every(n=>typeof n=='string'&&s.players.some(p=>p.name==n))){
    const k=a.v[0]<a.v[1]?a.v[0]+'|'+a.v[1]:a.v[1]+'|'+a.v[0],L=s.gtie||[];if(L.includes(k)){if(a.v.includes(from))return true;s.gtie=L.filter(x=>x!=k)}else s.gtie=[...L,k].slice(-8);bump()}return true}
  if(t=='gx'&&a.v=='stop'){if(from==s.host&&s.phase=='game'&&s.game){gFin(s);bump()}return true}
  if(t=='gx'){if(from!=s.host||s.phase!='gend')return true;s.players=s.players.filter(p=>p.online);
-  const G=GAMES[s.game.id],on=s.players.map(p=>p.name);
+  const G=GAMES[s.game.id],on=gPl(s);s.gspec=(s.gspec||[]).filter(n=>P(n));
   if(a.v=='again'&&on.length>=G.min&&on.length<=G.max){s.gsel=s.game.id;s.order=on;gStart(s)}else{s.phase='lobby';s.game=null;s.gres=null}
   bump();return true}
- if(t=='g'){const g=s.game;if(s.phase!='game'||!g||!s.order.includes(from))return true;if(a.k!=null&&a.k!==g.k&&!a.rx)return true;
-  let ch=false;if(a.rx&&typeof a.rx=='string'&&RX.includes(a.rx)){g.rx[from]=a.rx;(g.rxt=g.rxt||{})[from]=Date.now();ch=true}/* rxt : pour rejouer une réaction une seule fois */
-  else if(a.ok&&g.rv){if(!g.done[from]){g.done[from]=1;ch=true}}
+ if(t=='g'){const g=s.game;if(s.phase!='game'||!g||!P(from))return true;if(a.k!=null&&a.k!==g.k)return true;
+  /* 👀 spectateurs : pas d'action de jeu (leurs réactions passent par la barre commune) */if(!s.order.includes(from))return true;
+  let ch=false;if(a.ok&&g.rv){if(!g.done[from]){g.done[from]=1;ch=true}}
+  /* ✏️ Modifier : la personne n'est plus prête tant qu'elle n'a pas renvoyé (jamais pendant un dévoilement) */
+  else if(a.undo){if(!g.rv&&g.done[from]){delete g.done[from];(g.edt=g.edt||{})[from]=1;ch=true}}
   else{/* on peut changer d'avis tant que l'étape n'est pas finie (les autres jouent encore, sablier en cours) */
-   const was=g.done[from];if(was&&!g.rv)delete g.done[from];ch=!!GAMES[g.id].act(s,from,a);if(!ch&&was)g.done[from]=was}
+   const was=g.done[from];if(was&&!g.rv)delete g.done[from];ch=!!GAMES[g.id].act(s,from,a);if(!ch&&was)g.done[from]=was;if(ch&&g.edt)delete g.edt[from]}
   if(ch){gCheck(s);bump()}return true}
  return false};
 W.GHide=function(name,s){if(!s||s.phase!='game'||!s.game)return s;const G=GAMES[s.game.id];return G&&G.hide?{...s,game:G.hide(s.game,name,s)}:s};
@@ -103,50 +117,91 @@ if(typeof setInterval!='undefined'&&typeof document!='undefined')setInterval(W.g
 
 /* ---------- aides de vue ---------- */
 const RX=['😎','😱','🫧','🦈'];
+/* 💬 réactions : la barre de l'Expédition (reactBar, double-tap ❤️), sous le jeu ; G.rx = jeu de réactions propre (mécanique) */
+const gRxBar=G=>typeof reactBar=='function'?`<div class="gwrx">${reactBar(G&&G.rx)}</div>`:'';
+W.GRxOk=e=>{try{return st.phase=='game'&&!!st.game&&(GAMES[st.game.id].rx||[]).includes(e)}catch(x){return false}};
+/* bulle sur la puce du joueur dans le jeu (DOM seul : ne relance aucune autre animation) */
+W.GRxHit=(from,e)=>{if(typeof document=='undefined')return;document.querySelectorAll('section>.gw [data-rxp]').forEach(x=>{if(x.dataset.rxp!==from)return;
+ x.querySelectorAll('.grxf').forEach(o=>o.remove());const b=document.createElement('span');b.className='grxf';b.setAttribute('aria-hidden','true');b.textContent=e;x.appendChild(b);setTimeout(()=>b.remove(),2600)})};
 const gs=a=>send({t:'g',k:st.game.k,...a});
 const meN=()=>me.name;
 const NM=n=>n=='~'?`<b>🐟 ${esc(GT('ghost'))}</b>`:B(n);
 const DT=n=>n=='~'?'<span class="dot" style="background:#7aa6b8"></span>':DOT(n);
 const dl=(i,b=0)=>`style="animation-delay:${(b+i*.07).toFixed(2)}s"`;
 function gHint(s){const g=s.game,m=meN(),need=gNeed(s);
+ if(!s.order.includes(m))return{hint:'👀 '+GT('specH')};
  if(g.rv){const w=need.filter(n=>!g.done[n]);return g.done[m]?{hint:w.length?GT('waitN',{n:w.map(B).join(', ')}):'…'}:{hint:GT('ready'),hintBtn:`<button class="pri gokb" id="gok">${GT('ok')}</button>`,mine:true}}
  if(!need.includes(m))return{hint:GT('watch')};
  if(!g.done[m])return{hint:GT('yourMove'),mine:true};
- const w=need.filter(n=>!g.done[n]);return{hint:GT('waitN',{n:w.map(B).join(', ')})}}
+ const w=need.filter(n=>!g.done[n]);return{hint:GT('waitN',{n:w.map(n=>(g.edt||{})[n]?B(n)+' ✏️ '+GT('gEdg'):B(n)).join(', ')})}}
 const pick=(names,cur,attr,ex)=>`<div class="gpk">${names.filter(n=>n!=ex).map((n,i)=>`<button class="ga ${cur==n?'sel':''}" ${dl(i)} ${attr}="${esc(n)}">${DT(n)}<span>${n==meN()?GT('me'):esc(n)}</span></button>`).join('')}</div>`;
 const norm=w=>String(w||'').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,'').replace(/^(.{4,})[sx]$/,'$1');
+/* nombres lisibles : pluriel par langue, points signés (« +3 points », « −8 pts »), temps restant d'une étape */
+const gPlI=(v,l)=>{v=Math.abs(+v||0);l=l||(typeof LANG!='undefined'?LANG:'fr');if(l=='zh')return 0;if(l=='ru'){const a=v%10,b=v%100;return Number.isInteger(v)?(a==1&&b!=11?0:a>=2&&a<=4&&(b<12||b>14)?1:2):1}return l=='fr'?(v<2?0:1):(v==1?0:1)};
+const GTn=W.GTn=(k,v,x)=>{const f=GT(k,{v,...(x||{})}).split('|');return f[Math.min(gPlI(parseFloat(String(v).replace('−','-'))),f.length-1)]};
+const gSg=v=>v>0?'+'+v:v<0?'−'+Math.abs(v):'0';
+const gP=v=>GTn('pts',gSg(+v||0)).replace(/^(\S+)/,'$1'),gPs=v=>GTn('ptsS',gSg(+v||0));
+const gRem=s=>{const g=s.game;return g&&g.dl>0?Math.max(0,(g.dl-((s.updatedAt||Date.now())+(Date.now()-(typeof RCV!='undefined'&&RCV||Date.now()))))/1000):0};
 const hideOwn=(o,n)=>{const r={};for(const k in o||{})r[k]=k==n?o[k]:null;return r};
+
+/* animations d'entrée : une seule fois par étape (clé jeu + g.k). Un nouveau rendu dans la même étape (offre, réaction,
+   choix d'un·e autre, chat…) recrée le DOM : chaque animation déjà vue reprend là où elle en était (currentTime), donc
+   rien ne rejoue ni ne clignote ; seuls les éléments vraiment nouveaux s'animent. [data-gan] : animations qui se calent
+   elles-mêmes sur une horloge (sablier, séquences, bulles de réaction) — on n'y touche pas. */
+const gAnP=(el,root)=>{let p='';for(let e=el;e&&e!==root;e=e.parentElement){const c=((e.getAttribute('class')||'').split(' ')[0])||'',t=e.tagName;let i=0;
+ for(let x=e.previousElementSibling;x;x=x.previousElementSibling)if(x.tagName==t&&((x.getAttribute('class')||'').split(' ')[0]||'')==c)i++;p='/'+t+'.'+c+':'+i+p}return p};
+function gAnim(root,key){if(!root||!root.getAnimations)return;try{const now=performance.now(),N=new Map();if(GV.ak!==key){GV.ak=key;GV.am=new Map()}const M=GV.am;
+ for(const a of root.getAnimations({subtree:true})){const el=a.effect&&a.effect.target;if(!el||!a.animationName||el.closest('[data-gan]'))continue;
+  const id=gAnP(el,root.parentElement)+(a.effect.pseudoElement||'')+'@'+a.animationName,t0=M.get(id);
+  if(t0!=null){a.currentTime=now-t0;N.set(id,t0)}else N.set(id,now)}
+ GV.am=N}catch(e){}}
+W.GAnim=gAnim;
+/* brouillons de jeu (textes en cours d'écriture) : gardés aussi dans la session de l'onglet → survivent à un rechargement
+   de page (téléphone qui a tué l'onglet) tant que la partie est la même */
+const GDK='terra:gdr';
+function gDrIn(s){if(GV.dr===s.gid)return;GV.dr=s.gid;try{const o=JSON.parse(sessionStorage.getItem(GDK)||'null');if(o&&o.gid===s.gid)for(const k in o.d)if(drafts[k]==null)drafts[k]=o.d[k]}catch(e){}}
+function gDrOut(){try{const d={};for(const k in drafts)if(/^g[a-z]/.test(k)&&typeof drafts[k]=='string')d[k]=drafts[k];sessionStorage.setItem(GDK,JSON.stringify({gid:st.gid,d}))}catch(e){}}
+if(typeof document!='undefined')document.addEventListener('input',e=>{const t=e.target;if(t&&t.closest&&t.closest('.gw')&&t.dataset&&t.dataset.d)setTimeout(gDrOut,0)});
+/* 👀 bandeau des spectateurs (en partie) : qui regarde, et sa dernière réaction */
+function gSpecBar(s){const o=s.order||[],L=(s.players||[]).filter(p=>p.online&&!o.includes(p.name));if(!L.length)return '';const g=s.game||{};
+ return `<div class="gspb2"><span class="gspi" aria-hidden="true">👀</span>${L.map(p=>`<span class="gspn">${DT(p.name)}${p.name==meN()?esc(GT('me')):esc(p.name)}</span>`).join('')}</div>`}
 
 W.GView=function(){const s=isHost?GHide(meN(),st):st,g=s.game;if(!g||!GAMES[g.id])return{html:''};/* l'hôte voit la même chose que les autres */
  if(s.v!==GV.v){GV.v=s.v;GV.t=Date.now()}
+ try{gDrIn(s)}catch(e){}
  if(s.phase=='gend')return gEndView(s);
+ const spc=!s.order.includes(meN());
  const G=GAMES[g.id],v=G.view(s)||{},two=s.order.length==2;
- const rem=g.dl>0?Math.max(0,(g.dl-((s.updatedAt||Date.now())+(Date.now()-(RCV||Date.now()))))/1000):0;
+ const rem=gRem(s);
  const rk='r_'+g.id+(two&&GI18N.fr.ui['r_'+g.id+'2']?'2':'');
  const head=`<div class="ghd"><span class="gic">${G.icon}</span><b>${GT('n_'+g.id)}</b>${g.n?`<span class="grd">${Math.min(g.r+1,g.n)} / ${g.n}</span>`:''}${meN()==s.host?`<button class="gstop" id="gstop" aria-label="${esc(GT('stopAsk'))}" data-tip="${esc(GT('stopAsk'))}">✕</button>`:''}</div>
- ${g.dl>0?`<div class="gsab" aria-hidden="true"><i style="animation-duration:${g.sec}s;animation-delay:-${Math.max(0,g.sec-rem).toFixed(2)}s"></i></div>`:''}
+ ${spc?`<p class="gspc0">👀 ${GT((s.gspec||[]).includes(meN())?'specT2':'specT')}</p>`:''}${g.dl>0&&!(G.clk&&G.clk(g))?`<div class="gsab" data-gan aria-hidden="true"><i style="animation-duration:${g.sec}s;animation-delay:-${Math.max(0,g.sec-rem).toFixed(2)}s"></i></div>`:''}
  ${g.k<=1?`<p class="grule">${GT(rk)}</p>${g.nod?`<p class="gnod ga" ${dl(2)}>📜 ${GT('lgLast',{t:gLogT({g:g.id,...g.nod})})}</p>`:''}`:''}`;
  const h={...gHint(s),...v};const ob=v.bind;
- return{...h,html:`<div class="gw g-${g.id}${g.k>1?' gnx':''}">${head}${v.html}</div>`,bind(){
+ if(spc){delete h.hintBtn;h.mine=false}
+ return{...h,html:`<div class="gw g-${g.id}${g.k>1?' gnx':''}${spc?' gspc':''}">${head}${v.html}${gSpecBar(s)}${gRxBar(G)}</div>`,bind(){
   $('#gok')&&($('#gok').onclick=()=>gs({ok:1}));$('#gstop')&&($('#gstop').onclick=()=>ask(GT('stopAsk'),GT('stop')).then(v=>v&&send({t:'gx',v:'stop'})));
   if(GV.fx!==g.id+g.k){GV.fx=g.id+g.k;if(g.rv)try{SFX.reveal()}catch(e){}}
-  ob&&ob()}}};
+  gAnim($('section>.gw'),'g'+s.gid+'.'+g.k);ob&&ob()}}};
 
 function gEndView(s){const g=s.game,G=GAMES[g.id],R=s.gres||{pts:{}},host=meN()==s.host,two=s.order.length==2;
  const rows=Object.entries(R.pts).sort((a,b)=>b[1]-a[1]);let rank=0,prev=null;
  const list=R.coop?'':`<div class="gsc">${rows.map(([n,p],i)=>{if(p!==prev){rank=i;prev=p}return `<div class="grow ga ${n==meN()?'me':''}" ${dl(i,.1)}><span class="gmd">${['🥇','🥈','🥉'][rank]||rank+1}</span>${DT(n)}<span class="gnm">${NM(n)}</span><b class="gpt">${p}</b></div>`}).join('')}</div>`;
  const html=`<div class="gw g-${g.id}"><div class="ghd"><span class="gic">${G.icon}</span><b>${GT('n_'+g.id)}</b></div>
  <div class="card"><h3>${GT(R.coop?(GI18N.fr.ui['coop_'+g.id]?'coop_'+g.id:'coopT'):'scores')}</h3>${list}${G.endView?G.endView(s):''}</div>
- ${host?`<div class="gbtns"><button class="pri wide" data-gend="again">${GT('again')}</button><button class="ghost wide" data-gend="lobby">${GT('lobby')}</button></div>`:''}</div>`;
+ ${host?`<div class="gbtns"><button class="pri wide" data-gend="again">${GT('again')}</button><button class="ghost wide" data-gend="lobby">${GT('lobby')}</button></div>`:''}${gRxBar()}</div>`;
  return{html,mine:host,hint:host?GT('hostNext'):GT('waitHostN',{n:B(s.host)}),bind(){
   $$('[data-gend]').forEach(b=>b.onclick=()=>send({t:'gx',v:b.dataset.gend}));
+  gAnim($('section>.gw'),'e'+s.gid);
   if(GV.fx!=='end'+s.gid){GV.fx='end'+s.gid;if(!RM())setTimeout(()=>{try{confetti(rows[0]&&rows[0][0]==meN()||R.coop?50:24)}catch(e){}},350)}}}}
 
 /* @games : carte « Salle de jeux » du salon */
-W.GLobby=function(host,on,E){const sel=st.gsel&&GAMES[st.gsel]?st.gsel:'';
- const tile=id=>{const G=GAMES[id],ok=!id||on<=G.max,tag=host?'button':'div';
-  return `<${tag} class="gtile ggt ${sel==id?'sel':''}" ${host?`data-gsel="${id}" ${ok?'':'disabled'}`:''}><span class="gi">${id?G.icon:'⛵'}</span><span class="gt"><b>${id?GT('n_'+id):GT('exp')}</b><span class="mut">${id?GT('d_'+id):GT('expD')}</span></span><span class="gtags">${(id?G.tags:['social']).map(t=>`<i class="gtg-${t}">${GT('t_'+t)}</i>`).join('')}</span><span class="gmin">≈ ${id?G.dur:(E||'?')} min · ${id?G.min:2}–${id?G.max:8} 👤</span></${tag}>`};
- let h=`<div class="card"><h3>🎲 ${GT('room')}</h3><div class="gtiles">${host?['',...Object.keys(GAMES)].map(tile).join(''):tile(sel)}</div>${host?'':`<p class="gby">${T('chosenBy',{n:B(st.host)})}</p>`}</div>`;
+W.GLobby=function(host,on,E){const sel=st.gsel&&GAMES[st.gsel]?st.gsel:'',on0=on;on=gPl(st).length;/* 👀 les spectateurs ne comptent pas */
+ const tile=id=>{const G=GAMES[id],ok=!id||on<=G.max,miss=id?Math.max(0,G.min-on):Math.max(0,2-on),tag=host?'button':'div';
+  return `<${tag} class="gtile ggt ${id?'grw':'ghero'} ${sel==id?'sel':''} ${miss||!ok?'gfew':''}" ${host?`data-gsel="${id}" ${ok?'':'disabled'}`:''}>${id?'':`<span class="gmain">★ ${GT('gmain')}</span>`}<span class="gi">${id?G.icon:'⛵'}</span><span class="gt"><b>${id?GT('n_'+id):GT('exp')}</b><span class="mut">${id?GT('d_'+id):GT('expD')}</span></span><span class="gmin">≈ ${id?G.dur:(E||'?')} min · ${id?G.min:2}–${id?G.max:8} 👤</span>${miss?`<span class="gmiss">${GT(miss>1?'missN':'miss1',{n:miss})}</span>`:!ok?`<span class="gmiss">${GT('needP',{a:G.min,b:G.max})}</span>`:''}</${tag}>`};
+ let h=`<div class="card"><h3>🎲 ${GT('room')}</h3>${tile('')}${(()=>{const C=[['d',['bot','pha','rad','vag']],['s',['arc','msk','coq']],['h',['chn','mim','prl']],['c',['tmp','sau','aby','pec']]],seen=new Set(C.flatMap(c=>c[1]));
+  const sec=(k,ids)=>{ids=ids.filter(i=>GAMES[i]);return ids.length?`<h4 class="gsec">${GT('gcat_'+k)}</h4><div class="glist">${ids.map(tile).join('')}</div>`:''};
+  return C.map(([k,ids])=>sec(k,ids)).join('')+sec('o',Object.keys(GAMES).filter(i=>!seen.has(i)))})()}${host?'':`<p class="gby">${T('chosenBy',{n:B(st.host)})}</p>`}</div>`;
  /* 📜 livre de bord : l'hôte le recalcule pour les personnes présentes (envoyé au prochain bump) */
  if(host&&typeof localStorage!='undefined')try{const c=gClog(st);if(JSON.stringify(c)!==JSON.stringify(st.clog||[])){st.clog=c;setTimeout(()=>{try{bump()}catch(e){}},0)}}catch(e){}
  const CL=(st.clog||[]).filter(e=>GAMES[e.g]);
@@ -156,11 +211,14 @@ W.GLobby=function(host,on,E){const sel=st.gsel&&GAMES[st.gsel]?st.gsel:'';
   let ti='';if(G.ties){const L=(st.gtie||[]).filter(k=>k.split('|').every(p=>st.players.some(x=>x.name==p))),ps=st.players.filter(p=>p.online).map(p=>p.name);
    ti=`<h3 class="gh">🔗 ${GT('mtieT')}</h3><p class="gsub">${GT('mtieD')}</p>${L.length?`<div class="gties">${L.map(k=>`<span class="gtie">${k.split('|').map(B).join(' 🔗 ')}${k.split('|').includes(meN())?'':`<button class="gtx" data-gtie="${esc(k)}" aria-label="✕">✕</button>`}</span>`).join('')}</div>`:`<p class="gval">${GT('mtie0')}</p>`}
    ${ps.length>1?`<p class="gsub">${GT('mtieH')} ${GT('mtieA')}</p><div class="gtiep">${ps.map(p=>`<button class="ghost ${GV.tie==p?'sel':''}" data-gtp="${esc(p)}">${esc(p)}</button>`).join('')}</div>`:''}`}
-  h+=(G.tone?g2ToneCard(host):'')+`<div class="card"><p class="grule">${GT(rk)}</p>${G.tut?`<button class="ghost gtutb" data-gtut="${sel}">📖 ${GT('tuB')}</button>`:''}${ok?'':`<p class="err">${GT('needP',{a:G.min,b:G.max})}</p>`}${tm}${ti}
+  const sp=(st.gspec||[]).includes(meN()),SL=(st.gspec||[]).filter(n=>st.players.some(p=>p.name==n&&p.online));
+  const spc=on0>1||sp?`<div class="gspw"><button class="ghost gspt ${sp?'sel':''}" id="gspec" aria-pressed="${sp}">👀 ${GT('specB')}</button><p class="gsub">${GT('specD')}</p>${SL.length?`<p class="gval gspl">${GT('specL',{n:SL.map(B).join(', ')})}</p>`:''}</div>`:'';
+  h+=(G.tone?g2ToneCard(host):'')+`<div class="card"><p class="grule">${GT(rk)}</p>${G.tut?`<button class="ghost gtutb" data-gtut="${sel}">📖 ${GT('tuB')}</button>`:''}${ok?'':`<p class="err">${GT('needP',{a:G.min,b:G.max})}</p>`}${tm}${ti}${spc}
   ${host?`<button class="pri wide" id="start" ${ok?'':'disabled'}>${GT('play',{g:GT('n_'+sel)})}</button>`:`<p class="gby">${GT('waitHost')}</p>`}</div>`}
  return h};
 /* liens connus : clics délégués (le salon est rendu par index.html) */
 if(typeof document!='undefined')document.addEventListener('click',e=>{const lg=e.target.closest&&e.target.closest('.glog>summary');if(lg){GV.lgo=!lg.parentNode.open;return}
+ if(e.target.closest&&e.target.closest('#gspec')){send({t:'gspec',v:!(st.gspec||[]).includes(meN())});return}
  const t=e.target.closest&&e.target.closest('[data-gtp],[data-gtie]');if(!t)return;
  if(t.dataset.gtie!=null){send({t:'gtie',v:t.dataset.gtie.split('|')});return}
  const p=t.dataset.gtp;if(!GV.tie||GV.tie==p){GV.tie=GV.tie==p?null:p;render();return}const a=GV.tie;GV.tie=null;send({t:'gtie',v:[a,p]});render()});
@@ -206,10 +264,16 @@ GAMES.bot={icon:'🍾',min:2,max:8,dur:10,tags:['social'],tone:true,
   if(g.q)o.q=g.q.map((b,i)=>i<g.i||(i==g.i&&g.st=='r')?b:i==g.i?{t:b.t,m:b.a==n?1:0}:null);
   if(g.st=='v')o.v=hideOwn(g.v,n);return o},
  view(s){const g=s.game,m=meN(),two=s.order.length==2,t18=(+s.tone||0)>0;
-  if(g.st=='w'){if(g.done[m]&&GV.ed!==g.id+g.k)return{html:`<div class="card c"><div class="gbig ga gfloat">🍾</div><p class="ga" ${dl(2)}>${GT('bwait')}</p><button class="ghost gedit ga" ${dl(3)} id="gedit">✏️ ${GT('edit')}</button></div>`,bind(){$('#gedit').onclick=()=>{GV.ed=g.id+g.k;render()}}};
+  if(g.st=='w'){if(g.done[m]&&GV.ed!==g.id+g.k)return{html:`<div class="card c"><div class="gbig ga gfloat">🍾</div><p class="ga" ${dl(2)}>${GT('bwait')}</p><button class="ghost gedit ga" ${dl(3)} id="gedit">✏️ ${GT('edit')}</button></div>`,bind(){$('#gedit').onclick=()=>{GV.ed=g.id+g.k;gs({undo:1});render()}}};
    const fl=i=>drafts['gbf'+i]=='1',ip=(g.ip&&g.ip[m])||[];
-   return{html:`<div class="card">${[0,1,2].map(i=>`<div class="gwr ga" ${dl(i)}>${two?`<button type="button" class="gtf ${fl(i)?'f':''}" data-gf="${i}" aria-pressed="${fl(i)}">${GT(fl(i)?'bF':'bT')}</button>`:''}<textarea data-d="gbw${i}" rows="2" maxlength="220" placeholder="${esc(ip[i]?'💡 '+GC('bot',ip[i])+'…':GT(two?'bph2':t18?'bph18':'bph'))}"></textarea></div>`).join('')}<p class="err"></p><button class="pri wide" id="gsend">${GT('send')}</button></div>`,
-    bind(){$$('[data-gf]').forEach(b=>b.onclick=()=>{const k='gbf'+b.dataset.gf,v=drafts[k]=='1'?'0':'1';drafts[k]=v;b.classList.toggle('f',v=='1');b.setAttribute('aria-pressed',v=='1');b.textContent=GT(v=='1'?'bF':'bT')});
+   return{html:`<div class="card">${[0,1,2].map(i=>`<div class="gwr ga" ${dl(i)}>${two?`<button type="button" class="gtf ${fl(i)?'f':''}" data-gf="${i}" aria-pressed="${fl(i)}">${GT(fl(i)?'bF':'bT')}</button>`:''}<textarea data-d="gbw${i}" rows="2" maxlength="220" placeholder="${esc(GT(two?'bph2':t18?'bph18':'bph'))}"></textarea></div>`).join('')}
+    ${ip.length?`<div class="gidea"><p class="gidh">💡 ${GT('bIdea')}</p><div class="gidl">${ip.map((x,i)=>`<button type="button" class="gidc" data-gid="${i}">${esc(GC('bot',x))}</button>`).join('')}</div><p class="gidd">${GT('bIdeaD')}</p></div>`:''}<p class="err"></p><button class="pri wide" id="gsend">${GT('send')}</button></div>`,
+    bind(){/* 💡 idées facultatives : rien n'est écrit tant qu'on ne touche pas une idée ; elle va dans la case choisie
+      (ou la 1re vide), et ne remplace un texte que si toutes les cases sont pleines */
+     const T=[0,1,2].map(i=>$(`[data-d="gbw${i}"]`));T.forEach((t,i)=>t&&t.addEventListener('focus',()=>GV.bf=i));
+     $$('[data-gid]').forEach(b=>b.onclick=()=>{const tx=GC('bot',ip[+b.dataset.gid])+' : ';let i=GV.bf!=null&&T[GV.bf]&&!T[GV.bf].value.trim()?GV.bf:T.findIndex(t=>t&&!t.value.trim());if(i<0)i=GV.bf!=null?GV.bf:2;
+      const t=T[i];if(!t)return;t.value=tx;drafts['gbw'+i]=tx;t.dispatchEvent(new Event('input',{bubbles:true}));t.focus();try{t.setSelectionRange(tx.length,tx.length)}catch(e){}GV.bf=i});
+     $$('[data-gf]').forEach(b=>b.onclick=()=>{const k='gbf'+b.dataset.gf,v=drafts[k]=='1'?'0':'1';drafts[k]=v;b.classList.toggle('f',v=='1');b.setAttribute('aria-pressed',v=='1');b.textContent=GT(v=='1'?'bF':'bT')});
      $('#gsend').onclick=()=>{const w=[0,1,2].map(i=>tidy($(`[data-d="gbw${i}"]`).value)),f=[0,1,2].map(fl);
       if(two?(w.some(x=>!x)||!f.includes(true)||!f.includes(false)):w.filter(Boolean).length<2)return err(GT(two?'bmin2':'bmin'));GV.ed=null;gs({w,f})}}}}
   if(two){const o=s.order.find(x=>x!=m),b=(g.w[o]||[])[g.i]||{},my=(g.w[m]||[])[g.i]||{};
@@ -295,12 +359,12 @@ GAMES.vag={icon:'🌊',min:2,max:8,dur:5,tags:['skill'],tone:true,
   if(g.st=='v'||g.st=='b'){const mine=g.w[m],br=g.st=='b';
    return{html:`<div class="card c">${head}${br?`<div class="gduo">${s.order.map((n,i)=>`<div class="ga" ${dl(i)}>${DT(n)}<b>${esc((g.w0||{})[n]||'—')}</b></div>`).join('')}</div><p class="gnote">${GT('vmiss')} ${GT('vbr')}</p>`:''}
     ${mine&&GV.ed!==g.id+g.k?`<p class="gword ga">${esc(mine)}</p><button class="ghost gedit ga" ${dl(3)} id="gedit">✏️ ${GT('edit')}</button>`:`<div class="grow2"><input data-d="gvw${g.k}" maxlength="32" autocomplete="off" placeholder="${esc(GT(br?'vbr':'vin'))}"><button class="pri" id="gsend">${GT('send')}</button></div><p class="err"></p>`}</div>`,
-    bind(){$('#gedit')&&($('#gedit').onclick=()=>{GV.ed=g.id+g.k;render()});const i=$(`[data-d="gvw${g.k}"]`);if(!i)return;const go=()=>{const w=tidy(i.value);if(!norm(w))return;if(norm(w)==norm(q)||(br&&Object.values(g.w0||{}).some(x=>norm(x)==norm(w))))return err(GT('vno'));GV.ed=null;gs({w})};
+    bind(){$('#gedit')&&($('#gedit').onclick=()=>{GV.ed=g.id+g.k;gs({undo:1});render()});const i=$(`[data-d="gvw${g.k}"]`);if(!i)return;const go=()=>{const w=tidy(i.value);if(!norm(w))return;if(norm(w)==norm(q)||(br&&Object.values(g.w0||{}).some(x=>norm(x)==norm(w))))return err(GT('vno'));GV.ed=null;gs({w})};
      $('#gsend').onclick=go;i.onkeydown=e=>{if(e.key=='Enter')go()};if(matchMedia('(pointer:fine)').matches&&document.activeElement!==i)i.focus()}}}
   const r=g.res[g.r]||{w:{}};
   if(two){const [a,b]=s.order,ok=r.ok;return{html:`<div class="card c">${head}<div class="gduo">${[a,b].map((n,i)=>`<div class="ga" ${dl(i)}>${DT(n)}<b>${esc(r.w[n]||'—')}</b>${r.b?`<br><span class="mut">→ ${esc(r.b[n]||'—')}</span>`:''}</div>`).join('')}</div>
-   <p class="gbig2 ga ${ok?'ok':''}" ${dl(3)}>${ok==2?GT('vsame')+' +2':ok==1?GT('vpont')+' +1':GT('vmiss')}</p></div>`,bind(){if(ok&&!RM())sparkles($('.gbig2'),ok==2?18:8)}}}
-  return{html:`<div class="card">${head}${(r.gr||[]).map((l,i)=>`<div class="ggr ga ${l.length>1?'hit':''}" ${dl(i,.1)}><b>${esc(r.w[l[0]])}</b><span>${l.map(n=>`<span class="gchip">${DT(n)}${esc(n)}</span>`).join('')}</span>${l.length>1?`<i class="gpt">+${r.pts[l[0]]}</i>`:''}</div>`).join('')}
+   <p class="gbig2 ga ${ok?'ok':''}" ${dl(3)}>${ok==2?GT('vsame')+' · '+gP(2):ok==1?GT('vpont')+' · '+gP(1):GT('vmiss')}</p></div>`,bind(){if(ok&&!RM())sparkles($('.gbig2'),ok==2?18:8)}}}
+  return{html:`<div class="card">${head}${(r.gr||[]).map((l,i)=>`<div class="ggr ga ${l.length>1?'hit':''}" ${dl(i,.1)}><b>${esc(r.w[l[0]])}</b><span>${l.map(n=>`<span class="gchip">${DT(n)}${esc(n)}</span>`).join('')}</span>${l.length>1?`<i class="gpt">${gPs(r.pts[l[0]])}</i>`:''}</div>`).join('')}
    ${s.order.filter(n=>!r.w[n]).length?`<p class="mut">… ${s.order.filter(n=>!r.w[n]).map(esc).join(', ')}</p>`:''}</div>`,bind(){if((r.pts||{})[m]&&!RM())sparkles($('.ggr.hit'),10)}}},
  fin(s){const g=s.game;if(s.order.length==2){const v=g.sc[s.order[0]];return{pts:g.sc,coop:{v,max:g.n*2}}}return{pts:g.sc}},
  endView(s){const R=s.gres;if(!R.coop)return '';const f=R.coop.v/R.coop.max,lv=f>=.6?2:f>=.3?1:0;
@@ -356,7 +420,7 @@ GAMES.rad={icon:'🛟',min:2,max:8,dur:7,tags:['social','skill'],tone:true,
    joueur au seuil 8, il finit 1er dans 34 % des parties : battable, mais menaçant. Égalité : places partagées.
    ===================================================================== */
 const PBAG=[1,1,1,2,2,2,3,3,4,5,6,8,'m','m','r','r','r','r','r'];
-GAMES.pec={bag:PBAG,icon:'🦪',min:2,max:8,dur:7,tags:['chance'],
+GAMES.pec={bag:PBAG,icon:'🦪',rx:RX,min:2,max:8,dur:7,tags:['chance'],
  init(s){const g=s.game;g.n=s.order.length>=5?3:4;g.ps=[...s.order];if(g.ps.length==2)g.ps.push('~');g.cof={};g.ps.forEach(n=>g.cof[n]=0);g.r=-1;g.mh=[];this.man(s)},
  man(s){const g=s.game;g.r++;if(g.r>=g.n){g.over=1;return}g.bag=shuf(this.bag);g.out=[];g.down=g.ps.filter(n=>n=='~'||s.order.includes(n));g.fil={};g.down.forEach(n=>g.fil[n]=0);g.sh=0;g.upv={};g.lost={};g.last=[];g.ch={};this.draw(s)},
  draw(s){const g=s.game,it=g.bag.pop(),ev={it,x:1,t:[]};g.out.push(it);
@@ -379,12 +443,11 @@ GAMES.pec={bag:PBAG,icon:'🦪',min:2,max:8,dur:7,tags:['chance'],
   const evh=ev.it==null?'':typeof ev.it=='number'?`<div class="gev ga pearl"><span class="gpl big v${ev.it}">${ev.it}</span>${ev.x==2?`<b>${GT('pdouble')}</b>`:''}</div>`
    :ev.it=='m'?`<div class="gev ga jel"><span class="gbig">🪼</span><b>${GT('pjel')}</b>${ev.t.length?`<span>${ev.t.map(NM).join(', ')} −½</span>`:''}</div>`
    :`<div class="gev ga shk ${g.sh>=2?'dead':''}"><span class="gbig">🦈</span><b>${g.sh>=2?GT('pdead'):GT('pshark')} (${g.sh}/2)</b></div>`;
-  const divers=`<div class="gdv">${g.ps.filter(n=>g.fil[n]!=null).map((n,i)=>{const d=g.down.includes(n);return `<span class="gchip ${d?'dn':'up'} ${n==m?'me':''}">${d?'🤿':'⛵'} ${DT(n)}${n=='~'?'🐟':esc(n)} <b>${d?g.fil[n]:g.upv[n]!=null?'+'+g.upv[n]:g.lost[n]?'✗':''}</b>${g.rx[n]&&d?` <span class="grx">${g.rx[n]}</span>`:''}</span>`}).join('')}</div>`;
-  const cof=`<p class="gcof">🔒 ${GT('pcof')} : <b>${g.cof[m]??0}</b> <span class="mut">· ${GT('psecret')}</span></p>`;
-  if(g.st=='e'){const h=g.mh.at(-1)||{upv:{},lost:{}};return{html:`<div class="card c">${evh}<h3>${GT('pmanche')}</h3><div class="gdv">${g.ps.map((n,i)=>`<span class="gchip ga" ${dl(i,.2)}>${DT(n)}${n=='~'?'🐟':esc(n)} <b>${h.upv[n]!=null?'+'+h.upv[n]:h.lost[n]?'✗ −'+h.lost[n]:'0'}</b></span>`).join('')}</div>${cof}</div>`}}
-  return{html:`<div class="card c">${evh}${divers}${down?`<p class="gfil">${GT('pfil')} : <b>${g.fil[m]}</b></p><div class="gpk">${[['u','pup','⛵'],['d','pdown','🤿']].map(([v,k,ic],i)=>`<button class="ga gdec ${g.ch[m]==v?'sel':''}" ${dl(i)} data-gd="${v}">${ic} ${GT(k)}</button>`).join('')}</div>
-   <div class="grxb">${RX.map(e=>`<button class="ghost" data-grx="${e}" aria-label="${e}">${e}</button>`).join('')}</div>`:`<p class="gnote">${g.upv[m]!=null?GT('pyouup',{v:g.upv[m]}):g.lost[m]?GT('pdead'):''}</p>`}${bag}${cof}</div>`,
-   bind(){$$('[data-gd]').forEach(x=>x.onclick=()=>gs({v:x.dataset.gd}));$$('[data-grx]').forEach(x=>x.onclick=()=>send({t:'g',rx:x.dataset.grx}))}}},
+  const divers=`<div class="gdv">${g.ps.filter(n=>g.fil[n]!=null).map((n,i)=>{const d=g.down.includes(n);return `<span class="gchip ${d?'dn':'up'} ${n==m?'me':''}" data-rxp="${esc(n)}">${d?'🤿':'⛵'} ${DT(n)}${n=='~'?'🐟':esc(n)} <b>${d?g.fil[n]:g.upv[n]!=null?gPs(g.upv[n]):g.lost[n]?'✗':''}</b></span>`}).join('')}</div>`;
+  const cof=!s.order.includes(m)?'':`<p class="gcof">🔒 ${GT('pcof')} : <b>${g.cof[m]??0}</b> <span class="mut">· ${GT('psecret')}</span></p>`;
+  if(g.st=='e'){const h=g.mh.at(-1)||{upv:{},lost:{}};return{html:`<div class="card c">${evh}<h3>${GT('pmanche')}</h3><div class="gdv">${g.ps.map((n,i)=>`<span class="gchip ga" ${dl(i,.2)}>${DT(n)}${n=='~'?'🐟':esc(n)} <b>${h.upv[n]!=null?gPs(h.upv[n]):h.lost[n]?'✗ '+GT('pLostN',{v:h.lost[n]}):gPs(0)}</b></span>`).join('')}</div>${cof}</div>`}}
+  return{html:`<div class="card c">${evh}${divers}${down?`<p class="gfil">${GT('pfil')} : <b>${g.fil[m]}</b></p><div class="gpk">${[['u','pup','⛵'],['d','pdown','🤿']].map(([v,k,ic],i)=>`<button class="ga gdec ${g.ch[m]==v?'sel':''}" ${dl(i)} data-gd="${v}">${ic} ${GT(k)}</button>`).join('')}</div>`:`<p class="gnote">${g.upv[m]!=null?GT('pyouup',{v:g.upv[m]}):g.lost[m]?GT('pdead'):''}</p>`}${bag}${cof}</div>`,
+   bind(){$$('[data-gd]').forEach(x=>x.onclick=()=>gs({v:x.dataset.gd}))}}},
  fin(s){const p={};for(const n in s.game.cof)if(n=='~'||s.order.includes(n))p[n]=s.game.cof[n];return{pts:p}}};
 
 /* =====================================================================
@@ -481,7 +544,7 @@ GAMES.arc={icon:'🏝️',min:2,max:8,dur:12,tags:['skill'],T:arcT,V:arcV,gd:arc
   if(g.st=='s'){const tg=play?AX.map((x,i)=>i).filter(i=>AX[i][2]==g.R||AX[i][2]==g.R-1).map(i=>[i,AX[i][2]==g.R?'p':'f']):[];
    return{html:`<div class="card c"><p class="arcst">${GT('asetup')}</p>${this.svg(s,tg,{pp:g.pp[m],pf:g.pf[m]})}<p class="arclg mut">⚓ ${GT('k_p')} · 🪨 ${GT('k_f')}</p></div>`,bind}}
   if(g.st=='h'){const h=g.hv[g.hv.length-1]||{},last=g.r>=g.n;
-   return{html:`<div class="card c"><p class="arcst"><b>🦪 ${GT(last?'afinal':'aharv')}</b></p><div class="arcsc">${s.order.map((p,i)=>`<span class="gchip ga ${p==m?'me':''}" ${dl(i,.2)}>${DT(p)}${esc(p)} <b>+${h[p]||0}</b></span>`).join('')}</div>${this.svg(s)}
+   return{html:`<div class="card c"><p class="arcst"><b>🦪 ${GT(last?'afinal':'aharv')}</b></p><div class="arcsc">${s.order.map((p,i)=>`<span class="gchip ga ${p==m?'me':''}" ${dl(i,.2)}>${DT(p)}${esc(p)} <b>${gPs(h[p]||0)}</b></span>`).join('')}</div>${this.svg(s)}
     ${last?'':`<p class="gnote ga" ${dl(3,.3)}>🌊 ${GT('atidec')}</p>`}</div>`,bind(){if((h[m]||0)>0&&!RM())sparkles($('.arcsc .me'),10)}}}
   const left=4-g.r%4,fin=g.r>=g.n-4,tg=play?arcT(g,m):[],c=g.o[m],k=c!=null&&(tg.find(t=>t[0]==c)||[])[1],ev=g.ev||{};
   const chips=`<div class="arcsc">${s.order.map(p=>`<span class="gchip ${p==m?'me':''}">${DT(p)}${esc(p)} <b>${g.sc[p]||0}</b>🦪${nx[p]?`<i class="mut">+${nx[p]}</i>`:''}</span>`).join('')}</div>`;
@@ -571,10 +634,12 @@ GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,ties:true,MK
  mn(i){return `<span class="mkm"><span class="mke">${MKE[i]||'❔'}</span> ${esc(GL('mkn')[i]||'')}</span>`},
  view(s){const g=s.game,m=meN(),me=g.me||{},R=GAMES.msk;
   const sh=v=>v?`<span class="mksh" title="${esc(GT('mshT'))}">🦈${v>1?'×'+v:''}</span>`:'',duo=me.pt&&me.pt.length?me.pt.map((i,j)=>R.mn(i)+sh((me.ptr||[])[j])).join(''):'';
-  const head=g.st=='m'||g.st=='c'||g.st=='r'?`<div class="mkhd"><span class="mkme ga">${GT('ymask')} ${R.mn(me.m)}${sh(me.mtr)}</span><span class="mkvs ga" ${dl(1)}>${GT(me.pt.length>1?'ytrio':'yduo')} ${duo}</span></div>`:'';
+  const sp=!s.order.includes(m);/* 👀 spectateur : seulement le public (la mer des masques, la finale) */
+  if(sp&&(g.st=='m'||g.st=='c'))return{html:`<div class="card c"><div class="gbig ga gfloat">🎭</div></div>`};
+  const head=sp?'':g.st=='m'||g.st=='c'||g.st=='r'?`<div class="mkhd"><span class="mkme ga">${GT('ymask')} ${R.mn(me.m)}${sh(me.mtr)}</span><span class="mkvs ga" ${dl(1)}>${GT(me.pt.length>1?'ytrio':'yduo')} ${duo}</span></div>`:'';
   if(g.st=='m'){const pq=g.q[g.r];
    if(g.done[m]&&R.ed!==g.k)return{html:`<div class="card c">${head}<div class="mkbub mine ga" ${dl(2)}>${me.msg?esc(me.msg):`<i class="mut">${GT('mnone')}</i>`}</div><p class="gnote ga" ${dl(3)}>${GT('msent')}</p><button class="ghost mked" id="gedit">✏️ ${GT('medit')}</button></div>`,
-    bind(){$('#gedit').onclick=()=>{R.ed=g.k;drafts['gmw'+g.k]=me.msg||'';render()}}};
+    bind(){$('#gedit').onclick=()=>{R.ed=g.k;drafts['gmw'+g.k]=me.msg||'';gs({undo:1});render()}}};
    return{html:`<div class="card c">${head}${pq?`<p class="mktip ga" ${dl(2)}>💡 ${esc(GC('msk',pq))}</p>`:''}<textarea data-d="gmw${g.k}" rows="3" maxlength="140" placeholder="${esc(GT('mph'))}"></textarea>
     <div class="gbtns2"><button class="ghost" id="gskip">${GT('mskip')}</button><button class="pri" id="gsend">${GT('send')}</button></div></div>`,
     bind(){const t=$(`[data-d="gmw${g.k}"]`);$('#gsend').onclick=()=>{R.ed=null;gs({w:tidy(t.value)})};$('#gskip').onclick=()=>{R.ed=null;gs({w:''})}}}}
@@ -583,20 +648,22 @@ GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,ties:true,MK
    ${me.pt.length>1?me.pt.map((t,j)=>`<div class="mkrow ga" ${dl(j+3)}><span class="mkto">${R.mn(t)}${sh((me.ptr||[])[j])}</span><div class="gpk mkch sm">${['P','G'].map(v=>`<button class="gdec ${(me.ch||[])[j]==v?'sel':''}" data-gm="${v}" data-to="${t}">${GT('k'+v)}</button>`).join('')}</div></div>`).join(''):`<div class="gpk mkch">${['P','G'].map((v,i)=>`<button class="ga gdec ${(me.ch||[])[0]==v?'sel':''}" ${dl(i,.3)} data-gm="${v}">${GT('k'+v)}</button>`).join('')}</div>`}
    ${(me.ptr||[]).some(Boolean)?`<p class="mut mkshd">🦈 ${GT('mshD')}</p>`:''}</div>`,
    bind(){$$('[data-gm]').forEach(x=>x.onclick=()=>gs(x.dataset.to!=null?{v:x.dataset.gm,to:+x.dataset.to}:{v:x.dataset.gm}))}};
-  if(g.st=='r'){const sea=(g.pub[g.r]||[]).map((gr,i)=>`<div class="mksea ga" ${dl(i,.4)}>${gr.map(([k,c,v])=>`<span class="mkc ${c=='P'?'p':'g'} ${k===me.m?'me':''}">${MKE[k]} ${c=='P'?'🤝🏻':'🔒'} <b>+${v}</b></span>`).join('')}</div>`).join('');
+  if(g.st=='r'){const sea=(g.pub[g.r]||[]).map((gr,i)=>`<div class="mksea ga" ${dl(i,.4)}>${gr.map(([k,c,v])=>`<span class="mkc ${c=='P'?'p':'g'} ${k===me.m?'me':''}">${MKE[k]} ${c=='P'?'🤝🏻':'🔒'} <b dir="ltr">${gPs(v)}</b></span>`).join('')}</div>`).join('');
+   if(sp)return{html:`<div class="card c"><h3 class="gh3">🌊 ${GT('msea')}</h3>${sea}</div>`};
    const rep=me.hab;
    return{html:`<div class="card c">${head}<div class="mkres">${(me.pc||[]).map((c,i)=>`<p class="ga" ${dl(i+1)}>${MKE[me.pt[i]]} ${GT(c=='P'?'mshared':'mkept')}${me.pt.length>1?` <span class="mut">· ${esc(GT('me'))} ${me.ch[i]=='P'?'🤝🏻':'🔒'}</span>`:''}</p>`).join('')}
-    <p class="gbig2 ga ${me.gain>=4?'ok':''}" ${dl(3)}>+${me.gain}</p>${me.nb?`<p class="mknet ga" ${dl(4)}>🕸️ ${GT('mnet',{v:me.nb})}</p>`:''}${rep?`<p class="mut ga" ${dl(4)}>🔁 ${GT('mrep')}</p>`:''}${me.tm?`<p class="mut ga" ${dl(4)}>🔗 ${GT('mtieM')}</p>`:''}${me.mtr?`<p class="mut ga" ${dl(5)}>${sh(me.mtr)} ${GT('myshk',{v:me.mtr})}</p>`:''}<p class="gcof">🔒 ${GT('mtot',{v:g.sc[m]??0})}</p></div>
+    <p class="gbig2 ga ${me.gain>=4?'ok':''}" ${dl(3)}>${gP(me.gain)}</p>${me.nb?`<p class="mknet ga" ${dl(4)}>🕸️ ${GT('mnet',{v:me.nb})}</p>`:''}${rep?`<p class="mut ga" ${dl(4)}>🔁 ${GT('mrep')}</p>`:''}${me.tm?`<p class="mut ga" ${dl(4)}>🔗 ${GT('mtieM')}</p>`:''}${me.mtr?`<p class="mut ga" ${dl(5)}>${sh(me.mtr)} ${GT('myshk',{v:me.mtr})}</p>`:''}<p class="gcof">🔒 ${GT('mtot',{v:g.sc[m]??0})}</p></div>
     <h3 class="gh3">🌊 ${GT('msea')}</h3>${sea}</div>`,bind(){if(me.gain>=4&&!RM())sparkles($('.mkres .gbig2'),me.nb?14:8)}}}
   const fin=g.fin||[],isF=fin.includes(m),names=fin.map((p,i)=>NM(p)+((g.ftr||[])[i]?' 🦈'+(g.ftr[i]>1?'×'+g.ftr[i]:''):'')).join(' & ');
   if(g.st=='f'){const top=`<div class="mkfin ga"><span class="gbig">🎭</span><b>${GT('mfinT')}</b><p>${GT('mfinD',{n:names,v:g.pot})}</p><p class="mut">${GT('mfinC')}</p></div>`;
+   if(sp)return{html:`<div class="card c">${top}</div>`};
    if(isF)return{html:`<div class="card c">${top}<div class="gpk mkch">${['P','V'].map((v,i)=>`<button class="ga gdec ${g.fc[m]==v?'sel':''}" ${dl(i,.3)} data-gf="${v}">${GT('k'+v)}</button>`).join('')}</div><p class="gcof">🔒 ${GT('mtot',{v:g.sc[m]??0})}</p></div>`,
     bind(){$$('[data-gf]').forEach(x=>x.onclick=()=>gs({v:x.dataset.gf}))}};
    return{html:`<div class="card c">${top}<p class="gq2">${GT('mbet')}</p><div class="gab">${[0,1,2].map(i=>`<button class="gopt ga ${g.bet[m]===i?'sel':''}" ${dl(i,.3)} data-gb="${i}">${GT('mb'+i)}</button>`).join('')}</div></div>`,
     bind(){$$('[data-gb]').forEach(x=>x.onclick=()=>gs({b:+x.dataset.gb}))}}}
   const fr=g.fr||{c:{},add:{}};
-  return{html:`<div class="card c"><div class="mkfin"><b>${GT('mfinT')}</b></div><div class="gduo mkduo">${fin.map((p,i)=>`<div class="ga" ${dl(i*2,.1)}>${DT(p)}<b>${esc(p)}</b><br><span class="gtag ${fr.c[p]=='P'?'':'no'}">${GT('k'+fr.c[p])}</span><br><b>+${fr.add[p]||0}</b></div>`).join('')}</div>
-   <p class="gbig2 ga ok" ${dl(4)}>${GT('mb'+fr.out)}</p>${isF?'':`<p class="gnote ga" ${dl(5)}>${g.bet[m]===fr.out?GT('mbetok'):'—'}</p>`}</div>`,
+  return{html:`<div class="card c"><div class="mkfin"><b>${GT('mfinT')}</b></div><div class="gduo mkduo">${fin.map((p,i)=>`<div class="ga" ${dl(i*2,.1)}>${DT(p)}<b>${esc(p)}</b><br><span class="gtag ${fr.c[p]=='P'?'':'no'}">${GT('k'+fr.c[p])}</span><br><b class="mkadd ${(fr.add[p]||0)<0?'neg':''}">${(fr.add[p]||0)<0?GT('mLose',{v:GTn('pts',-fr.add[p])}):fr.add[p]?GT('mGain',{v:GTn('pts',fr.add[p])}):gP(0)}</b></div>`).join('')}</div>
+   <p class="gbig2 ga ok" ${dl(4)}>${GT('mb'+fr.out)}</p>${isF||sp?'':`<p class="gnote ga" ${dl(5)}>${g.bet[m]===fr.out?GT('mbetok'):'—'}</p>`}</div>`,
    bind(){if(fr.out==0&&!RM())sparkles($('.mkduo'),16)}}},
  endView(s){const g=s.game,o=s.order,n=o.length,W=220,cx=110,cy=110,rr=82,pos={};o.forEach((p,i)=>{const a=2*Math.PI*i/n-Math.PI/2;pos[p]=[cx+rr*Math.cos(a),cy+rr*Math.sin(a)]});
   const E={};(g.h||[]).forEach(r=>r.grp.forEach(x=>{for(let i=0;i<x.length;i++)for(let j=i+1;j<x.length;j++){const a=x[i],b=x[j],k=mkPair(a,b),e=E[k]=E[k]||{a:a<b?a:b,b:a<b?b:a,pp:0,gg:0,t:{}};
@@ -677,14 +744,14 @@ GAMES.chn={icon:'🧭',min:4,max:8,dur:20,tags:['social'],CHI,NF:n=>n<=5?1:2,RL:
  /* route : capitaine 🧭 puis gardiens 🗼 ; kn(p,i) = [reçu, transmis] connus de moi (moi, ou le joueur aux fers) */
  chain(route,hold,kn){const R=this,m=meN();return `<div class="chrt">${route.map((p,i)=>{const k=kn(p,i);
   return `${i?'<i class="charr" aria-hidden="true">➜</i>':''}<span class="chn ga ${p==hold?'on':''} ${p==m?'me':''}" ${dl(i)}>${DT(p)}<b>${p==m?esc(GT('me')):esc(p)}</b>${k?`<span class="chk">${R.ch(k[0])}<i>›</i>${R.ch(k[1],k[1]!=null&&k[0]!=k[1]?'x':'')}</span>`:''}</span>`}).join('')}</div>`},
- log(g,m){const R=this,mine={};((g.pv||{})[m]||[]).forEach(([w,a,b])=>mine[w]=[a,b]);
+ hlog(g,m){const R=this,mine={};((g.pv||{})[m]||[]).forEach(([w,a,b])=>mine[w]=[a,b]);
   return g.h.length?`<details class="chlog"><summary>📜 ${GT('chLog')} (${g.h.length})</summary>${g.h.map((w,i)=>`<div class="chlr"><b>${w.ok?'⛵':'💥'} ${i+1}</b> ${w.route.map((p,j)=>esc(p)+(mine[i]&&p==m?` ${R.ch(mine[i][0])}›${R.ch(mine[i][1])}`:w.ir==p&&w.ip?` ⛓️${R.ch(w.ip[0])}›${R.ch(w.ip[1],w.ip[0]!=w.ip[1]?'x':'')}`:'')).join(' <i class="charr">➜</i> ')}</div>`).join('')}</details>`:''},
  view(s){const g=s.game,m=meN(),R=GAMES.chn,N=!!(g.nf&&g.nf.includes(m));
-  const hd=`<div class="chhd"><span class="chrole ga ${N?'n':''}">${N?'🏴‍☠️ '+GT('chN'):'🗼 '+GT('chC')}${N&&g.nf.length>1?' · '+g.nf.filter(p=>p!=m).map(B).join(', '):''}</span>
-   <span class="chsk ga" ${dl(1)} title="${esc(GT('chSkT',{v:g.th}))}">💥 ${g.sk}/${g.th} · ⛵ ${g.ok}</span>${g.irn?`<span class="chir ga" ${dl(2)}>⛓️ ${B(g.irn)}</span>`:''}</div>`;
+  const hd=`<div class="chhd">${s.order.includes(m)?`<span class="chrole ga ${N?'n':''}">${N?'🏴‍☠️ '+GT('chN'):'🗼 '+GT('chC')}${N&&g.nf.length>1?' · '+g.nf.filter(p=>p!=m).map(B).join(', '):''}</span>`:''}
+   <span class="chsk ga" ${dl(1)} title="${esc(GT('chSkT',{v:g.th}))}">💥 ${GT('chSkL',{v:g.sk,n:g.th})} · ⛵ ${GTn('chOkN',g.ok)}</span>${g.irn?`<span class="chir ga" ${dl(2)}>⛓️ ${B(g.irn)}</span>`:''}</div>`;
   const kn=(rc,ps)=>p=>p in rc||p in ps?[rc[p],ps[p]]:null;
   if(g.st=='p'){const me=m==g.hold,cap=g.route[0]==m;
-   if(!me)return{html:`<div class="card c">${hd}${R.chain(g.route,g.hold,kn(g.rc,g.ps))}<p class="gnote ga" ${dl(2)}>${GT(g.route.length==1?'chWaitC':'chWait',{n:B(g.hold)})}</p>${g.lv&&g.route.length==1?R.lvote(g):''}${R.log(g,m)}</div>`};
+   if(!me)return{html:`<div class="card c">${hd}${R.chain(g.route,g.hold,kn(g.rc,g.ps))}<p class="gnote ga" ${dl(2)}>${GT(g.route.length==1?'chWaitC':'chWait',{n:B(g.hold)})}</p>${g.lv&&g.route.length==1?R.lvote(g):''}${R.hlog(g,m)}</div>`};
    const pl=R.pilot(s),E=pl?[]:R.elig(s),rc=g.rc[m],K='ch'+g.k;if(R.sk!==K){R.sk=K;R.sc=rc;R.st=null}
    const ready=R.sc!=null&&(pl||E.includes(R.st));
    return{html:`<div class="card c">${hd}${R.chain(g.route,g.hold,kn(g.rc,g.ps))}<p class="gq2 ga">${GT(cap?'chCap':'chGot')} ${R.ch(rc,'big')}</p>
@@ -700,13 +767,13 @@ GAMES.chn={icon:'🧭',min:4,max:8,dur:20,tags:['social'],CHI,NF:n=>n<=5?1:2,RL:
   const body=`${hd}${res}${R.chain(w.route,null,wk)}`;
   if(g.st=='v'){const v=g.vt[m];
    return{html:`<div class="card c">${body}<p class="gq2">⛓️ ${GT('chVote')}</p><p class="gsub">${GT('chVoteD')}</p>${pick(s.order,v,'data-chv',m)}
-    <button class="ghost wide chno ${v===''?'sel':''}" data-chv="">${GT(g.irn?'chFree':'chNone')}</button>${R.log(g,m)}</div>`,
+    <button class="ghost wide chno ${v===''?'sel':''}" data-chv="">${GT(g.irn?'chFree':'chNone')}</button>${R.hlog(g,m)}</div>`,
     bind(){$$('[data-chv]').forEach(b=>b.onclick=()=>gs({v:b.dataset.chv}));if(!w.ok&&!RM())try{$('.chres').classList.add('shk')}catch(e){}}}}
   const K='ca'+g.k;if(R.ak!==K){R.ak=K;R.ac=[...(g.acc[m]||[])]}
   const sent=g.acc[m]!=null&&g.done[m];
   return{html:`<div class="card c">${body}<p class="gq2">🕵🏻 ${GT('chAcc',{v:g.K})}</p><p class="gsub">${GT(N?'chAccN':'chAccD')}</p>
    <div class="gpk">${s.order.filter(p=>p!=m).map((p,i)=>`<button class="ga ${R.ac.includes(p)?'sel':''}" ${dl(i)} data-cha="${esc(p)}" aria-pressed="${R.ac.includes(p)}">${DT(p)}<span>${esc(p)}</span></button>`).join('')}</div>
-   <button class="pri wide" id="gsend">${GT(sent?'chAccOk':'send')}</button>${R.log(g,m)}</div>`,
+   <button class="pri wide" id="gsend">${GT(sent?'chAccOk':'send')}</button>${R.hlog(g,m)}</div>`,
    bind(){$$('[data-cha]').forEach(b=>b.onclick=()=>{const p=b.dataset.cha;R.ac=R.ac.includes(p)?R.ac.filter(x=>x!=p):[...R.ac,p].slice(-g.K);render()});
     $('#gsend').onclick=()=>gs({v:R.ac})}}},
  lvote(g){const e=Object.entries(g.lv.c||{}).sort((a,b)=>b[1]-a[1]);if(!e.length)return '';
@@ -807,7 +874,10 @@ GAMES.mim={icon:'🐙',min:4,max:8,dur:10,tags:['social','skill'],
   const t=g.N[d.m];if(v.mk||now<(v.cd||0)||!t||t==from||!s.order.includes(t)||g.out.includes(t))return;
   v.mk=t;v.me=now+this.MD*1000;g.fx.push({i:++g.xi,x:v.x,y:v.y,t:now})},
  /* instantané pour UN joueur : seulement ce qui est dans son halo ; apparence (jamais l'identité réelle) */
- snap(s,n,now){const g=s.game,me=g.dv&&g.dv[n];if(!me||g.st!='p')return null;const R2=(MIL+14)**2,N=g.N,im=g.M.includes(n),r=Math.round,ix=x=>N.indexOf(x),near=(x,y)=>(x-me.x)**2+(y-me.y)**2<=R2;
+ snap(s,n,now){const g=s.game,me=g.dv&&g.dv[n];
+  if(!me&&g.st=='p'&&!s.order.includes(n)){let a=0;for(const k in g.ann)a+=g.ann[k];/* 👀 spectateur : rien de ce qui se voit dans la grotte */
+   return{t:'grt',k:g.k,h:now,me:null,sp:1,d:[],p:[],x:[],l:Math.max(0,Math.ceil(this.left(g,now)/100)),a,v:g.th,dc:Math.max(0,Math.ceil((g.da-now)/1000)),f:g.feed.slice(-4)}}
+  if(!me||g.st!='p')return null;const R2=(MIL+14)**2,N=g.N,im=g.M.includes(n),r=Math.round,ix=x=>N.indexOf(x),near=(x,y)=>(x-me.x)**2+(y-me.y)**2<=R2;
   const ds=[];for(const p of s.order){const d=g.dv[p];if(p==n||!d||!near(d.x,d.y))continue;const ap=d.mk||p;ds.push([ix(ap),r(d.x),r(d.y),(g.out.includes(ap)?1:0)|(im&&g.M.includes(p)?2:0)])}
   ds.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);ds.forEach((e,i)=>e.push(i&&ds[i-1][0]==e[0]?ds[i-1][4]+1:0));
   let a=0;for(const k in g.ann)a+=g.ann[k];
@@ -832,17 +902,17 @@ GAMES.mim={icon:'🐙',min:4,max:8,dur:10,tags:['social','skill'],
   o.ss={[n]:g.ss[n]};o.hist=g.hist.map(h=>({...h,vt:null}));if(g.vt)o.vt=hideOwn(g.vt,n);return o},
  view(s){const g=s.game,m=meN(),R=this,N=g.N,im=!!(g.M&&g.M.includes(m)),out=g.out.includes(m),play=s.order.includes(m);
   const L=MI.gid==s.gid&&MI.last&&MI.last.k==g.k?MI.last:null,an=L?L.a:Object.values(g.ann).reduce((a,b)=>a+b,0);
-  const role=`<span class="chrole ga ${im?'n':''}">${im?'🐙 '+GT(out?'miOut':'miMim')+(g.M.length>1?' · '+g.M.filter(p=>p!=m).map(B).join(', '):''):'🤿 '+GT('miCrew')}</span>`;
+  const role=!play?'':`<span class="chrole ga ${im?'n':''}">${im?'🐙 '+GT(out?'miOut':'miMim')+(g.M.length>1?' · '+g.M.filter(p=>p!=m).map(B).join(', '):''):'🤿 '+GT('miCrew')}</span>`;
   const hd=`<div class="mihd">${role}<span class="michip ga" ${dl(1)} id="mitl">⏱ ${miClock(L?L.l/10:g.left0/1000)}</span><span class="michip ga" ${dl(2)} id="mian" data-tip="${esc(GT('miGoalT'))}">🦪 <b>${an}</b>/${g.Q}${g.k>2?` · ✓${g.net}`:''}</span><span class="michip ga mith" ${dl(3)} id="mith">🐙 <b>${L?L.v:g.th}</b>/${g.S} ${GT('miThefts')}</span>${g.out.length?`<span class="michip ga" ${dl(3)}>🐙 ${g.out.map(B).join(', ')}</span>`:''}</div>`;
   const fl=(e,i)=>`<li class="ga${e.s?' st':''}" ${dl(i||0)}>${miFeedLi(N,e)}</li>`;
   if(g.st=='p'){const tg=s.order.filter(p=>p!=m&&!g.out.includes(p)),canCall=play&&!g.cl[m]&&g.D>0;
    const fd=(MI.gid==s.gid?MI.feed:g.feed).filter(e=>e.i>g.f0).slice(-3).reverse();
-   return{hint:GT(im&&!out?'miHintM':'miHint'),mine:false,html:`<div class="card c mim">${hd}<div class="micv" id="micv"></div>
-    <div class="mibar">${im&&!out?`<button class="ghost mimk" id="mimk">🎭 ${GT('miMask')}</button>`:''}<span class="michip" id="mimine">${im?'🎭':'🦪'} <b>${L?L.me[7]:(g.ss[m]||{})[im?'v':'c']||0}</b> ${GT(im?'miStolen':'miMine')}</span>
+   return{hint:GT(im&&!out?'miHintM':'miHint'),mine:false,html:`<div class="card c mim">${hd}${play?`<div class="micv" id="micv"></div>`:''}
+    <div class="mibar">${im&&!out?`<button class="ghost mimk" id="mimk">🎭 ${GT('miMask')}</button>`:''}${play?`<span class="michip" id="mimine">${im?'🎭':'🦪'} <b>${L&&L.me?L.me[7]:(g.ss[m]||{})[im?'v':'c']||0}</b> ${GT(im?'miStolen':'miMine')}</span>`:''}
      ${play?`<button class="ghost micall" id="micall" ${canCall&&!(L&&L.dc>0)?'':'disabled'}>📯 ${GT('miCall')} · ${g.D}</button>`:''}</div>
     ${im&&!out?`<div class="mipk" id="mipk" ${MI.pick?'':'hidden'}><p class="gsub">${GT('miMaskQ')}</p><div class="gpk">${tg.map(p=>`<button data-mim="${N.indexOf(p)}">${DT(p)}<span>${esc(p)}</span></button>`).join('')}</div></div>`:''}
     <ul class="mifd" id="mifd" aria-live="polite">${fd.map(e=>fl(e)).join('')}</ul></div>`,
-    bind(){miMount();const k=$('#mimk');k&&(k.onclick=()=>{const l=MI.last;if(l&&l.me[4]>=0){miSend({m:-1});return}MI.pick=!MI.pick;const pk=$('#mipk');pk&&(pk.hidden=!MI.pick)});
+    bind(){miMount();const k=$('#mimk');k&&(k.onclick=()=>{const l=MI.last;if(l&&l.me&&l.me[4]>=0){miSend({m:-1});return}MI.pick=!MI.pick;const pk=$('#mipk');pk&&(pk.hidden=!MI.pick)});
      $$('[data-mim]').forEach(b=>b.onclick=()=>{miSend({m:+b.dataset.mim});MI.pick=false;const pk=$('#mipk');pk&&(pk.hidden=true)});
      const c=$('#micall');c&&(c.onclick=()=>ask(GT('miCallAsk',{v:g.D}),GT('miCall')).then(v=>v&&gs({a:'call'})));if(L)miHud(L)}}}
   const since=g.feed.filter(e=>e.i>g.f0).reverse();
@@ -869,7 +939,7 @@ W.GRtIn=function(from,d){try{const s=st,g=s&&s.game;if(!isHost||!g||s.phase!='ga
 W.GRtTick=function(){try{if(!isHost||!st||st.phase!='game'||!st.game||st.game.id!='mim'||st.game.st!='p')return;const G=GAMES.mim,now=Date.now();
  if(G.tick(st,now)){gFin(st);bump();return}
  if(now-(MI.ls||0)<95)return;MI.ls=now;
- for(const id in conns){const c=conns[id];if(c.open&&c.pname&&st.order.includes(c.pname))try{const v=G.snap(st,c.pname,now);v&&c.send(v)}catch(e){}}
+ for(const id in conns){const c=conns[id];if(c.open&&c.pname&&P(c.pname))try{const v=G.snap(st,c.pname,now);v&&c.send(v)}catch(e){}}
  const v=G.snap(st,me.name,now);v&&W.GRtRx(v)}catch(e){console.warn(e)}};
 /* minuteur dans un Worker : un onglet hôte en arrière-plan continue d'envoyer ~10 instantanés/s (setInterval y serait bridé) */
 let MIT=null;function miTicker(){if(MIT)return;try{const u=URL.createObjectURL(new Blob(['setInterval(()=>postMessage(0),66)'],{type:'text/javascript'}));MIT=new Worker(u);MIT.onmessage=()=>W.GRtTick()}catch(e){MIT=1}}
@@ -878,20 +948,20 @@ if(typeof setInterval!='undefined'&&typeof document!='undefined')setInterval(()=
 /* ---------- 🐙 temps réel : côté joueur (réception, interpolation, rendu canvas) ---------- */
 const MI={gid:null,k:null,buf:[],off:null,last:null,feed:[],fmax:0,fx:{},cv:null,ctx:null,raf:0,ro:null,sp:null,tap:null,ts:0,tt:0,pick:false,cam:null,bg:null,bgL:null,w:0,h:0,dpr:1,ft:0};
 function miSend(o){try{o.t='grt';o.k=st.game.k;if(isHost)W.GRtIn(me.name,o);else if(hostConn&&hostConn.open)hostConn.send(o)}catch(e){}}
-W.GRtRx=function(d){try{if(!st||st.phase!='game'||!st.game||st.game.id!='mim'||!d||!d.me)return;const now=Date.now();
+W.GRtRx=function(d){try{if(!st||st.phase!='game'||!st.game||st.game.id!='mim'||!d||!(d.me||d.sp))return;const now=Date.now();
  if(MI.gid!==st.gid){MI.gid=st.gid;MI.feed=[];MI.fmax=0;MI.fx={};MI.pick=false;MI.off=null}
  if(d.k!==MI.k){MI.k=d.k;MI.buf=[];MI.sp=null;MI.tap=null}
  const o=now-d.h;MI.off=MI.off==null||o<MI.off?o:MI.off+(o-MI.off)*.02;
  MI.buf.push(d);if(MI.buf.length>12)MI.buf.shift();MI.last=d;
  const nf=[];(d.f||[]).forEach(e=>{if(e.i>MI.fmax){MI.fmax=e.i;MI.feed.push(e);nf.push(e)}});if(MI.feed.length>80)MI.feed.splice(0,MI.feed.length-80);
  (d.x||[]).forEach(([i,x,y])=>{if(!MI.fx[i])MI.fx[i]={x,y,t:now}});
- miHud(d,nf);if(MI.cv&&MI.cv.isConnected&&!MI.raf&&!document.hidden)MI.raf=requestAnimationFrame(miDraw)}catch(e){}};
-function miHud(d,nf){const g=st.game,m=meN(),q=s=>document.getElementById(s);if(!q('micv'))return;
+ miHud(d,nf);if(d.me&&MI.cv&&MI.cv.isConnected&&!MI.raf&&!document.hidden)MI.raf=requestAnimationFrame(miDraw)}catch(e){}};
+function miHud(d,nf){const g=st.game,m=meN(),q=s=>document.getElementById(s);if(!q('mitl'))return;
  const t=q('mitl');t&&(t.textContent='⏱ '+miClock(d.l/10),t.classList.toggle('low',d.l<300));
  const a=q('mian');if(a){const b=a.querySelector('b');b&&(b.textContent=d.a)}
  const h=q('mith');if(h){const b=h.querySelector('b');if(b&&b.textContent!=String(d.v)){b.textContent=d.v;h.classList.add('hot');RM()||h.animate&&h.animate([{transform:'scale(1.2)'},{transform:'none'}],{duration:400})}}
- const n=q('mimine');if(n){const b=n.querySelector('b');b&&b.textContent!=String(d.me[7])&&(b.textContent=d.me[7],RM()||n.animate&&n.animate([{transform:'scale(1.15)'},{transform:'none'}],{duration:300}))}
- const k=q('mimk');if(k){const on=d.me[4]>=0,cd=d.me[6];k.disabled=!on&&cd>0;k.classList.toggle('on',on);
+ const n=d.me&&q('mimine');if(n){const b=n.querySelector('b');b&&b.textContent!=String(d.me[7])&&(b.textContent=d.me[7],RM()||n.animate&&n.animate([{transform:'scale(1.15)'},{transform:'none'}],{duration:300}))}
+ const k=d.me&&q('mimk');if(k){const on=d.me[4]>=0,cd=d.me[6];k.disabled=!on&&cd>0;k.classList.toggle('on',on);
   k.style.setProperty('--cd',on?d.me[5]/(GAMES.mim.MD*10):cd>0?cd/(GAMES.mim.CD*10):0);
   const lb=on?'🎭 '+GT('miAs',{n:esc(g.N[d.me[4]]||'')})+' · '+Math.ceil(d.me[5]/10)+' s':cd>0?'🎭 '+Math.ceil(cd/10)+' s':'🎭 '+GT('miMask');if(k._l!==lb){k._l=lb;k.innerHTML=lb}
   if(on&&MI.pick){MI.pick=false;const pk=q('mipk');pk&&(pk.hidden=true)}}
@@ -1061,14 +1131,14 @@ GAMES.prl={icon:'⚫',min:3,max:8,dur:10,tags:['social'],tone:true,PRN,PRS,
  neck(s,H,r,m){if(!H||!H.length)return '';
   return `<div class="prnk"><p class="prnkh">📿 ${GT('prNeck')}</p>${H.map((h,t)=>{const G={};for(const p in h.pk)if(h.pk[p]!=null&&s.order.includes(p))(G[h.pk[p]]=G[h.pk[p]]||[]).push(p);
    const ec=r?r.ec[t]||{}:{},ks=Object.keys(G).sort((a,b)=>G[b].length-G[a].length);
-   return `<div class="prnr ga" ${dl(t)}><span class="prti">🌊${t+1}</span><span class="prgs">${ks.map(k=>`<span class="prg ${G[k].length>1?'two':''} ${ec[k]=='e'?'ec':ec[k]=='s'?'st':''}"><i>${h.tr[k]}</i>${G[k].map(p=>{const pk=r&&r.pe.includes(p);
+   return `<div class="prnr ga" ${dl(t)}><span class="prti">🌊 ${GT('prTn',{i:t+1})}</span><span class="prgs">${ks.map(k=>`<span class="prg ${G[k].length>1?'two':''} ${ec[k]=='e'?'ec':ec[k]=='s'?'st':''}"><i>${h.tr[k]}</i>${G[k].map(p=>{const pk=r&&r.pe.includes(p);
     return `<small class="${pk?'pk':''}">${pk?'<b class="prbk sm" aria-hidden="true"></b>':DT(p)}${esc(p==m?GT('me'):p)}</small>`}).join('')}${ec[k]=='s'?'<b class="prst" aria-hidden="true">✋🏻</b>':''}</span>`).join('')}</span></div>`}).join('')}</div>`},
  rview(s,r,m,L){if(!r)return{html:''};const R=this,cs=R.cs(r.q,L),nm=i=>cs[r.o[i]]||'';
   const ch=`<div class="prcf">${[...Array(PRL.NC).keys()].map(i=>{const ds=r.pe.filter(p=>r.dv[p]&&r.dv[p].c===i);
    return `<span class="prch ga ${i===r.t?'tru':'off'}" ${dl(i)}><span aria-hidden="true">${i===r.t?'💎':'🧰'}</span><b>${esc(nm(i))}</b>${ds.map(p=>`<em>🤿 ${esc(p)}</em>`).join('')}</span>`}).join('')}</div>`;
   const out=r.pe.map((p,i)=>{const d=r.dv[p]||{c:-1},v=d.ok?PRL.V[d.t]:r.pe.length>1?1:2;
    return `<p class="gnote prout ga" ${dl(i,.5)}><b class="prbk" aria-hidden="true"></b> ${d.ok?GT('prOk',{n:B(p),v,i:d.t+1}):GT(d.c<0?'prNo':'prKo',{n:B(p),v})}</p>`}).join('');
-  const pts=`<div class="gvl">${s.order.map((p,i)=>`<span class="gchip ga ${r.pts[p]?'ok':''} ${p==m?'me':''}" ${dl(i,.7)}>${r.pe.includes(p)?'<b class="prbk sm" aria-hidden="true"></b>':DT(p)}${esc(p)} ${r.pts[p]?'+'+r.pts[p]:'0'}</span>`).join('')}</div>`;
+  const pts=`<div class="gvl">${s.order.map((p,i)=>`<span class="gchip ga ${r.pts[p]?'ok':''} ${p==m?'me':''}" ${dl(i,.7)}>${r.pe.includes(p)?'<b class="prbk sm" aria-hidden="true"></b>':DT(p)}${esc(p)} ${gPs(r.pts[p]||0)}</span>`).join('')}</div>`;
   return{html:`<div class="card c"><p class="gpre">${GT('prTrue')}</p>${ch}${out}${R.neck(s,r.h,r,m)}<p class="prnkh prrd">${GT('prRd')}</p>${pts}</div>`,
    bind(){if(r.pts[m]&&!RM())sparkles($('.prch.tru')||$('.prcf'),Math.min(18,r.pts[m]*5))}}},
  view(s){const g=s.game,m=meN(),R=this,L=typeof LANG!='undefined'?LANG:'fr';
@@ -1097,7 +1167,9 @@ GAMES.prl={icon:'⚫',min:3,max:8,dur:10,tags:['social'],tone:true,PRN,PRS,
    Niveau k : chacun reçoit k vagues secrètes (nombres 1–100, tous différents). Il faut toutes les lâcher dans l'ordre
      croissant, à l'échelle du groupe, sans jamais dire de chiffre : pendant la partie le chat se tait (hôte : messages
      refusés), seules les 4 réactions restent.
-   Rythme partagé = coups de houle (6 s × sablier de l'hôte ; sans sablier : quand tout le monde a choisi). À chaque coup,
+   Rythme partagé = coups de houle (8 s × sablier de l'hôte, jamais moins de 7 s réelles ; sans sablier : quand tout le
+     monde a choisi). Chaque niveau s'ouvre sur un court moment « tes vagues » (5 s ou « Continuer ») pour les lire.
+     La jauge de la tempête est l'horloge : elle descend en continu pendant le coup. À chaque coup,
      en même temps et modifiable jusqu'à la fin du coup : 🌊 Lâcher (ma plus petite vague), ⏳ Retenir (défaut), 🌅 Vague
      calme. Pas de premier joueur : les vagues lâchées ensemble se rangent toutes seules ; une erreur n'arrive que si une
      vague PLUS BASSE reste en main → elle part dans l'écume (révélée), −1 ⛵ par coup fautif.
@@ -1118,18 +1190,18 @@ GAMES.prl={icon:'⚫',min:3,max:8,dur:10,tags:['social'],tone:true,PRN,PRS,
      Rejetés : mêmes niveaux pour tous (5 à 8 joueurs : 24–32 vagues au dernier niveau, 1–19 % en moyen),
      2 ⛵ partout (moyen 3–12 % dès 3 joueurs).
    ===================================================================== */
-const TMP={BT:6,CB:3,LV:n=>n==2?7:n==3?6:n==4?5:n==5?4:3,LF:n=>n==2?2:n==8?5:4,B:c=>Math.ceil(c*1.5)+8,BON:{2:'c',3:'l',5:'c',6:'l'}};
+const TMP={BT:8,BM:7,FT:5,CB:3,LV:n=>n==2?7:n==3?6:n==4?5:n==5?4:3,LF:n=>n==2?2:n==8?5:4,B:c=>Math.ceil(c*1.5)+8,BON:{2:'c',3:'l',5:'c',6:'l'}};
 const tpBand=v=>{const k=Math.floor((v-1)/10);return (10*k+1)+"–"+(10*k+10)};
-GAMES.tmp={icon:'⛈️',min:2,max:8,dur:8,tags:['skill'],mute:1,TMP,
+GAMES.tmp={icon:'⛈️',rx:RX,min:2,max:8,dur:8,tags:['skill'],mute:1,TMP,clk:g=>g.st=='b',
  init(s){const g=s.game,n=s.order.length;g.n=TMP.LV(n);g.life=TMP.LF(n);g.calm=1;g.hist=[];g.ok=0;this.deal(s)},
  deal(s){const g=s.game,k=g.r+1,d=shuf([...Array(100).keys()].map(i=>i+1));g.h={};s.order.forEach(p=>g.h[p]=d.splice(0,k).sort((a,b)=>a-b));
-  g.pl=[];g.ec=[];g.band={};g.left=g.B=TMP.B(k*s.order.length);g.ev=null;g.res=null;g.bt=0;g.since=0;g.nx=0;this.beat(s)},
+  g.pl=[];g.ec=[];g.band={};g.left=g.B=TMP.B(k*s.order.length);g.ev=null;g.res=null;g.bt=0;g.since=0;g.nx=0;g.ch={};this.pub(s);gWait(g,TMP.FT,'f',1)},
  hold(s){const g=s.game;return s.order.filter(p=>(g.h[p]||[]).length)},
  pub(s){const g=s.game;g.cnt={};s.order.forEach(p=>g.cnt[p]=(g.h[p]||[]).length)},
- beat(s){const g=s.game;g.ch={};gWait(g,TMP.BT,'b');g.need=this.hold(s);g.bt++;this.pub(s)},
+ beat(s){const g=s.game,f=gTF();g.ch={};gWait(g,f?Math.max(TMP.BT,TMP.BM/f):TMP.BT,'b');g.need=this.hold(s);g.bt++;this.pub(s)},
  act(s,from,a){const g=s.game;if(g.st!='b'||!(g.h[from]||[]).length||!['P','W','C'].includes(a.v))return;if(a.v=='C'&&g.calm<1)return;
   g.ch[from]=a.v;g.done[from]=1;return true},
- next(s){const g=s.game;if(g.st=='b'){this.res(s);return}
+ next(s){const g=s.game;if(g.st=='f'){this.beat(s);return}if(g.st=='b'){this.res(s);return}
   if(g.end){g.over=1;return}g.r++;this.deal(s)},
  res(s){const g=s.game,H=this.hold(s),on=new Set(gOn(s)),ch=g.ch,Ho=H.filter(p=>on.has(p));g.left--;
   const nc=Ho.filter(p=>ch[p]=='C').length;
@@ -1153,35 +1225,42 @@ GAMES.tmp={icon:'⛈️',min:2,max:8,dur:8,tags:['skill'],mute:1,TMP,
  /* secrets : chacun ne reçoit que SES vagues ; pendant un coup, on voit seulement qui demande la vague calme */
  hide(g,n){const o={...g};o.h={[n]:(g.h[n]||[]).slice()};
   if(g.st=='b'){o.ch={};for(const p in g.ch)if(p==n||g.ch[p]=='C')o.ch[p]=g.ch[p]}return o},
- sea(g,nw){const P=g.pl||[],E=g.ec||[];
-  return `<div class="tpsea" aria-hidden="true"><i class="tpln"></i>${E.map(x=>`<b class="tpw ec ${nw&&x.b==nw?'nw':''}" style="inset-inline-start:${x.v-1}%"><span>${x.v}</span></b>`).join('')}
-   ${P.map(x=>`<b class="tpw ${x.e?'bad':''} ${nw&&x.b==nw?'nw':''}" style="inset-inline-start:${x.v-1}%;--c:${col(x.p)}"><span>${x.v}</span></b>`).join('')}<span class="tp0">1</span><span class="tp1">100</span></div>`},
- /* réaction : bulle de 2,6 s, jouée une fois par envoi (les re-rendus de coup la continuent sans la relancer) */
- rxa(g,p){const t=(g.rxt||{})[p],e=(g.rx||{})[p];if(!t||!e)return '';const M=this.rxs=this.rxs||{};if(!M[p]||M[p].t!==t)M[p]={t,at:Date.now()};
-  const age=Date.now()-M[p].at;return age<2600?`<span class="tprx" style="animation-delay:-${age}ms">${e}</span>`:''},
+ sea(g,nw){const P=g.pl||[],E=g.ec||[],ln={},last=[-99,-99];
+  /* numéros des vagues qui viennent de tomber : rangée du haut ou du bas, jamais à moins de 9 unités l'un de l'autre */
+  [...E.map(x=>({...x,k:'e'+x.v})),...P.map(x=>({...x,k:'p'+x.v}))].filter(x=>nw&&x.b==nw).sort((a,b)=>a.v-b.v).forEach(x=>{const r=x.v-last[0]>=9?0:x.v-last[1]>=9?1:last[0]<=last[1]?0:1;last[r]=x.v;ln[x.k]=r});
+  const lb=(k,v)=>ln[k]!=null?`<span class="${ln[k]?'dn':''}">${v}</span>`:'';
+  return `<div class="tpsea" aria-hidden="true"><i class="tpln"></i>${E.map(x=>`<b class="tpw ec ${nw&&x.b==nw?'nw':''}" style="inset-inline-start:${x.v-1}%">${lb('e'+x.v,x.v)}</b>`).join('')}
+   ${P.map(x=>`<b class="tpw ${x.e?'bad':''} ${nw&&x.b==nw?'nw':''}" style="inset-inline-start:${x.v-1}%;--c:${col(x.p)}">${lb('p'+x.v,x.v)}</b>`).join('')}<span class="tp0">1</span><span class="tp1">100</span></div>`},
+ /* petite légende : couleurs et icônes */
+ lg(){return `<p class="tplg"><span><i class="tpw0" style="--c:${col(meN())}"></i>${GT('tpLgW')}</span><span><i class="tpw0 bad"></i>${GT('tpLgB')}</span><span><i class="tpw0 ec"></i>${GT('tpLgE')}</span><span>⛵ ${GT('tpLgL')}</span><span>🌅 ${GT('tpLgC')}</span></p>`},
  seq(g){return `<div class="tpseq">${[...(g.pl||[]).map(x=>`<b class="${x.e?'bad':''}" style="--c:${col(x.p)}">${x.v}</b>`),...(g.ec||[]).map(x=>`<b class="ec">${x.v}</b>`)].join('')}</div>`},
  view(s){const g=s.game,m=meN(),R=this,my=(g.h||{})[m]||[],ch=g.ch||{};
-  const bar=`<div class="tpbar"><span class="tplf" title="⛵">${'⛵'.repeat(Math.max(0,g.life))}</span><span class="tpcl ${g.calm?'':'z'}" title="🌅">🌅 ${g.calm}</span><b class="tplv">${GT('tpLv',{v:g.r+1})}</b></div>`;
+  const bar=`<div class="tpbar"><span class="tplf" title="${esc(GT('tpLgL'))}">${'⛵'.repeat(Math.max(0,g.life))}</span><span class="tpcl ${g.calm?'':'z'}" title="${esc(GT('tpLgC'))}">🌅 ${g.calm}</span><b class="tplv">${GT('tpLv',{v:g.r+1})}</b></div>`;
+  if(g.st=='f'){const pl=s.order.includes(m);
+   return{html:`<div class="card c tpcard">${bar}<p class="gq2 ga">${GT(pl?'tpFocus':'tpFocusS')}</p>${pl&&my.length?`<div class="tphand tpfoc">${my.map((v,i)=>`<b class="tpv ga ${i?'':'lo'}" ${dl(i,.15)}>${v}</b>`).join('')}</div>`:''}
+    <p class="gsub ga" ${dl(3)}>${GT('tpFocusD',{v:GTn('tpBeatN',g.B)})}</p>${R.lg()}</div>`}}
   if(g.st=='r'){const r=g.res||{};
    const msg=r.ok?(r.storm?GT('tpStorm'):GT(r.lv>=g.n?'tpWin':'tpOk',{v:r.lv})):GT('tpSunk');
    return{html:`<div class="card c">${bar}<p class="gbig2 ga ${r.ok&&!r.storm?'ok':''}">${r.ok?(r.storm?'⛈️':'🌈'):'🌊'}</p><p class="gby2 ga" ${dl(1)}>${msg}</p>
     ${r.bon?`<p class="gnote ga ok" ${dl(2)}>${GT(r.bon=='l'?'tpBonL':'tpBonC')}</p>`:''}${R.sea(g,0)}${R.seq(g)}</div>`,
     bind(){if(r.ok&&!r.storm&&!RM())sparkles($('.gby2'),14)}}}
   const H=s.order.filter(p=>g.cnt[p]),nc=Object.values(ch).filter(v=>v=='C').length,ev=g.ev||{};
-  const evt=ev.t=='p'?ev.put.map(x=>`${DT(x.p)}<b>${x.v}</b>`).join(' '):ev.t=='x'?`💥 ${GT('tpX',{v:ev.lost.map(x=>x.v).join(', ')})}`:ev.t=='c'?`🌅 ${GT('tpC')}`:ev.t=='w'?GT('tpW'):GT('tpGo');
+  const evt=ev.t=='p'?ev.put.map(x=>`<span class="tpe">${DT(x.p)}<b>${x.v}</b></span>`).join(''):ev.t=='x'?`💥 ${GT('tpX',{v:ev.lost.map(x=>x.v).join(', ')})}`:ev.t=='c'?`🌅 ${GT('tpC')}`:ev.t=='w'?GT('tpW'):GT('tpGo');
   const crew=s.order.map(p=>{const k=g.cnt[p]||0,bd=g.band[p];
-   return `<div class="tpm ${p==m?'me':''} ${k?'':'out'}"><span class="tpnm">${DT(p)}${p==m?esc(GT('me')):esc(p)}</span><span class="tpk">${k?'🌊'.repeat(Math.min(k,7)):'✓'}</span>
-    ${bd!=null&&k?`<span class="tpbd" dir="ltr">${tpBand(bd*10+1)}</span>`:''}${ch[p]=='C'?'<span class="tpcq">🌅</span>':''}${g.done[p]&&k?'<i class="tpok" aria-hidden="true"></i>':''}${R.rxa(g,p)}</div>`}).join('');
+   return `<div class="tpm ${p==m?'me':''} ${k?'':'out'}" data-rxp="${esc(p)}"><span class="tpnm">${DT(p)}${p==m?esc(GT('me')):esc(p)}</span><span class="tpk">${k?'🌊'.repeat(Math.min(k,7)):'✓'}</span>
+    ${bd!=null&&k?`<span class="tpbd" dir="ltr">${tpBand(bd*10+1)}</span>`:''}${ch[p]=='C'?'<span class="tpcq">🌅</span>':''}${g.done[p]&&k?'<i class="tpok" aria-hidden="true"></i>':''}</div>`}).join('');
   const c=ch[m]||'W',hand=my.length?`<div class="tphand">${my.map((v,i)=>`<b class="tpv ${i?'':'lo'}">${v}</b>`).join('')}</div>
    <div class="tpbt"><button class="tpgo ${c=='P'?'sel':''}" data-tp="P" aria-pressed="${c=='P'}">🌊 ${GT('tpPut',{v:my[0]})}</button><button class="ghost ${g.done[m]&&c=='W'?'sel':''}" data-tp="W" aria-pressed="${c=='W'}">⏳ ${GT('tpHold')}</button>
-   <button class="ghost tpcb ${c=='C'?'sel':''}" data-tp="C" ${g.calm?'':'disabled'} aria-pressed="${c=='C'}">🌅 ${GT('tpCalm')}${nc?` <small>${nc}/${Math.max(1,Math.ceil(H.length/2))}</small>`:''}</button></div>`:`<p class="gnote">${GT('tpNone')}</p>`;
-  return{html:`<div class="card c tpcard">${bar}<div class="tpst"><span>⛈️ ${GT('tpLeft',{v:g.left})}</span><span class="tpsb"><i style="width:${Math.max(0,Math.min(100,100*g.left/g.B))}%"></i></span></div>
-   ${R.sea(g,g.bt-1)}<p class="tpev" aria-live="polite">${evt}</p><p class="tpsi">${GT('tpSince',{v:g.since})}</p><div class="tpcrew">${crew}</div>${hand}
-   <div class="grxb tprxb">${RX.map(e=>`<button class="ghost" data-grx="${e}" aria-label="${e}">${e}</button>`).join('')}</div><p class="tpmu">🤫 ${GT('tpMute')}</p></div>`,
-   bind(){$$('[data-tp]').forEach(b=>b.onclick=()=>gs({v:b.dataset.tp}));$$('[data-grx]').forEach(x=>x.onclick=()=>send({t:'g',rx:x.dataset.grx}))}}},
+   <button class="ghost tpcb ${c=='C'?'sel':''}" data-tp="C" ${g.calm?'':'disabled'} aria-pressed="${c=='C'}">🌅 ${GT('tpCalm')}${nc?` <small>${nc}/${Math.max(1,Math.ceil(H.length/2))}</small>`:''}</button></div>`:s.order.includes(m)?`<p class="gnote">${GT('tpNone')}</p>`:'';
+  /* la jauge EST l'horloge : elle glisse de « coups restants » à « un de moins » pendant le coup (calée sur le sablier) */
+  const ga=Math.max(0,Math.min(1,g.left/g.B)),gb=Math.max(0,Math.min(1,(g.left-1)/g.B)),rm=gRem(s),run=g.dl>0&&g.sec;
+  return{html:`<div class="card c tpcard">${bar}<div class="tpst"><span>⛈️ ${GTn('tpLeftN',g.left)}</span><span class="tpsb"><i data-gan style="--a:${ga.toFixed(4)};--b:${gb.toFixed(4)};${run?`animation-duration:${g.sec}s;animation-delay:-${Math.max(0,g.sec-rm).toFixed(2)}s`:'animation:none;transform:scaleX(var(--a))'}"></i></span></div>
+   ${R.sea(g,g.bt-1)}<p class="tpev" aria-live="polite">${evt}</p><p class="tpsi">${GT('tpSince',{v:g.since})}</p><div class="tpcrew">${crew}</div>${hand}${R.lg()}
+   <p class="tpmu">🤫 ${GT('tpMute')}</p></div>`,
+   bind(){$$('[data-tp]').forEach(b=>b.onclick=()=>gs({v:b.dataset.tp}))}}},
  endView(s){const g=s.game;
   return `<p class="gbig2 ga ${g.ok>=g.n?'ok':''}">${g.ok>=g.n?'🌈':'⛈️'} ${g.ok} / ${g.n}</p><p class="gnote ga" ${dl(1)}>${GT('tpEnd',{v:g.ok,n:g.n})}</p>
-   <div class="tpend">${(g.hist||[]).map((h,i)=>`<div class="ga" ${dl(i,.3)}><b>${GT('tpLv',{v:h.lv})}</b><span>${h.ok?(h.st?'⛈️':'✓'):'🌊'}${h.x?' · 💥×'+h.x:''}</span><span class="mut">${h.bt} 〰️</span></div>`).join('')}</div>`},
+   <div class="tpend">${(g.hist||[]).map((h,i)=>`<div class="ga" ${dl(i,.3)}><b>${GT('tpLv',{v:h.lv})}</b><span>${h.ok?(h.st?'⛈️':'✓'):'🌊'}${h.x?' · 💥 '+GTn('tpErrN',h.x):''}</span><span class="mut">${GTn('tpBeatN',h.bt)}</span></div>`).join('')}</div>`},
  fin(s){const g=s.game;return{pts:g.sc,coop:{v:g.ok,max:g.n}}}};
 /* @games : jeux silencieux (Tempête) — pendant la partie, le chat se tait (hôte et envoi) ; réactions seulement */
 W.GMute=s=>!!(s&&s.phase=='game'&&s.game&&GAMES[s.game.id]&&GAMES[s.game.id].mute);
@@ -1269,7 +1348,7 @@ GAMES.coq={icon:'🐚',min:2,max:8,dur:10,tags:['social','chance'],COQ,
    return `<div class="cqsl ${cur?'on':''} ${h?'past':''}">${this.lotH(h?h.lot:l,'xs')}${h?`<i class="cqsw">${h.w?DT(h.w):'↪'}</i>`:''}</div>`}).join('')}</div>`},
  /* résultat d'un lot : toutes les offres, égalités barrées */
  resH(h,m){if(!h)return '';const E=Object.entries(h.b).sort((a,b)=>b[1]-a[1]);
-  const who=h.w?`→ ${h.w==m?`<b>${esc(GT('me'))}</b>`:B(h.w)} <span class="cqpay" dir="ltr">−${h.b[h.w]} 🪙</span>`:`<b class="mut">↪ ${GT('cqCarry')}</b>`;
+  const who=h.w?`→ ${h.w==m?`<b>${esc(GT('me'))}</b>`:B(h.w)} <span class="cqpay">${GT('cqPay',{v:h.b[h.w]})}</span>`:`<b class="mut">↪ ${GT('cqCarry')}</b>`;
   return `<div class="cqres ga">${this.lotH(h.lot,'sm')}<span class="cqwho">${who}</span><span class="cqbids" dir="ltr">${E.map(([p,c],i)=>
    `<span class="cqbid ${p==h.w?'w':''} ${h.tie.includes(c)?'x':''}" ${dl(i,.12)}>${DT(p)}<b>${c}</b></span>`).join('')}</span></div>`},
  /* tableau des cotes : révélée / mon indice / ? ; annonces (▲ ▼ à la couleur de chacun), vérifiées quand la cote sort */
@@ -1304,7 +1383,7 @@ GAMES.coq={icon:'🐚',min:2,max:8,dur:10,tags:['social','chance'],COQ,
    <p class="cqnote">${GT(my==null?'cqAuto':'cqTie')}</p>${R.tips(g)}`:''}${R.board(s,g)}${R.crew(s,g,m)}</div>`,
    bind(){$$('[data-cq]').forEach(b=>b.onclick=()=>gs({c:+b.dataset.cq}))}}},
  endView(s){const g=s.game,T=g.T||this.tally(s),m=meN(),R=this;
-  return `${g.sea?`<p class="gnote mut">🌊 ${GT('cqSea')}</p>`:g.last?R.resH(g.last,m):''}<h3 class="gh3">🐚 ${GT('cqMk')}</h3>
+  return `<div class="cqendl">${g.sea?`<p class="gnote mut">🌊 ${GT('cqSea')}</p>`:g.last?R.resH(g.last,m):''}</div><h3 class="gh3">🐚 ${GT('cqMk')}</h3>
    <div class="cqfin">${[0,1,2,3,4].map((x,i)=>`<div class="cqfc ga" ${dl(i,.2)}>${cqS(x)}<b>${g.co[x]}</b><small>${esc(R.nm(x))}</small></div>`).join('')}</div>
    <div class="cqtl">${[...s.order].sort((a,b)=>T[b].t-T[a].t).map((p,i)=>{const t=T[p];
     return `<div class="cqtr ga ${p==m?'me':''}" ${dl(i,.5)}><span class="cqnm">${DT(p)}<b>${esc(p)}</b></span><span class="cqco">${R.coll(g.col[p])}</span>
@@ -1326,7 +1405,7 @@ const TU={c:['#ef8354','#2fa894','#9b7be8','#d9a520'],
  /* glisse de (x0,y0) vers (x,y) */
  mv(x0,y0,x,y,h,d,c,st){return TU.e(x,y,h,d,'m '+(c||''),`--x:${x0-x}px;--y:${y0-y}px;${st||''}`)},
  av(i,lab){const n=TU.n()[i]||'?';return `<b class="tav" style="--c:${TU.c[i]}">${esc([...n][0])}</b>${lab===false?'':`<small class="tnm">${esc(n)}</small>`}`},
- pt(v,cl){return `<b class="tpt ${cl||''}">${v}</b>`},
+ pt(v,cl){const m=String(v).match(/^([+−-]?)(\d+|½)$/);if(m)v=GTn('ptsS',m[1].replace('-','−')+m[2]);return `<b class="tpt ${cl||''}" dir="ltr">${v}</b>`},
  cd(h,cl){return `<i class="tcd ${cl||''}">${h}</i>`},
  dot(i){return `<i class="tdot" style="--c:${TU.c[i]}"></i>`},
  bt(i){return `<i class="tbt" style="--c:${TU.c[i]}">⛵</i>`}};
@@ -1340,7 +1419,7 @@ const TUS={
   {k:'tu_bot2',s:()=>TU.e(150,30,'🍾',0,'a big')+TU.e(150,78,TU.cd('🗼 💤'),.5,'p')+[0,1,2].map(i=>TU.e(60+90*i,150,TU.av(i))+TU.e(60+90*i,112,'❓',1.1+.15*i,'p')).join('')},
   {k:'tu_bot3',s:()=>TU.e(150,30,TU.cd('🗼 💤'))+[0,1,2].map(i=>TU.e(60+90*i,150,TU.av(i))).join('')+TU.mv(60,150,140,108,TU.dot(0),.4)+TU.mv(240,150,160,108,TU.dot(2),.8)+TU.e(150,78,'✅',1.5,'p')+TU.e(60,104,TU.pt('+2'),1.9,'p')+TU.e(240,104,TU.pt('+2'),2,'p')},
   {k:'tu_bot4',x:'n',s:()=>TU.e(80,40,TU.cd('🔍 ❌❌❌'),.2,'p')+TU.e(80,95,TU.av(1,false),.2)+TU.e(80,140,TU.pt('+3'),.9,'p')+TU.e(220,40,TU.cd('🔍 ✅❌❌'),1.3,'p')+TU.e(220,95,TU.av(1,false),1.3)+TU.e(220,140,TU.pt('+1'),1.9,'p')},
-  {k:'tu_bot5',x:'2',s:()=>[0,1].map(i=>TU.e(80+140*i,150,TU.av(i))+[0,1,2].map(j=>TU.e(48+140*i+32*j,104,TU.cd(j==2?'🎭':'✅'),.3+.2*j+.6*i,'p')).join('')).join('')+TU.e(80,62,TU.pt('+2'),2,'p')+TU.e(220,62,TU.pt('+2'),2.3,'p')}],
+  {k:'tu_bot5',x:'2',s:()=>[0,1].map(i=>TU.e(80+140*i,150,TU.av(i))+[0,1,2].map(j=>TU.e(44+140*i+36*j,104,TU.cd(j==2?'🎭':'✅'),.3+.2*j+.6*i,'p')).join('')).join('')+TU.e(80,62,TU.pt('+2'),2,'p')+TU.e(220,62,TU.pt('+2'),2.3,'p')}],
  pha:[
   {k:'tu_pha1',s:()=>TU.e(40,95,'🗼',0,'a big')+TU.e(55,95,'<i class="tbeam"></i>',.3)+TU.e(205,95,TU.cd('❓🏝️'),.7,'p')},
   {k:'tu_pha2',x:'n',s:()=>[0,1,2,3].map(i=>TU.e(45+70*i,150,TU.av(i))).join('')+TU.mv(45,150,185,98,TU.dot(0),.3)+TU.mv(115,150,45,98,TU.dot(1),.5)+TU.mv(185,150,185,84,TU.dot(2),.7)+TU.mv(255,150,185,70,TU.dot(3),.9)},
@@ -1357,7 +1436,7 @@ const TUS={
   {k:'tu_rad3',x:'n',s:()=>TU.e(150,24,TU.cd('🐬 3 – 1 🕊️'),0,'p')+[0,1,2,3].map(i=>TU.e(45+70*i,150,TU.av(i))+TU.e(45+70*i,104,TU.cd(i<3?'🐬':'🕊️'),.3)+TU.e(45+70*i,64,TU.pt(i<3?'+1':'+2'),1+.2*i,'p')).join('')},
   {k:'tu_rad4',x:'2',s:()=>TU.e(90,150,TU.av(0))+TU.e(210,150,TU.av(1))+TU.e(90,104,TU.cd('🐬'),.2,'p')+TU.e(90,60,TU.cd('🔮 🕊️'),.7,'p')+TU.e(210,104,TU.cd('🕊️'),1.4,'p')+TU.e(150,60,TU.pt('+1'),2,'p')}],
  pec:[
-  {k:'tu_pec1',d:6,s:()=>`<i class="tsea"></i>`+TU.e(150,40,'👜',0,'p big')+['🦪','🦪','🦪','🦪','🦪','🪼','🪼','🦈','🦈','🦈','🦈','🦈'].map((x,i)=>TU.e(40+20*i,92,x,.5+.12*i,'p')).join('')+[0,1,2].map(i=>TU.mv(75+75*i,0,75+75*i,150,TU.av(i,false),2+.2*i)).join('')},
+  {k:'tu_pec1',d:6,s:()=>`<i class="tsea"></i>`+TU.e(150,40,'👜',0,'p big')+['🦪','🦪','🦪','🦪','🦪','🪼','🪼','🦈','🦈','🦈','🦈','🦈'].map((x,i)=>TU.e(65+34*(i%6),84+28*(i>5),x,.5+.12*i,'p')).join('')+[0,1,2].map(i=>TU.mv(75+75*i,0,75+75*i,150,TU.av(i,false),2+.2*i)).join('')},
   {k:'tu_pec2',s:()=>`<i class="tsea"></i>`+TU.e(30,28,'👜')+TU.mv(30,28,150,48,'🦪<sub>3</sub>',.2)+[0,1,2].map(i=>TU.e(75+75*i,125,TU.av(i,false))+TU.e(75+75*i,160,TU.cd('🕸️ 0'),0,'o','--o:1.2s')+TU.e(75+75*i,160,TU.cd('🕸️ 3','ok'),1.2+.15*i,'p')).join('')},
   {k:'tu_pec3',s:()=>`<i class="tsea"></i>`+TU.e(268,22,'🧰')+[0,2].map(i=>TU.e(75+75*i,125,TU.av(i,false))+TU.e(75+75*i,160,TU.cd('🕸️ 3'))+TU.e(75+75*i,92,'🤿',1.6,'p')).join('')+TU.mv(150,125,150,22,TU.av(1,false),.4)+TU.e(150,160,TU.cd('🕸️ 3'),0,'o','--o:.9s')+TU.mv(150,160,268,48,TU.cd('3','ok'),1,'','--op0:0')},
   {k:'tu_pec4',d:6,s:()=>`<i class="tsea"></i>`+TU.e(150,22,TU.av(1,false))+TU.e(268,22,'🧰')+TU.e(268,48,TU.cd('3','ok'))+TU.e(110,60,'🦈',.2,'p')+TU.e(110,84,TU.pt('1/2','no'),.5,'p')+TU.e(190,60,'🦈',1.8,'p k')+[0,2].map(i=>TU.e(75+75*i,125,TU.av(i,false))+TU.e(75+75*i,160,TU.cd('🕸️ 7'),0,'o','--o:2.4s')+TU.e(75+75*i,160,TU.cd('🕸️ 0','no'),2.5,'p')).join('')},
@@ -1369,16 +1448,16 @@ const TUS={
   {k:'tu_arc1',s:()=>tuHex()+TU.e(105,90,TU.bt(0),.4,'p')+TU.e(195,90,TU.bt(1),.6,'p')+TU.e(105,64,TU.av(0,false),.8,'p sm')+TU.e(195,64,TU.av(1,false),.9,'p sm')},
   {k:'tu_arc2',s:()=>tuHex()+TU.e(105,90,TU.bt(0))+TU.e(195,90,TU.bt(1))+TU.e(40,40,TU.cd('🂠'),.2,'p')+TU.e(260,40,TU.cd('🂠'),.4,'p')+TU.e(40,40,TU.cd('↗️','ok'),1.5,'p')+TU.e(260,40,TU.cd('🏝️','ok'),1.7,'p')+TU.e(150,160,'⏳',.8,'p')},
   {k:'tu_arc3',s:()=>tuHex(0,3)+TU.e(127.5,51,'<i class="tring"></i>',.2,'p')+TU.mv(105,90,127.5,51,TU.bt(0),1)+TU.e(127.5,24,TU.av(0,false),1.6,'p sm')},
-  {k:'tu_arc4',s:()=>tuHex()+TU.e(127.5,56,'🏝️',.8,'p')+TU.e(127.5,44,TU.bt(0))+TU.e(127.5,18,TU.av(0,false),0,'a sm')},
-  {k:'tu_arc5',d:6,s:()=>tuHex()+TU.e(172.5,56,'🏝️',0,'o','--o:2.6s')+TU.e(172.5,56,'🌊',2.7,'p')+TU.e(172.5,44,TU.bt(0))+TU.e(172.5,18,TU.av(0,false),0,'a sm')+TU.e(195,90,TU.bt(1),0,'o','--o:1.6s')+TU.mv(195,90,172.5,129,TU.bt(1),1.6,'','--op0:0')+TU.e(212,70,'🛡️',.4,'p o','--o:1.6s')+TU.e(150,160,TU.pt('💥','no'),2.7,'p')},
-  {k:'tu_arc6',s:()=>tuHex(0,0)+TU.e(105,90,TU.bt(0),0,'a k2')+TU.e(195,90,TU.bt(1),0,'a k2')+TU.mv(115,90,138,90,'➡️',.3)+TU.mv(185,90,162,90,'⬅️',.3)+TU.e(150,90,'💥',1.2,'p big')},
-  {k:'tu_arc7',d:6,s:()=>tuHex(1)+TU.e(150,92,'🏝️')+TU.e(195,92,'🏝️',0,'o','--o:2.4s')+TU.e(150,66,TU.pt('+3'),.4,'p')+TU.e(195,66,TU.pt('+2'),.7,'p')+TU.e(127.5,103,TU.pt('+2'),1,'p')+TU.e(127.5,129,'🏝️',0,'o','--o:2.4s')+TU.e(150,165,'🌊 🌊 🌊',2.2,'p')}],
+  {k:'tu_arc4',s:()=>tuHex()+TU.e(127.5,64,'🏝️',.8,'p')+TU.e(127.5,38,TU.bt(0))+TU.e(127.5,13,TU.av(0,false),0,'a sm')},
+  {k:'tu_arc5',d:6,s:()=>tuHex()+TU.e(172.5,64,'🏝️',0,'o','--o:2.6s')+TU.e(172.5,64,'🌊',2.7,'p')+TU.e(172.5,38,TU.bt(0))+TU.e(172.5,13,TU.av(0,false),0,'a sm')+TU.e(195,90,TU.bt(1),0,'o','--o:1.6s')+TU.mv(195,90,172.5,129,TU.bt(1),1.6,'','--op0:0')+TU.e(218,64,'🛡️',.4,'p o','--o:1.6s')+TU.e(150,160,TU.pt('💥','no'),2.7,'p')},
+  {k:'tu_arc6',s:()=>tuHex(0,0)+TU.e(105,90,TU.bt(0),0,'a k2')+TU.e(195,90,TU.bt(1),0,'a k2')+TU.mv(122,90,135,90,'➡️',.3)+TU.mv(178,90,165,90,'⬅️',.3)+TU.e(150,90,'💥',1.2,'p big')},
+  {k:'tu_arc7',d:6,s:()=>tuHex(1)+TU.e(150,92,'🏝️')+TU.e(195,92,'🏝️',0,'o','--o:2.4s')+TU.e(145,68,TU.pt('+3'),.4,'p')+TU.e(210,68,TU.pt('+2'),.7,'p')+TU.e(84,129,TU.pt('+2'),1,'p')+TU.e(127.5,129,'🏝️',0,'o','--o:2.4s')+TU.e(150,165,'🌊 🌊 🌊',2.2,'p')}],
  msk:[
   {k:'tu_msk1',s:()=>TU.e(150,145,TU.av(0))+TU.e(150,112,'🎭',.3,'p')+TU.e(80,50,'🐙',.8,'p big')+TU.e(220,50,'🦀',1.1,'p big')+TU.e(80,86,'?',1.3,'p')+TU.e(220,86,'?',1.4,'p')},
   {k:'tu_msk2',s:()=>TU.e(150,145,TU.av(0))+TU.e(150,40,'🐙',0,'a big')+TU.mv(150,120,150,78,TU.cd('💬 …'),.3)+TU.e(100,110,TU.cd('🤝🏻'),1.3,'p')+TU.e(200,110,TU.cd('🔒'),1.5,'p')},
   {k:'tu_msk3',s:()=>TU.e(80,80,'🐙',0,'a big')+TU.e(220,80,'🎭',0,'a big')+TU.e(80,130,TU.cd('🤝🏻'),.2,'p')+TU.e(220,130,TU.cd('🤝🏻'),.4,'p')+TU.e(80,40,TU.pt('+4'),1,'p')+TU.e(220,40,TU.pt('+4'),1.1,'p')+TU.e(150,80,'🔗',1.5,'p big')},
-  {k:'tu_msk4',s:()=>TU.e(80,80,'🐙',0,'a big')+TU.e(220,80,'🎭',0,'a big')+TU.e(80,130,TU.cd('🤝🏻'),.2,'p')+TU.e(220,130,TU.cd('🔒'),.4,'p')+TU.e(80,40,TU.pt('+1','no'),1,'p')+TU.e(220,40,TU.pt('+4'),1.1,'p')+TU.e(252,62,'🦈',1.7,'p')},
-  {k:'tu_msk5',s:()=>TU.e(80,80,'🐙',0,'a big')+TU.e(112,62,'🦈')+TU.e(220,80,'🎭',0,'a big')+TU.e(80,130,TU.cd('🔒'),.2,'p')+TU.e(220,130,TU.cd('🔒'),.4,'p')+TU.e(80,40,TU.pt('+2'),1,'p')+TU.e(220,40,TU.pt('+2'),1.1,'p')+TU.e(258,62,'✓',1.7,'p')},
+  {k:'tu_msk4',s:()=>TU.e(80,80,'🐙',0,'a big')+TU.e(220,80,'🎭',0,'a big')+TU.e(80,130,TU.cd('🤝🏻'),.2,'p')+TU.e(220,130,TU.cd('🔒'),.4,'p')+TU.e(80,40,TU.pt('+1','no'),1,'p')+TU.e(220,40,TU.pt('+4'),1.1,'p')+TU.e(264,50,'🦈',1.7,'p')},
+  {k:'tu_msk5',s:()=>TU.e(80,80,'🐙',0,'a big')+TU.e(120,50,'🦈')+TU.e(220,80,'🎭',0,'a big')+TU.e(80,130,TU.cd('🔒'),.2,'p')+TU.e(220,130,TU.cd('🔒'),.4,'p')+TU.e(80,40,TU.pt('+2'),1,'p')+TU.e(220,40,TU.pt('+2'),1.1,'p')+TU.e(258,62,'✓',1.7,'p')},
   {k:'tu_msk6',d:7,s:()=>TU.e(70,140,TU.av(0))+TU.e(230,140,TU.av(1))+TU.e(150,40,TU.cd('16','ok'),0,'p')+
    [['🤝🏻','🤝🏻','+8','+8',.3,1.9],['🗡️','🤝🏻','+16','0',2.1,3.7],['🗡️','🗡️','−8','−8',3.9,0]].map(([a,b,x,y,d,o])=>{const O=o?'p o':'p';return TU.e(70,100,TU.cd(a),d,O,'--o:'+o+'s')+TU.e(230,100,TU.cd(b),d+.1,O,'--o:'+o+'s')+TU.e(70,72,TU.pt(x,x[0]=='−'?'no':''),d+.6,O,'--o:'+o+'s')+TU.e(230,72,TU.pt(y,y[0]=='−'||y=='0'?'no':''),d+.7,O,'--o:'+o+'s')}).join('')}]};
 /* 🧭 tutoriel de La Chaîne des Phares */
@@ -1402,12 +1481,12 @@ const tuP3=()=>[0,1,2].map(i=>TU.e(60+90*i,152,TU.av(i))).join(''),tuCh=(hl,d,o)
  tuRo=d=>TU.e(60,112,'<i class="prp"></i>',d)+TU.e(150,112,'<i class="prp"></i>',d)+TU.e(240,112,'<i class="prbk big"></i>',d);
 TUS.prl=[
  {k:'tu_prl1',d:6,s:()=>tuCh(-1)+tuP3()+tuRo(.6)+TU.e(150,24,TU.cd('💎','ok'),1.6,'p')+TU.mv(60,112,128,52,'👀',2,'','--op0:0')+TU.mv(150,112,172,52,'👀',2.2,'','--op0:0')+TU.e(240,72,'❓',2.6,'p big')},
- {k:'tu_prl2',d:7,s:()=>['🧺','🍉','⛺','🎣'].map((e,i)=>TU.e(75+50*i,40,TU.cd(e),.1*i,'p')).join('')+tuP3()+tuRo(0)+
-  [0,1,2].map(i=>TU.e(60+90*i,82,'🫧',.5+.2*i,'p o','--o:2s')+TU.e(60+90*i,82,TU.cd(i<2?'🧺':'🎣',i<2?'ok':''),2.1,'p')).join('')+TU.e(105,82,'🔗',2.7,'p')+TU.e(60,58,TU.pt('+1'),3.1,'p')+TU.e(150,58,TU.pt('+1'),3.2,'p')},
+ {k:'tu_prl2',d:7,s:()=>['🧺','🍉','⛺','🎣'].map((e,i)=>TU.e(75+50*i,22,TU.cd(e),.1*i,'p')).join('')+tuP3()+tuRo(0)+
+  [0,1,2].map(i=>TU.e(60+90*i,82,'🫧',.5+.2*i,'p o','--o:2s')+TU.e(60+90*i,82,TU.cd(i<2?'🧺':'🎣',i<2?'ok':''),2.1,'p')).join('')+TU.e(105,82,'🔗',2.7,'p')+TU.e(60,54,TU.pt('+1'),3.1,'p')+TU.e(150,54,TU.pt('+1'),3.2,'p')},
  {k:'tu_prl3',d:6,s:()=>tuP3()+tuRo(0)+[0,1].map(i=>TU.e(60+90*i,82,TU.cd('🧺'))).join('')+TU.e(240,82,'🫧',.2,'p o','--o:1s')+TU.e(240,82,TU.cd('🧺'),1.1,'p')+
   TU.mv(240,70,105,82,'✋🏻',1.7,'','--op0:0')+TU.e(60,50,TU.pt('0','no'),2.4,'p')+TU.e(150,50,TU.pt('0','no'),2.5,'p')+TU.e(240,50,TU.pt('+1'),2.6,'p')},
  {k:'tu_prl4',d:7,s:()=>tuCh(-1,0,'a')+TU.e(150,24,TU.cd('💎','ok'),2.2,'p')+TU.e(60,152,TU.av(0))+TU.e(150,152,TU.av(1))+TU.mv(240,152,150,72,TU.av(2,false),.4)+TU.e(150,98,'🤿',.9,'p')+
-  TU.e(205,72,TU.pt('+3'),2.8,'p')+TU.e(240,128,TU.cd('🌊2 +3 · 🌊3 +2'),3.4,'p')},
+  TU.e(205,72,TU.pt('+3'),2.8,'p')+TU.e(232,128,TU.cd(`${GT('prTn',{i:2})} : ${gPs(3)}<br>${GT('prTn',{i:3})} : ${gPs(2)}`,'sm2'),3.4,'p')},
  {k:'tu_prl5',d:6,s:()=>tuCh(-1,0,'a')+TU.e(150,24,TU.cd('💎','ok'),1.8,'p')+TU.e(254,24,TU.cd('✗','no'),1.2,'p')+TU.mv(240,152,254,74,TU.av(2,false),.3)+TU.e(254,100,'🤿',.7,'p')+
   TU.e(60,152,TU.av(0))+TU.e(150,152,TU.av(1))+TU.e(60,112,TU.pt('+2'),2.4,'p')+TU.e(150,112,TU.pt('+2'),2.6,'p')},
  {k:'tu_prl6',d:6,s:()=>tuP3()+[0,1,2].map(i=>TU.e(60+90*i,104,'<i class="prbk big"></i>',.3+1.3*i,i<2?'p o':'p',i<2?'--o:'+(1.5+1.3*i)+'s':'')+TU.e(60+90*i,72,TU.pt('#'+(i+1)),.4+1.3*i,'p')).join('')}];
@@ -1434,22 +1513,33 @@ TUS.coq=[
  {k:'tu_coq7',x:'2',s:()=>TU.e(80,150,TU.av(0))+TU.e(220,150,TU.av(1))+TU.e(80,100,TU.cd('🔍 '+tuQ(0)+' '+tuQ(2)),.3,'p')+TU.e(220,100,TU.cd('🔍 '+tuQ(3)+' '+tuQ(4)),.6,'p')+TU.e(150,40,'⚔️',1.4,'p big')}];
 for(const id in TUS)if(GAMES[id])GAMES[id].tut=TUS[id];
 const GTU={id:null,i:0,t:null};
+/* scène dessinée sur 300×180 et mise à l'échelle d'un bloc (transform) : mêmes proportions partout, rien ne déborde à 375 px */
+function gTuFit(){const b=$('.gtu .tus'),c=b&&b.firstElementChild;if(c)c.style.setProperty('--k',(b.clientWidth/300).toFixed(4))}W.GTuFit=gTuFit;
+if(typeof window!='undefined'&&window.addEventListener)window.addEventListener('resize',()=>{if($('.gtu'))gTuFit()});
 W.GTut=function(id){const G=GAMES[id];if(!G||!G.tut||typeof document=='undefined')return false;
  const nOn=(()=>{try{return st&&st.phase=='game'&&st.order?st.order.length:st.players.filter(p=>p.online).length}catch(e){return 3}})();
  const L=G.tut.filter(x=>!x.x||(x.x=='2'?nOn==2:nOn!=2));GTU.id=id;GTU.i=0;
  const box=$('#modal');if(!box)return false;
- box.innerHTML=`<div class="modal gtu" role="dialog" aria-modal="true" aria-label="${esc(GT('n_'+id))}"><div class="card"><div class="tuh"><span>${G.icon}</span><b>${GT('n_'+id)}</b></div>
-  <div class="tus" aria-hidden="true"></div><p class="tucap" aria-live="polite"></p><div class="steps">${L.map((_,j)=>`<i data-s="${j}"></i>`).join('')}</div>
-  <div class="row"><button class="ghost" id="tuag"></button><button class="pri" id="tunx"></button></div></div></div>`;
+ box.innerHTML=`<div class="modal gtu" role="dialog" aria-modal="true" aria-label="${esc(GT('n_'+id))}"><div class="card"><div class="tuh"><span>${G.icon}</span><b>${GT('n_'+id)}</b><button class="tux" id="tux" aria-label="${esc(GT('tuClose'))}" data-tip="${esc(GT('tuClose'))}">✕</button></div>
+  <div class="tuw"><div class="tus" aria-hidden="true"></div><button class="turp" id="tuag" aria-label="${esc(GT('tuAgain'))}" data-tip="${esc(GT('tuAgain'))}">↺</button></div>
+  <p class="tucap" aria-live="polite"></p><div class="steps">${L.map((_,j)=>`<button class="tud" data-s="${j}" aria-label="${j+1} / ${L.length}"></button>`).join('')}</div>
+  <div class="row"><button class="ghost" id="tupv">${document.dir=='rtl'?'▶':'◀'} ${GT('tuPrev')}</button><button class="pri" id="tunx"></button></div></div></div>`;
  const nm=TU.n(),tw=TU.w(),V={a:nm[0],b:nm[1],c:nm[2],d:nm[3],w0:tw[0],w1:tw[1],w2:tw[2],w3:tw[3]};
  const show=j=>{clearTimeout(GTU.t);GTU.i=j;const S=L[j],stg=$('.gtu .tus');if(!stg)return;
-  stg.innerHTML=`<div class="tusc">${S.s()}</div>`;$('.gtu .tucap').innerHTML=esc(GT(S.k,V));
-  $$('.gtu .steps i').forEach((el,k)=>el.className=k==j?'on':k<j?'done':'');
-  const last=j==L.length-1;$('#tunx').textContent=last?GT('tuOk'):T('next');$('#tuag').textContent=last&&L.length>1?'↺ '+GT('tuAll'):'↺ '+GT('tuAgain');
+  stg.textContent='';void stg.offsetWidth;/* nouveau nœud : la scène repart de zéro (Revoir, boucle) */
+  stg.innerHTML=`<div class="tusc">${S.s()}</div>`;gTuFit();$('.gtu .tucap').innerHTML=esc(GT(S.k,V));
+  $$('.gtu .steps .tud').forEach((el,k)=>{el.className='tud'+(k==j?' on':k<j?' done':'');el.setAttribute('aria-current',k==j?'step':'false')});
+  const last=j==L.length-1;$('#tunx').textContent=last?GT('tuOk'):T('next')+(document.dir=='rtl'?' ◀':' ▶');$('#tupv').disabled=!j;
   if(!RM())GTU.t=setTimeout(()=>{if($('.gtu')&&GTU.i==j)show(j)},(S.d||5)*1000)};/* la scène rejoue en boucle */
- const close=()=>{clearTimeout(GTU.t);const m=$('.gtu');if(!m)return;m.classList.add('closing');setTimeout(()=>{if($('.gtu'))$('#modal').textContent=''},240)};
- $$('.gtu .steps i').forEach(el=>el.onclick=()=>show(+el.dataset.s));
- $('#tuag').onclick=()=>show(GTU.i==L.length-1&&L.length>1?0:GTU.i);
+ const close=()=>{clearTimeout(GTU.t);document.removeEventListener('keydown',key,true);const m=$('.gtu');if(!m)return;m.classList.add('closing');setTimeout(()=>{if($('.gtu'))$('#modal').textContent=''},240)};
+ const key=e=>{if(!$('.gtu')){document.removeEventListener('keydown',key,true);return}
+  if(e.key=='Escape'){e.preventDefault();close()}else if(e.key=='ArrowRight'||e.key=='ArrowLeft'){const rtl=document.dir=='rtl'||document.documentElement.dir=='rtl',fw=(e.key=='ArrowRight')!=rtl;
+   if(fw&&GTU.i<L.length-1)show(GTU.i+1);else if(!fw&&GTU.i>0)show(GTU.i-1)}};
+ document.addEventListener('keydown',key,true);
+ $$('.gtu .steps .tud').forEach(el=>el.onclick=()=>show(+el.dataset.s));
+ $('#tuag').onclick=()=>{const b=$('#tuag');b.classList.remove('spin');void b.offsetWidth;b.classList.add('spin');show(GTU.i)};
+ $('#tupv').onclick=()=>{if(GTU.i>0)show(GTU.i-1)};
+ $('#tux').onclick=close;$('.gtu').onclick=e=>{if(e.target.classList.contains('gtu'))close()};
  $('#tunx').onclick=()=>GTU.i<L.length-1?show(GTU.i+1):close();
  show(0);return true};
 /* @games : « ? » contextuel — dans un jeu (ou un jeu choisi au salon) il ouvre la démo de ce jeu, sinon le tutoriel de l'Expédition */
@@ -1466,6 +1556,23 @@ if(typeof document!='undefined'){const c=document.createElement('style');c.id='g
 [dir=rtl] .gsab i{transform-origin:right}
 
 .gedit{display:block;margin:10px auto 0;padding:6px 16px;border-radius:99px;font-size:14px}
+
+.gtile.gfew:not(.sel){opacity:.55;filter:saturate(.45)}
+.gtile .gmiss{display:block;margin-top:4px;font:700 12px Nunito,sans-serif;color:var(--bad,#d9534f)}
+div.gtile{cursor:default}
+
+.gtile.ghero{position:relative;width:100%;margin-top:12px;padding:16px 18px 14px;border-width:2.5px}
+.gtile.ghero .gi{font-size:34px}.gtile.ghero .gt b{font-size:21px}.gtile.ghero .gt .mut{font-size:14px}
+.gtile.ghero .gmain{position:absolute;top:10px;inset-inline-end:12px;font:800 11px Nunito,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:var(--acc-d,#c2410c);background:#ffe2c6;border-radius:99px;padding:3px 9px}
+.gsec{margin:18px 4px 8px;font:700 13px Nunito,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--mut)}
+.glist{display:grid;grid-template-columns:1fr;gap:8px}
+@media (min-width:720px){.glist{grid-template-columns:1fr 1fr}}
+.gtile.grw{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;column-gap:12px;row-gap:3px;align-items:center;padding:10px 12px;border-radius:16px;box-shadow:0 3px 0 var(--edge2)}
+.gtile.grw .gi{grid-row:1/3;font-size:26px}
+.gtile.grw .gt b{font-size:16px}.gtile.grw .gt .mut{font-size:12.5px;line-height:1.25}
+.gtile.grw .gmin,.gtile.grw .gmiss{grid-column:2;justify-self:start;margin-top:0}
+.gtile.grw .gmiss{grid-column:2}
+[data-theme=dark] .gtile.ghero .gmain{background:#3a2a1c;color:#ffc48a}
 @keyframes gsab{from{transform:scaleX(1)}to{transform:scaleX(0)}}
 .grule{font-size:14px;color:var(--txt);margin:0 0 10px;line-height:1.45;background:var(--paper);border:2px solid var(--edge);border-radius:16px;padding:9px 12px;opacity:.95}.card .grule{border:0;padding:0;background:none;color:var(--mut)}
 .gw .card{margin-top:0}
@@ -1481,7 +1588,7 @@ if(typeof document!='undefined'){const c=document.createElement('style');c.id='g
 .gw button.sel{border-color:var(--acc);background:#fff1e4;box-shadow:0 4px 0 var(--acc-d)}
 .ga{animation:gin .34s var(--gease,ease) both}
 @keyframes gin{from{opacity:0;transform:translateY(8px) scale(.97)}}
-.still .ga,.still .gbar{animation:none}
+.still .ga:not(.gw .ga),.still .gbar:not(.gw .gbar){animation:none}/* en jeu : gAnim() reprend les animations au lieu de les couper */
 .gbig{font-size:46px;line-height:1.1;display:block}
 .gfloat{animation:gin .34s ease both,gfl 4s ease-in-out .4s infinite}
 @keyframes gfl{50%{transform:translateY(-5px) rotate(-4deg)}}
@@ -1531,6 +1638,9 @@ if(typeof document!='undefined'){const c=document.createElement('style');c.id='g
 .gcamp.maj{border-color:var(--gold)}
 .gopt2{font:600 16px/1.3 Fredoka,Nunito;margin:0 0 4px;overflow-wrap:anywhere}
 .gsc{display:flex;flex-direction:column;gap:6px}
+.gsc+*{margin-top:18px}.cqendl:empty{display:none}.cqendl>.cqres{margin:0}
+.mkadd{display:inline-block;margin-top:4px;color:var(--ok,#2fa894)}.mkadd.neg{color:var(--bad)}
+.tcd.sm2{font-size:12px;line-height:1.35;text-align:center;padding:4px 8px}
 .grow{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:14px;background:var(--paper2)}
 .grow.me{outline:2px solid var(--acc)}.grow .gmd{width:1.6em;text-align:center}.grow .gnm{flex:1;min-width:0;overflow-wrap:anywhere}.grow .gpt{font-size:18px}
 .gbtns{display:flex;flex-direction:column;gap:10px;margin:6px 0}
@@ -1551,8 +1661,10 @@ if(typeof document!='undefined'){const c=document.createElement('style');c.id='g
 .gdec{font-size:18px!important;padding:14px!important}
 .gfil{font:700 16px Nunito;margin:12px 0 8px}.gfil b{font-size:22px;color:var(--ink)}
 .gcof{font:700 14px Nunito;margin:10px 0 0}
-.grxb{display:flex;gap:6px;justify-content:center;margin-top:10px}.grxb button{padding:6px 12px;font-size:18px;box-shadow:none}
-.grx{animation:gin .3s ease both}
+.gwrx{margin:4px 0 6px}.gwrx .reacts{margin-top:10px}
+[data-rxp]{position:relative}.grxf{position:absolute;top:-14px;inset-inline-end:-4px;font-size:18px;line-height:1;pointer-events:none;animation:grxF 2.6s ease both}
+@keyframes grxF{0%{opacity:0;transform:translateY(6px) scale(.5)}12%{opacity:1;transform:none}80%{opacity:1;transform:translateY(-4px)}100%{opacity:0;transform:translateY(-10px)}}
+@media (prefers-reduced-motion:reduce){.grxf{animation:none}}
 .gokb{pointer-events:auto}
 [data-theme=dark] .gw button.sel{background:#3a2a1c}
 [data-theme=dark] .ghd{color:#eaf7f9;text-shadow:0 1px 3px #000a}
@@ -1563,7 +1675,7 @@ if(typeof document!='undefined'){const c=document.createElement('style');c.id='g
 [data-theme=dark] .gtags i{background:#12403f;color:#8fd6dc}[data-theme=dark] .gtags i.gtg-chance{background:#45321a;color:#ffc27a}[data-theme=dark] .gtags i.gtg-skill{background:#262f5a;color:#b7c1ff}
 [data-theme=dark] .gpl{color:#3b2a1b}
 /* entre deux étapes : l'en-tête et la carte restent, seul le contenu se renouvelle (plus d'écran vide pendant le fondu) */
-section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) both}.still .gw.gnx>.card{animation:none}
+section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) both}
 @keyframes gstep{from{opacity:.55}}
 /* 🏝️ Archipel */
 .arcsc{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:0 0 8px}.arcsc .gchip b{font-size:14px}.arcsc .gchip i{font-style:normal;font-size:12px}
@@ -1588,7 +1700,7 @@ section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) b
 .arcb .mv{animation:arcmv .75s var(--gease) both}@keyframes arcmv{from{transform:translate(var(--dx),var(--dy))}}
 .arcb .pop{transform-box:fill-box;transform-origin:center;animation:arcpop .45s var(--gease) .45s both}@keyframes arcpop{from{transform:scale(.3);opacity:0}}
 .arcb .gone{opacity:0;transform-box:fill-box;transform-origin:center;animation:arcgone 1s ease .35s both}@keyframes arcgone{from{opacity:1;transform:none}to{opacity:0;transform:scale(.5)}}
-.still .arcb *{animation:none!important}
+
 [data-theme=dark] .arcb .r0{fill:#2a7f97}[data-theme=dark] .arcb .r1{fill:#21627a}[data-theme=dark] .arcb .r2{fill:#1b4e66}[data-theme=dark] .arcb .r3{fill:#163f55}
 [data-theme=dark] .arcb .v{fill:#bfe6ee;opacity:.7}[data-theme=dark] .arcb .isl{stroke:#e9f6f8}[data-theme=dark] .arcb .rk circle{fill:#8d9ea6;stroke:#53646b}
 [data-theme=dark] .arcb .tg.on{fill:#ff8a3d55}
@@ -1614,15 +1726,27 @@ section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) b
 .mkcst{display:block;width:100%;max-width:300px;margin:4px auto 0;overflow:visible}
 .mkcst line{stroke-width:2.2;stroke-linecap:round}.mkcst .pp{stroke:var(--ink)}.mkcst .gg{stroke:var(--mut);stroke-dasharray:3 4;opacity:.6}.mkcst .tr{stroke:var(--bad)}
 .mkcst circle{stroke:var(--paper);stroke-width:2.5}.mkcst .mkn{font:800 10px Nunito,sans-serif;fill:var(--txt);text-anchor:middle;dominant-baseline:central}
-.mkl{animation:fi .5s ease both}.still .mkl{animation:none}
+.mkl{animation:fi .5s ease both}
 .mktr p{margin:4px 0;font:600 14px Nunito;text-align:center}
 [data-theme=dark] .mkc.p{border-color:#2c7a62}[data-theme=dark] .mkc.g{border-color:#7a4a2a}
 /* 📖 tutoriels animés */
 .gtu .tuh{display:flex;align-items:center;justify-content:center;gap:8px;font-size:18px;margin-bottom:10px}.gtu .tuh span{font-size:26px}
-.gtu .tus{position:relative;width:min(300px,100%);aspect-ratio:300/180;margin:0 auto;border-radius:18px;overflow:hidden;background:var(--paper2);box-shadow:inset 0 0 0 2px var(--edge)}
-.gtu .tusc{position:absolute;inset:0}
+.gtu .tuh{position:relative;padding:0 36px}
+.gtu .tux{position:absolute;inset-inline-end:-4px;top:50%;transform:translateY(-50%);width:34px;height:34px;padding:0;border-radius:50%;border:0;background:transparent;color:var(--mut);font-size:16px;line-height:1;cursor:pointer;box-shadow:none}
+.gtu .tux:hover{background:color-mix(in srgb,var(--mut) 14%,transparent);color:var(--txt)}
+.gtu .tuw{position:relative;width:min(300px,100%);margin:0 auto}
+.gtu .tus{position:relative;width:100%;aspect-ratio:300/180;border-radius:18px;overflow:hidden;background:var(--paper2);box-shadow:inset 0 0 0 2px var(--edge)}
+.gtu .tusc{position:absolute;left:0;top:0;width:300px;height:180px;transform-origin:0 0;transform:scale(var(--k,1))}
+[dir=rtl] .gtu .tusc{left:auto;right:0;transform-origin:100% 0}
+.gtu .turp{position:absolute;top:6px;inset-inline-end:6px;width:30px;height:30px;padding:0;border-radius:50%;border:0;background:color-mix(in srgb,var(--paper) 82%,transparent);color:var(--txt);font-size:15px;line-height:1;cursor:pointer;box-shadow:0 1px 3px #0002}
+.gtu .turp.spin{animation:tuSpin .45s var(--gease,ease)}@keyframes tuSpin{from{transform:rotate(-300deg)}}
+.gtu .steps{display:flex;justify-content:center;gap:4px;margin:10px 0 12px}
+.gtu .tud{width:22px;height:22px;padding:0;border:0;background:none;box-shadow:none;cursor:pointer;display:grid;place-items:center}
+.gtu .tud::before{content:'';width:8px;height:8px;border-radius:99px;background:var(--edge);transition:width .2s,background .2s}
+.gtu .tud.done::before{background:#ffc999}.gtu .tud.on::before{width:22px;background:linear-gradient(90deg,var(--acc2),var(--acc))}[data-theme=dark] .gtu .tud.done::before{background:#9a6a45}
+.gtu .row button:disabled{opacity:.4}
 .gtu .tucap{min-height:3.2em;margin:12px 4px 0;font-size:15px;line-height:1.4}
-.gtu .row{display:flex;gap:10px;justify-content:center}.gtu .row button{flex:1}
+.gtu .row{display:flex;gap:10px;justify-content:center}.gtu .row button{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-inline:10px}
 .te{position:absolute;width:0;height:0}.te>span{position:absolute;left:0;top:0;transform:translate(-50%,-50%);display:inline-flex;flex-direction:column;align-items:center;gap:1px;font-size:22px;line-height:1;white-space:nowrap}
 .te.big>span{font-size:36px}.te.sm>span{font-size:15px}
 .tav{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--c);color:#fff;font-size:15px;box-shadow:0 2px 0 #0002}
@@ -1649,7 +1773,7 @@ section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) b
 @keyframes tuOut{to{opacity:0;transform:scale(.8)}}
 @keyframes tuShake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
 @keyframes tuDead{to{opacity:.25}}
-[data-theme=dark] .gtu .tus{background:#0b1c2d;box-shadow:inset 0 0 0 2px #26475f}[data-theme=dark] .tcd{background:#16324a;box-shadow:0 0 0 1.5px #2c5574,0 3px 0 #06121f}[data-theme=dark] .tub polygon{fill:#2d6a8a55;stroke:#2c5574}[data-theme=dark] .tub .c0{fill:#2d6a8aaa}
+[data-theme=dark] .gtu .tus{background:#0b1c2d;box-shadow:inset 0 0 0 2px #26475f}[data-theme=dark] .gtu .turp{background:#16324acc;color:#e8f1f6}[data-theme=dark] .tcd{background:#16324a;box-shadow:0 0 0 1.5px #2c5574,0 3px 0 #06121f}[data-theme=dark] .tub polygon{fill:#2d6a8a55;stroke:#2c5574}[data-theme=dark] .tub .c0{fill:#2d6a8aaa}
 .gtutb{margin-top:10px}
 @media (prefers-reduced-motion:reduce){.te,.te>span,.tub .tdead{animation:none!important}.te.o{display:none}.te.m{transform:none}}
 
@@ -1752,6 +1876,22 @@ button.prch{cursor:pointer;width:auto}button.prch:hover{border-color:var(--edge2
 @media (prefers-reduced-motion:reduce){.prp,.prbk{animation:none!important}.prtr button.sel{transform:none}}
 @media (max-width:420px){.prmy b{font-size:19px}.prtr{gap:6px}.prtr button{font-size:28px;padding:10px 0}.prch{font-size:13px;padding:5px 10px}}
 /* 📜 Livre de bord */
+.gidea{margin:4px 0 2px;padding:10px 12px;border-radius:14px;border:1.5px dashed var(--edge)}
+.gidh{margin:0 0 8px;font-size:13px;font-weight:700;color:var(--mut)}
+.gidl{display:flex;flex-wrap:wrap;gap:6px}
+.gidc{font:inherit;font-size:13px;line-height:1.3;padding:6px 10px;border-radius:99px;border:1.5px solid var(--edge);background:var(--paper);color:var(--txt);cursor:pointer;text-align:start;max-width:100%;transition:transform .15s,border-color .15s}
+.gidc:hover{border-color:var(--acc)}.gidc:active{transform:scale(.97)}
+.gidd{margin:8px 0 0;font-size:12px;color:var(--mut);line-height:1.4}
+/* 👀 spectateurs */
+.gspc0{font-size:13px;color:var(--mut);margin:0 0 10px;padding:6px 11px;border-inline-start:3px solid var(--acc);border-radius:4px 12px 12px 4px;background:color-mix(in srgb,var(--acc) 8%,transparent);line-height:1.4}
+.gw.gspc .card :is(textarea,input,#gsend,.gedit,.grow2,.gwr,.gidea,.gpk,.chno,.gab,.tpbt,.gbtns2,.mipk){display:none!important}
+.gw.gspc .card button:not(.gtutb){pointer-events:none}
+.gw.gspc .card .gpk button:not(.sel),.gw.gspc .card [data-tp]{opacity:.55}
+.gspb2{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:12px;font-size:13px;color:var(--mut)}
+.gspi{font-size:15px}.gspn{display:inline-flex;align-items:center;gap:5px}.gspn i{font-style:normal}
+.gspw{margin-top:14px;padding-top:12px;border-top:1.5px dashed var(--edge)}
+.gspt.sel{background:color-mix(in srgb,var(--acc) 14%,var(--paper));border-color:var(--acc)}
+.gspw .gsub{margin:8px 0 0}.gspl{margin:6px 0 0}
 .gnod{font-size:13px;color:var(--mut);margin:0 0 10px;padding:6px 11px;border-inline-start:3px solid var(--gold);border-radius:4px 12px 12px 4px;background:color-mix(in srgb,var(--gold) 9%,transparent);line-height:1.4}
 .gnod b{font-weight:700}
 .glog{padding:10px 14px}.glog>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;user-select:none}
@@ -1765,13 +1905,20 @@ button.prch{cursor:pointer;width:auto}button.prch:hover{border-color:var(--edge2
 .tpbar{display:flex;align-items:center;gap:10px;justify-content:space-between;margin-bottom:6px}
 .tplf{letter-spacing:1px;font-size:15px}.tpcl{font-size:13px;font-weight:700;padding:2px 9px;border-radius:99px;border:1.5px solid var(--edge)}.tpcl.z{opacity:.45}.tplv{font-size:13px;color:var(--mut)}
 .tpst{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700;margin:4px 0 6px}.tpst>span:first-child{flex:none;min-width:70px;text-align:start}
-.tpsb{flex:1;height:8px;border-radius:99px;background:var(--paper2);border:1px solid var(--edge);overflow:hidden}.tpsb i{display:block;height:100%;background:linear-gradient(90deg,#7b8fd8,#5ad8ae);transition:width .6s ease}
-[dir=rtl] .tpsb i{margin-inline-start:auto}
-.tpsea{position:relative;height:46px;margin:12px 12px 4px}.tpln{position:absolute;inset-inline:0;top:25px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--ink),var(--acc));opacity:.5}
-.tp0,.tp1{position:absolute;top:32px;font-size:10px;color:var(--mut)}.tp0{inset-inline-start:-6px}.tp1{inset-inline-end:-10px}
+.tpsb{flex:1;height:8px;border-radius:99px;background:var(--paper2);border:1px solid var(--edge);overflow:hidden}.tpsb i{display:block;width:100%;height:100%;background:linear-gradient(90deg,#7b8fd8,#5ad8ae);transform-origin:left center;animation:tpG linear both}
+[dir=rtl] .tpsb i{transform-origin:right center}
+@keyframes tpG{from{transform:scaleX(var(--a))}to{transform:scaleX(var(--b))}}
+.tpw span.dn{bottom:auto;top:15px}
+.tpe{display:inline-flex;align-items:center;gap:4px}
+.tplg{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 12px;margin:10px 0 0;font-size:11.5px;color:var(--mut);line-height:1.3}
+.tplg>span{display:inline-flex;align-items:center;gap:5px}
+.tpw0{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--c,var(--ink));box-shadow:0 0 0 1px var(--edge)}.tpw0.bad{background:var(--bad)}.tpw0.ec{background:transparent;border:1.5px dashed var(--mut);box-shadow:none;width:8px;height:8px}
+.tpfoc{margin:8px 0 6px}.tpfoc .tpv{font-size:26px;min-width:58px;padding:12px}
+.tpsea{position:relative;height:58px;margin:14px 12px 4px}.tpln{position:absolute;inset-inline:0;top:25px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--ink),var(--acc));opacity:.5}
+.tp0,.tp1{position:absolute;top:44px;font-size:10px;color:var(--mut)}.tp0{inset-inline-start:-6px}.tp1{inset-inline-end:-10px}
 .tpw{position:absolute;top:20px;width:13px;height:13px;margin-inline-start:-6px;border-radius:50%;background:var(--c,var(--ink));border:2px solid var(--paper);box-shadow:0 0 0 1px var(--edge)}
 .tpw span{position:absolute;bottom:15px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;color:var(--mut);opacity:0}
-.tpw.nw span{opacity:1}.tpw.ec span{bottom:auto;top:12px}.tpw.nw{animation:tpIn .6s cubic-bezier(.3,1.6,.5,1) both}.tpw.nw span{color:var(--txt);font-size:12px}
+.tpw.nw span{opacity:1}.tpw.ec span{bottom:13px}.tpw.ec span.dn{bottom:auto;top:13px}.tpw.nw{animation:tpIn .6s cubic-bezier(.3,1.6,.5,1) both}.tpw.nw span{color:var(--txt);font-size:12px}
 .tpw.bad{background:var(--bad)}.tpw.ec{background:transparent;border:2px dashed var(--mut);box-shadow:none;top:21px;width:11px;height:11px}
 @keyframes tpIn{from{transform:translateY(-16px) scale(.4);opacity:0}}
 .tpev{min-height:26px;font-size:15px;margin:2px 0 0;display:flex;gap:6px 12px;justify-content:center;align-items:center;flex-wrap:wrap}.tpev b{font-size:19px}
@@ -1781,17 +1928,15 @@ button.prch{cursor:pointer;width:auto}button.prch:hover{border-color:var(--edge2
 .tpm.me{border-color:var(--acc)}.tpm.out{opacity:.55}.tpnm{display:flex;align-items:center;gap:5px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 60px}
 .tpk{font-size:11px;letter-spacing:-2px}.tpbd{font-size:11px;font-weight:700;padding:0 6px;border-radius:99px;background:color-mix(in srgb,var(--gold) 24%,transparent)}
 .tpcq{font-size:12px}.tpok{position:absolute;top:-4px;inset-inline-end:-4px;width:10px;height:10px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 2px var(--paper)}
-.tprx{position:absolute;top:-13px;inset-inline-end:14px;font-size:18px;animation:tpRx 2.6s ease both;pointer-events:none}
-@keyframes tpRx{0%{transform:translateY(8px) scale(.5);opacity:0}15%{transform:none;opacity:1}75%{opacity:1}100%{transform:translateY(-6px);opacity:0}}
 .tphand{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:2px 0 12px}
 .tpv{min-width:46px;padding:9px 10px;border-radius:14px;border:2px solid var(--edge);background:var(--paper2);font-size:20px;text-align:center}.tpv.lo{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 14%,var(--paper2))}
 .tpbt{display:grid;grid-template-columns:1fr 1fr;gap:8px}.tpbt .tpgo{grid-column:1/-1;font-size:17px;padding:13px;background:linear-gradient(180deg,#4fb6c9,#2f8fa8);color:#fff;border:0}
 .tpbt button.sel{outline:3px solid var(--acc);outline-offset:1px}.tpbt small{font-size:11px;opacity:.8}
-.tprxb{margin-top:12px}.tpmu{font-size:11.5px;color:var(--mut);margin:6px 0 0}
+.tpmu{font-size:11.5px;color:var(--mut);margin:6px 0 0}
 .tpend{display:grid;gap:5px;margin-top:8px}.tpend>div{display:flex;gap:10px;justify-content:space-between;padding:6px 10px;border:1.5px solid var(--edge);border-radius:10px;font-size:14px}
 .tpseq{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-top:10px}.tpseq b{font-size:13px;padding:2px 7px;border-radius:8px;border:1.5px solid var(--c,var(--edge))}.tpseq b.bad{border-color:var(--bad);color:var(--bad)}.tpseq b.ec{border:1.5px dashed var(--mut);color:var(--mut);text-decoration:line-through}
 .tutrk{display:block;width:250px;height:3px;border-radius:3px;background:linear-gradient(90deg,#2fa894,#ef8354);opacity:.6}
-@media (prefers-reduced-motion:reduce){.tpw.nw,.tprx{animation:none}.tpsb i{transition:none}}
+@media (prefers-reduced-motion:reduce){.tpw.nw{animation:none}.tpsb i{animation:none!important;transform:scaleX(var(--a))}}
 @media (max-width:420px){.tpcrew{grid-template-columns:1fr 1fr}.tpv{min-width:40px;font-size:18px;padding:7px 8px}}
 .cqs{width:22px;height:22px;display:inline-block;vertical-align:middle;flex:none;filter:drop-shadow(0 1px 1px #0002)}
 .cqs.xs{width:14px;height:14px}.cqlot.xs .cqs{width:17px;height:17px}.cqlot.sm .cqs{width:18px;height:18px}.cqs.big{width:46px;height:46px}
@@ -1858,13 +2003,13 @@ button.prch{cursor:pointer;width:auto}button.prch:hover{border-color:var(--edge2
    (listes '|' alignées par index ; dilemmes « A~B » ; réserve 1 = coquin, 2 = trash, 18+ entre adultes)
    ===================================================================== */
 const GI18N=W.GI18N={};
-GI18N.fr={ui:{mtieA:`Tout le monde peut déclarer un lien ; seuls les autres peuvent le retirer.`,edit:`Modifier`,stopAsk:`Arrêter ce jeu et voir les scores ?`,stop:`Arrêter`,room:`Salle de jeux`,exp:`Expédition`,expD:`Le voyage d'île en île`,play:`Jouer à {g}`,waitHost:`L'hôte lance la partie`,needP:`De {a} à {b} joueurs`,
+GI18N.fr={ui:{gmain:`Le jeu principal`,gcat_d:`Se découvrir`,gcat_s:`Stratégie et bluff`,gcat_h:`Rôles cachés`,gcat_c:`Ensemble et adresse`,gcat_o:`Autres jeux`,miss1:`Il manque {n} joueur`,missN:`Il manque {n} joueurs`,mtieA:`Tout le monde peut déclarer un lien ; seuls les autres peuvent le retirer.`,edit:`Modifier`,stopAsk:`Arrêter ce jeu et voir les scores ?`,stop:`Arrêter`,room:`Salle de jeux`,exp:`Expédition`,expD:`Le voyage d'île en île`,play:`Jouer à {g}`,waitHost:`L'hôte lance la partie`,needP:`De {a} à {b} joueurs`,
 t_skill:`skill`,t_chance:`chance`,t_social:`social`,send:`Envoyer`,ok:`Continuer`,me:`moi`,or:`ou`,waitN:`On attend {n}`,yourMove:`À toi !`,watch:`Regarde les autres jouer`,ready:`{g:Prêt|Prête} ? On continue quand tout le monde l'est`,
 scores:`Scores`,coopT:`Score de connexion`,again:`Rejouer`,lobby:`Retour au salon`,hostNext:`Rejouer, ou retour au salon ?`,waitHostN:`{n} choisit la suite`,
 n_bot:`Bouteilles à la mer`,d_bot:`Des anecdotes vraies et anonymes : qui les a écrites ?`,
 r_bot:`Écris 2 ou 3 choses vraies sur toi. Elles arrivent anonymes : trouve l'auteur (+2). Personne ne te trouve ? +3. Une partie seulement ? +1.`,
 r_bot2:`Écris 3 anecdotes, vraies ou inventées (au moins une de chaque). Devine celles de l'autre (+2) ; chaque bluff réussi te rapporte +2.`,
-bph:`Une chose vraie sur toi…`,bph18:`Une chose vraie (et osée) sur toi…`,bph2:`Une anecdote sur toi…`,bmin:`Écris-en au moins 2`,bmin2:`Remplis les 3, avec au moins une vraie et une inventée`,bwait:`Tes bouteilles sont à l'eau`,
+bph:`Une anecdote vraie sur toi…`,bph18:`Une chose vraie (et osée) sur toi…`,bph2:`Une anecdote sur toi…`,bmin:`Écris-en au moins 2`,bmin2:`Remplis les 3, avec au moins une vraie et une inventée`,bwait:`Tes bouteilles sont à l'eau`,
 bwho:`Qui a écrit ça ?`,bmine:`C'est la tienne : vote quand même, pour brouiller les pistes`,bby:`Écrite par {n}`,bnone:`Personne n'a trouvé : +3 pour {n}`,bsome:`Juste assez mystérieux : +1 pour {n}`,ball:`Tout le monde a trouvé !`,
 bT:`Vraie`,bF:`Inventée`,bguess:`Vraie ou inventée ?`,bfrom:`Bouteille de {n}`,bfool:`Bluff réussi : +2 pour {n}`,bok:`Bien vu : +2 pour {n}`,
 n_pha:`Le Phare`,d_pha:`Qui de nous… ? Votez, le phare éclaire le groupe`,r_pha:`Vote pour la personne qui colle le mieux, même toi. +1 si tu votes comme la majorité.`,r_pha2:`Choisis l'un de vous deux, puis prédis la réponse de l'autre : +1 si tu vois juste.`,
@@ -1888,7 +2033,7 @@ rad:`Vivre sur un bateau~Vivre dans une cabane perchée|Respirer sous l'eau~Vole
 rad1:`Un premier baiser sous la pluie~Un premier baiser au coucher du soleil|Un massage~Un bain à deux|De la lingerie~Rien du tout|Draguer~Te faire draguer|Un rendez-vous à l'aveugle~Un rendez-vous avec ton ex|Des mots doux~Des regards brûlants|Une nuit à la belle étoile à deux~Une nuit dans un hôtel de luxe à deux|De longs préliminaires~Aller droit au but|Lumière allumée~Lumière éteinte|Le matin~Le soir|Un slow collé-serré~Une danse endiablée|Un texto coquin~Un appel à minuit|Un tatouage caché~Un piercing caché|Un partenaire qui cuisine~Un partenaire qui masse|Un baiser dans le cou~Un murmure à l'oreille`,
 rad2:`Le sexe dans la mer~Le sexe sur la plage|Ta sextape publiée~Ton historique internet publié|Un plan à trois~Un club échangiste|Des menottes~Un bandeau sur les yeux|Coucher avec ton ex~Coucher avec quelqu'un du boulot|Un an sans sexe~Un an sans internet|Faire l'amour en silence à vie~Faire l'amour bruyamment à vie|Tes parents lisent tes fantasmes~Tu lis ceux de tes parents|Toujours dessus~Toujours dessous|Le sexe dans un avion~Le sexe dans un ascenseur|Ne plus jamais jouir~Jouir à chaque éternuement|Un nude qui fuite~Un vocal gênant qui fuite|Coucher le premier soir~Attendre trois mois|Une nuit avec une star~Une nuit avec ton crush secret|Des jouets~Que les mains`};
 
-GI18N.en={ui:{mtieA:`Anyone can declare a bond; only the others can remove it.`,edit:`Edit`,stopAsk:`Stop this game and see the scores?`,stop:`Stop`,room:`Game room`,exp:`Expedition`,expD:`The island-hopping voyage`,play:`Play {g}`,waitHost:`The host starts the game`,needP:`{a} to {b} players`,
+GI18N.en={ui:{gmain:`The main game`,gcat_d:`Get to know each other`,gcat_s:`Strategy & bluff`,gcat_h:`Hidden roles`,gcat_c:`Together & skill`,gcat_o:`More games`,miss1:`{n} more player needed`,missN:`{n} more players needed`,mtieA:`Anyone can declare a bond; only the others can remove it.`,edit:`Edit`,stopAsk:`Stop this game and see the scores?`,stop:`Stop`,room:`Game room`,exp:`Expedition`,expD:`The island-hopping voyage`,play:`Play {g}`,waitHost:`The host starts the game`,needP:`{a} to {b} players`,
 t_skill:`skill`,t_chance:`luck`,t_social:`social`,send:`Send`,ok:`Continue`,me:`me`,or:`or`,waitN:`Waiting for {n}`,yourMove:`Your move!`,watch:`Watch the others play`,ready:`Ready? We go on when everyone is`,
 scores:`Scores`,coopT:`Connection score`,again:`Play again`,lobby:`Back to lobby`,hostNext:`Play again, or back to the lobby?`,waitHostN:`{n} picks what's next`,
 n_bot:`Messages in a Bottle`,d_bot:`True, anonymous stories: who wrote them?`,r_bot:`Write 2 or 3 true things about you. They arrive anonymously: find the author (+2). Nobody finds you? +3. Only some? +1.`,
@@ -1916,7 +2061,7 @@ rad:`Live on a boat~Live in a treehouse|Breathe underwater~Fly|Read minds~Become
 rad1:`A first kiss in the rain~A first kiss at sunset|A massage~A bath for two|Lingerie~Nothing at all|Flirt~Be flirted with|A blind date~A date with your ex|Sweet words~Burning looks|A night under the stars for two~A night in a luxury hotel for two|Long foreplay~Straight to the point|Lights on~Lights off|Mornings~Evenings|A close slow dance~A wild dance|A naughty text~A midnight call|A hidden tattoo~A hidden piercing|A partner who cooks~A partner who massages|A kiss on the neck~A whisper in the ear`,
 rad2:`Sex in the sea~Sex on the beach|Your sex tape leaked~Your browser history leaked|A threesome~A swingers' club|Handcuffs~A blindfold|Sleep with your ex~Sleep with a coworker|A year without sex~A year without internet|Silent sex for life~Loud sex for life|Your parents read your fantasies~You read your parents'|Always on top~Always on the bottom|Sex on a plane~Sex in an elevator|Never climax again~Climax at every sneeze|A leaked nude~A leaked awkward voice note|Sleep together the first night~Wait three months|A night with a celebrity~A night with your secret crush|Toys~Hands only`};
 
-GI18N.es={ui:{mtieA:`Cualquiera puede declarar un vínculo; solo los demás pueden quitarlo.`,edit:`Cambiar`,stopAsk:`¿Parar este juego y ver los puntos?`,stop:`Parar`,room:`Sala de juegos`,exp:`Expedición`,expD:`El viaje de isla en isla`,play:`Jugar a {g}`,waitHost:`El anfitrión inicia la partida`,needP:`De {a} a {b} jugadores`,
+GI18N.es={ui:{gmain:`El juego principal`,gcat_d:`Conocerse`,gcat_s:`Estrategia y farol`,gcat_h:`Roles ocultos`,gcat_c:`Juntos y habilidad`,gcat_o:`Más juegos`,miss1:`Falta {n} jugador`,missN:`Faltan {n} jugadores`,mtieA:`Cualquiera puede declarar un vínculo; solo los demás pueden quitarlo.`,edit:`Cambiar`,stopAsk:`¿Parar este juego y ver los puntos?`,stop:`Parar`,room:`Sala de juegos`,exp:`Expedición`,expD:`El viaje de isla en isla`,play:`Jugar a {g}`,waitHost:`El anfitrión inicia la partida`,needP:`De {a} a {b} jugadores`,
 t_skill:`habilidad`,t_chance:`azar`,t_social:`social`,send:`Enviar`,ok:`Continuar`,me:`yo`,or:`o`,waitN:`Esperando a {n}`,yourMove:`¡Te toca!`,watch:`Mira jugar a los demás`,ready:`¿{g:Listo|Lista}? Seguimos cuando todos lo estén`,
 scores:`Puntos`,coopT:`Puntuación de conexión`,again:`Otra vez`,lobby:`Volver a la sala`,hostNext:`¿Otra vez, o volver a la sala?`,waitHostN:`{n} elige qué sigue`,
 n_bot:`Mensajes en botellas`,d_bot:`Anécdotas verdaderas y anónimas: ¿quién las escribió?`,r_bot:`Escribe 2 o 3 cosas verdaderas sobre ti. Llegan anónimas: adivina quién las escribió (+2). ¿Nadie te descubre? +3. ¿Solo algunos? +1.`,
@@ -1944,7 +2089,7 @@ rad:`Vivir en un barco~Vivir en una casa del árbol|Respirar bajo el agua~Volar|
 rad1:`Un primer beso bajo la lluvia~Un primer beso al atardecer|Un masaje~Un baño para dos|Lencería~Nada de nada|Ligar~Que te liguen|Una cita a ciegas~Una cita con tu ex|Palabras dulces~Miradas ardientes|Una noche bajo las estrellas en pareja~Una noche en un hotel de lujo en pareja|Preliminares largos~Ir al grano|Luz encendida~Luz apagada|Por la mañana~Por la noche|Un lento bien pegados~Un baile desenfrenado|Un mensaje picante~Una llamada a medianoche|Un tatuaje escondido~Un piercing escondido|Pareja que cocina~Pareja que da masajes|Un beso en el cuello~Un susurro al oído`,
 rad2:`Sexo en el mar~Sexo en la playa|Tu vídeo porno publicado~Tu historial de internet publicado|Un trío~Un club de intercambio|Esposas~Una venda en los ojos|Acostarte con tu ex~Acostarte con alguien del trabajo|Un año sin sexo~Un año sin internet|Sexo en silencio de por vida~Sexo ruidoso de por vida|Tus padres leen tus fantasías~Tú lees las de tus padres|Siempre arriba~Siempre abajo|Sexo en un avión~Sexo en un ascensor|No volver a tener un orgasmo~Tener uno con cada estornudo|Un desnudo filtrado~Un audio vergonzoso filtrado|Acostarse la primera noche~Esperar tres meses|Una noche con una estrella~Una noche con tu crush secreto|Juguetes~Solo manos`};
 
-GI18N.it={ui:{mtieA:`Chiunque può dichiarare un legame; solo gli altri possono toglierlo.`,edit:`Modifica`,stopAsk:`Fermare il gioco e vedere i punteggi?`,stop:`Ferma`,room:`Sala giochi`,exp:`Spedizione`,expD:`Il viaggio di isola in isola`,play:`Gioca a {g}`,waitHost:`L'host avvia la partita`,needP:`Da {a} a {b} giocatori`,
+GI18N.it={ui:{gmain:`Il gioco principale`,gcat_d:`Conoscersi`,gcat_s:`Strategia e bluff`,gcat_h:`Ruoli nascosti`,gcat_c:`Insieme e abilità`,gcat_o:`Altri giochi`,miss1:`Manca {n} giocatore`,missN:`Mancano {n} giocatori`,mtieA:`Chiunque può dichiarare un legame; solo gli altri possono toglierlo.`,edit:`Modifica`,stopAsk:`Fermare il gioco e vedere i punteggi?`,stop:`Ferma`,room:`Sala giochi`,exp:`Spedizione`,expD:`Il viaggio di isola in isola`,play:`Gioca a {g}`,waitHost:`L'host avvia la partita`,needP:`Da {a} a {b} giocatori`,
 t_skill:`abilità`,t_chance:`fortuna`,t_social:`social`,send:`Invia`,ok:`Continua`,me:`io`,or:`o`,waitN:`Si aspetta {n}`,yourMove:`Tocca a te!`,watch:`Guarda gli altri giocare`,ready:`{g:Pronto|Pronta}? Si continua quando lo sono tutti`,
 scores:`Punteggi`,coopT:`Punteggio di connessione`,again:`Rigioca`,lobby:`Torna alla sala`,hostNext:`Rigiocare, o tornare alla sala?`,waitHostN:`{n} sceglie cosa fare`,
 n_bot:`Messaggi in bottiglia`,d_bot:`Aneddoti veri e anonimi: chi li ha scritti?`,r_bot:`Scrivi 2 o 3 cose vere su di te. Arrivano anonime: indovina chi le ha scritte (+2). Nessuno ti scopre? +3. Solo alcuni? +1.`,
@@ -1972,7 +2117,7 @@ rad:`Vivere su una barca~Vivere in una casa sull'albero|Respirare sott'acqua~Vol
 rad1:`Un primo bacio sotto la pioggia~Un primo bacio al tramonto|Un massaggio~Un bagno in due|Lingerie~Niente di niente|Corteggiare~Farti corteggiare|Un appuntamento al buio~Un appuntamento con il tuo ex|Parole dolci~Sguardi infuocati|Una notte sotto le stelle in due~Una notte in un hotel di lusso in due|Preliminari lunghi~Dritti al punto|Luce accesa~Luce spenta|Il mattino~La sera|Un lento stretti stretti~Un ballo scatenato|Un messaggio piccante~Una chiamata a mezzanotte|Un tatuaggio nascosto~Un piercing nascosto|Un partner che cucina~Un partner che fa massaggi|Un bacio sul collo~Un sussurro all'orecchio`,
 rad2:`Sesso in mare~Sesso in spiaggia|Il tuo sex tape pubblicato~La tua cronologia internet pubblicata|Una cosa a tre~Un club di scambisti|Manette~Una benda sugli occhi|Andare a letto con il tuo ex~Andare a letto con un collega|Un anno senza sesso~Un anno senza internet|Sesso in silenzio a vita~Sesso rumoroso a vita|I tuoi genitori leggono le tue fantasie~Tu leggi le loro|Sempre sopra~Sempre sotto|Sesso in aereo~Sesso in ascensore|Mai più un orgasmo~Un orgasmo a ogni starnuto|Una foto nuda trapelata~Un vocale imbarazzante trapelato|Farlo la prima sera~Aspettare tre mesi|Una notte con una star~Una notte con la tua cotta segreta|Giocattoli~Solo mani`};
 
-GI18N.de={ui:{mtieA:`Alle können eine Verbindung angeben; nur die anderen können sie entfernen.`,edit:`Ändern`,stopAsk:`Spiel beenden und Punkte zeigen?`,stop:`Beenden`,room:`Spielesaal`,exp:`Expedition`,expD:`Die Reise von Insel zu Insel`,play:`{g} spielen`,waitHost:`Der Host startet das Spiel`,needP:`{a} bis {b} Spieler`,
+GI18N.de={ui:{gmain:`Das Hauptspiel`,gcat_d:`Sich kennenlernen`,gcat_s:`Strategie & Bluff`,gcat_h:`Versteckte Rollen`,gcat_c:`Gemeinsam & Geschick`,gcat_o:`Weitere Spiele`,miss1:`Es fehlt {n} Person`,missN:`Es fehlen {n} Personen`,mtieA:`Alle können eine Verbindung angeben; nur die anderen können sie entfernen.`,edit:`Ändern`,stopAsk:`Spiel beenden und Punkte zeigen?`,stop:`Beenden`,room:`Spielesaal`,exp:`Expedition`,expD:`Die Reise von Insel zu Insel`,play:`{g} spielen`,waitHost:`Der Host startet das Spiel`,needP:`{a} bis {b} Spieler`,
 t_skill:`Können`,t_chance:`Glück`,t_social:`sozial`,send:`Senden`,ok:`Weiter`,me:`ich`,or:`oder`,waitN:`Warten auf {n}`,yourMove:`Du bist dran!`,watch:`Schau den anderen zu`,ready:`Bereit? Weiter, sobald alle bereit sind`,
 scores:`Punkte`,coopT:`Verbindungswert`,again:`Nochmal`,lobby:`Zurück zur Lobby`,hostNext:`Nochmal, oder zurück zur Lobby?`,waitHostN:`{n} wählt, wie es weitergeht`,
 n_bot:`Flaschenpost`,d_bot:`Wahre, anonyme Anekdoten: Wer hat sie geschrieben?`,r_bot:`Schreib 2 oder 3 wahre Dinge über dich. Sie kommen anonym an: Errate, wer sie schrieb (+2). Niemand errät dich? +3. Nur manche? +1.`,
@@ -2000,7 +2145,7 @@ rad:`Auf einem Boot leben~In einem Baumhaus leben|Unter Wasser atmen~Fliegen|Ged
 rad1:`Ein erster Kuss im Regen~Ein erster Kuss bei Sonnenuntergang|Eine Massage~Ein Bad zu zweit|Dessous~Gar nichts|Flirten~Angeflirtet werden|Ein Blind Date~Ein Date mit dem Ex|Süße Worte~Glühende Blicke|Eine Nacht unter den Sternen zu zweit~Eine Nacht im Luxushotel zu zweit|Langes Vorspiel~Direkt zur Sache|Licht an~Licht aus|Morgens~Abends|Ein enger Stehblues~Ein wilder Tanz|Eine freche Nachricht~Ein Anruf um Mitternacht|Ein verstecktes Tattoo~Ein verstecktes Piercing|Wer kocht~Wer massiert|Ein Kuss auf den Hals~Ein Flüstern ins Ohr`,
 rad2:`Sex im Meer~Sex am Strand|Dein Sextape veröffentlicht~Dein Browserverlauf veröffentlicht|Ein Dreier~Ein Swingerclub|Handschellen~Eine Augenbinde|Mit dem Ex schlafen~Mit jemandem von der Arbeit schlafen|Ein Jahr ohne Sex~Ein Jahr ohne Internet|Lebenslang leiser Sex~Lebenslang lauter Sex|Deine Eltern lesen deine Fantasien~Du liest die deiner Eltern|Immer oben~Immer unten|Sex im Flugzeug~Sex im Aufzug|Nie wieder kommen~Bei jedem Niesen kommen|Ein geleaktes Nacktfoto~Eine geleakte peinliche Sprachnachricht|In der ersten Nacht~Drei Monate warten|Eine Nacht mit einem Star~Eine Nacht mit deinem heimlichen Schwarm|Spielzeug~Nur Hände`};
 
-GI18N.ru={ui:{mtieA:`Любой может отметить связь; убрать её могут только остальные.`,edit:`Изменить`,stopAsk:`Остановить игру и показать очки?`,stop:`Остановить`,room:`Игровой зал`,exp:`Экспедиция`,expD:`Путешествие с острова на остров`,play:`Играть: {g}`,waitHost:`Хост запускает игру`,needP:`От {a} до {b} игроков`,
+GI18N.ru={ui:{gmain:`Главная игра`,gcat_d:`Узнать друг друга`,gcat_s:`Стратегия и блеф`,gcat_h:`Тайные роли`,gcat_c:`Вместе и ловкость`,gcat_o:`Другие игры`,miss1:`Не хватает игроков: {n}`,missN:`Не хватает игроков: {n}`,mtieA:`Любой может отметить связь; убрать её могут только остальные.`,edit:`Изменить`,stopAsk:`Остановить игру и показать очки?`,stop:`Остановить`,room:`Игровой зал`,exp:`Экспедиция`,expD:`Путешествие с острова на остров`,play:`Играть: {g}`,waitHost:`Хост запускает игру`,needP:`От {a} до {b} игроков`,
 t_skill:`навык`,t_chance:`удача`,t_social:`общение`,send:`Отправить`,ok:`Дальше`,me:`я`,or:`или`,waitN:`Ждём: {n}`,yourMove:`Твой ход!`,watch:`Смотри, как играют другие`,ready:`{g:Готов|Готова}? Продолжим, когда все будут готовы`,
 scores:`Очки`,coopT:`Счёт связи`,again:`Ещё раз`,lobby:`В лобби`,hostNext:`Ещё раз или в лобби?`,waitHostN:`{n} выбирает, что дальше`,
 n_bot:`Письма в бутылках`,d_bot:`Правдивые анонимные истории: кто их написал?`,r_bot:`Напиши 2–3 правдивых факта о себе. Они приходят анонимно: угадай автора (+2). Тебя никто не угадал? +3. Только некоторые? +1.`,
@@ -2028,7 +2173,7 @@ rad:`Жить на лодке~Жить в домике на дереве|Дыш�
 rad1:`Первый поцелуй под дождём~Первый поцелуй на закате|Массаж~Ванна на двоих|Кружевное бельё~Совсем ничего|Флиртовать~Чтобы флиртовали с тобой|Свидание вслепую~Свидание с бывшим|Нежные слова~Жгучие взгляды|Ночь под звёздами вдвоём~Ночь в роскошном отеле вдвоём|Долгие ласки~Сразу к делу|Свет включён~Свет выключен|Утром~Вечером|Тесный медляк~Зажигательный танец|Игривое сообщение~Звонок в полночь|Скрытая татуировка~Скрытый пирсинг|Партнёр, который готовит~Партнёр, который делает массаж|Поцелуй в шею~Шёпот на ухо`,
 rad2:`Секс в море~Секс на пляже|Твоё секс-видео в сети~Твоя история браузера в сети|Секс втроём~Свинг-клуб|Наручники~Повязка на глаза|Переспать с бывшим~Переспать с коллегой|Год без секса~Год без интернета|Всю жизнь тихий секс~Всю жизнь громкий секс|Родители читают твои фантазии~Ты читаешь их фантазии|Всегда сверху~Всегда снизу|Секс в самолёте~Секс в лифте|Больше никогда не кончать~Кончать от каждого чиха|Утёкшее интимное фото~Утёкшее неловкое голосовое|Переспать в первую ночь~Ждать три месяца|Ночь со звездой~Ночь с тайной симпатией|Игрушки~Только руки`};
 
-GI18N.zh={ui:{mtieA:`任何人都可以标记关系；只有其他人才能取消。`,edit:`修改`,stopAsk:`结束本局并查看得分？`,stop:`结束`,room:`游戏厅`,exp:`远征`,expD:`一岛接一岛的旅程`,play:`开始：{g}`,waitHost:`房主开始游戏`,needP:`{a}–{b} 名玩家`,
+GI18N.zh={ui:{gmain:`主游戏`,gcat_d:`彼此了解`,gcat_s:`策略与诈唬`,gcat_h:`隐藏身份`,gcat_c:`合作与技巧`,gcat_o:`更多游戏`,miss1:`还差 {n} 名玩家`,missN:`还差 {n} 名玩家`,mtieA:`任何人都可以标记关系；只有其他人才能取消。`,edit:`修改`,stopAsk:`结束本局并查看得分？`,stop:`结束`,room:`游戏厅`,exp:`远征`,expD:`一岛接一岛的旅程`,play:`开始：{g}`,waitHost:`房主开始游戏`,needP:`{a}–{b} 名玩家`,
 t_skill:`技巧`,t_chance:`运气`,t_social:`社交`,send:`发送`,ok:`继续`,me:`我`,or:`还是`,waitN:`等待 {n}`,yourMove:`轮到你了！`,watch:`看看大家怎么玩`,ready:`准备好了吗？大家都准备好就继续`,
 scores:`得分`,coopT:`默契分`,again:`再来一局`,lobby:`回到大厅`,hostNext:`再来一局，还是回大厅？`,waitHostN:`{n} 正在决定下一步`,
 n_bot:`漂流瓶`,d_bot:`真实又匿名的小故事：是谁写的？`,r_bot:`写下 2–3 件关于你的真事。它们会匿名出现：猜出作者 +2。没人猜中你？+3。只有部分人猜中？+1。`,
@@ -2056,7 +2201,7 @@ rad:`住在船上~住在树屋里|在水下呼吸~在天上飞|读心术~隐身�
 rad1:`雨中的初吻~日落时的初吻|按摩~双人浴|性感内衣~什么都不穿|主动撩人~被人撩|盲约~和前任约会|甜言蜜语~炙热的眼神|两人星空下过夜~两人豪华酒店过夜|长长的前戏~直奔主题|开着灯~关着灯|早上~晚上|贴身慢舞~狂野热舞|一条撩人的短信~一通午夜来电|隐藏的纹身~隐藏的穿孔|会做饭的伴侣~会按摩的伴侣|吻脖子~耳边低语`,
 rad2:`在海里做爱~在沙滩上做爱|你的性爱视频曝光~你的浏览记录曝光|3P~换妻俱乐部|手铐~蒙眼布|和前任上床~和同事上床|一年没有性~一年没有网络|一辈子安静地做爱~一辈子大声地做爱|父母读你的性幻想~你读父母的|永远在上面~永远在下面|在飞机上做爱~在电梯里做爱|再也不能高潮~每打一个喷嚏就高潮|裸照外泄~尴尬语音外泄|第一晚就上床~等三个月|和明星共度一夜~和暗恋对象共度一夜|用玩具~只用手`};
 
-GI18N.he={ui:{mtieA:`כל אחד יכול לסמן קשר; רק האחרים יכולים להסיר אותו.`,edit:`לשנות`,stopAsk:`לעצור את המשחק ולראות ניקוד?`,stop:`לעצור`,room:`חדר משחקים`,exp:`מסע`,expD:`המסע מאי לאי`,play:`לשחק: {g}`,waitHost:`המארח מתחיל את המשחק`,needP:`{a} עד {b} שחקנים`,
+GI18N.he={ui:{gmain:`המשחק הראשי`,gcat_d:`להכיר זה את זה`,gcat_s:`אסטרטגיה ובלוף`,gcat_h:`תפקידים סודיים`,gcat_c:`ביחד ומיומנות`,gcat_o:`עוד משחקים`,miss1:`חסר שחקן אחד`,missN:`חסרים {n} שחקנים`,mtieA:`כל אחד יכול לסמן קשר; רק האחרים יכולים להסיר אותו.`,edit:`לשנות`,stopAsk:`לעצור את המשחק ולראות ניקוד?`,stop:`לעצור`,room:`חדר משחקים`,exp:`מסע`,expD:`המסע מאי לאי`,play:`לשחק: {g}`,waitHost:`המארח מתחיל את המשחק`,needP:`{a} עד {b} שחקנים`,
 t_skill:`מיומנות`,t_chance:`מזל`,t_social:`חברתי`,send:`שליחה`,ok:`המשך`,me:`אני`,or:`או`,waitN:`מחכים ל{n}`,yourMove:`תורך!`,watch:`צפו באחרים משחקים`,ready:`{g:מוכן|מוכנה}? ממשיכים כשכולם מוכנים`,
 scores:`ניקוד`,coopT:`ניקוד חיבור`,again:`שוב`,lobby:`חזרה ללובי`,hostNext:`עוד סיבוב, או חזרה ללובי?`,waitHostN:`{n} בוחר מה הלאה`,
 n_bot:`מכתבים בבקבוק`,d_bot:`סיפורים אמיתיים ואנונימיים: מי כתב אותם?`,r_bot:`כתבו 2 או 3 דברים אמיתיים על עצמכם. הם מגיעים בעילום שם: נחשו מי כתב (+2). אף אחד לא זיהה אתכם? +3. רק חלק? +1.`,
@@ -2084,7 +2229,7 @@ rad:`לגור על סירה~לגור בבית עץ|לנשום מתחת למים~
 rad1:`נשיקה ראשונה בגשם~נשיקה ראשונה בשקיעה|עיסוי~אמבטיה זוגית|הלבשה תחתונה~כלום בכלל|לפלרטט~שיפלרטטו איתך|דייט עיוור~דייט עם האקס|מילים מתוקות~מבטים לוהטים|לילה זוגי תחת הכוכבים~לילה זוגי במלון יוקרה|משחק מקדים ארוך~ישר לעניין|אור דולק~אור כבוי|בבוקר~בערב|סלואו צמוד~ריקוד פרוע|הודעה שובבה~שיחה בחצות|קעקוע נסתר~פירסינג נסתר|בן זוג שמבשל~בן זוג שמעסה|נשיקה בצוואר~לחישה באוזן`,
 rad2:`סקס בים~סקס על החוף|סרטון הסקס שלך דלף~היסטוריית הגלישה שלך דלפה|שלישייה~מועדון חילופי זוגות|אזיקים~כיסוי עיניים|לשכב עם האקס~לשכב עם מישהו מהעבודה|שנה בלי סקס~שנה בלי אינטרנט|סקס שקט כל החיים~סקס רועש כל החיים|ההורים קוראים את הפנטזיות שלך~את קורא את שלהם|תמיד למעלה~תמיד למטה|סקס במטוס~סקס במעלית|לא לגמור לעולם~לגמור בכל עיטוש|תמונת עירום שדלפה~הודעה קולית מביכה שדלפה|כבר בלילה הראשון~לחכות שלושה חודשים|לילה עם כוכב~לילה עם הקראש הסודי|צעצועים~רק ידיים`};
 
-GI18N.pt={ui:{mtieA:`Qualquer pessoa pode declarar um laço; só os outros podem removê-lo.`,edit:`Alterar`,stopAsk:`Parar o jogo e ver os pontos?`,stop:`Parar`,room:`Sala de jogos`,exp:`Expedição`,expD:`A viagem de ilha em ilha`,play:`Jogar {g}`,waitHost:`O anfitrião inicia a partida`,needP:`De {a} a {b} jogadores`,
+GI18N.pt={ui:{gmain:`O jogo principal`,gcat_d:`Conhecer-se`,gcat_s:`Estratégia e blefe`,gcat_h:`Papéis ocultos`,gcat_c:`Juntos e habilidade`,gcat_o:`Mais jogos`,miss1:`Falta {n} jogador`,missN:`Faltam {n} jogadores`,mtieA:`Qualquer pessoa pode declarar um laço; só os outros podem removê-lo.`,edit:`Alterar`,stopAsk:`Parar o jogo e ver os pontos?`,stop:`Parar`,room:`Sala de jogos`,exp:`Expedição`,expD:`A viagem de ilha em ilha`,play:`Jogar {g}`,waitHost:`O anfitrião inicia a partida`,needP:`De {a} a {b} jogadores`,
 t_skill:`habilidade`,t_chance:`sorte`,t_social:`social`,send:`Enviar`,ok:`Continuar`,me:`eu`,or:`ou`,waitN:`Esperando {n}`,yourMove:`Sua vez!`,watch:`Veja os outros jogarem`,ready:`{g:Pronto|Pronta}? Seguimos quando todos estiverem`,
 scores:`Pontos`,coopT:`Pontuação de conexão`,again:`Jogar de novo`,lobby:`Voltar ao salão`,hostNext:`Jogar de novo, ou voltar ao salão?`,waitHostN:`{n} escolhe o que vem agora`,
 n_bot:`Mensagens na garrafa`,d_bot:`Histórias verdadeiras e anônimas: quem escreveu?`,r_bot:`Escreva 2 ou 3 coisas verdadeiras sobre você. Elas chegam anônimas: descubra quem escreveu (+2). Ninguém te descobriu? +3. Só alguns? +1.`,
@@ -3203,6 +3348,57 @@ tu_prl4:`A Pérola Negra lê seus tesouros e mergulha em segredo num baú: +3 na
 tu_prl5:`Baú errado, ou nenhum mergulho: +2 para cada nácar. Óbvios demais, seus tesouros a guiam; sutis demais, nada de eco.`,
 tu_prl6:`Cada um é Pérola Negra uma vez por partida.`});
 /* /⚫ */
+/* 💡 Bouteilles : idées facultatives */
+Object.assign(GI18N.fr.ui,{bIdea:`Besoin d'idée ?`,bIdeaD:`Écris ce que tu veux : ce ne sont que des idées, touche-en une seulement si elle t'inspire.`});
+Object.assign(GI18N.en.ui,{bIdea:`Need an idea?`,bIdeaD:`Write whatever you like: these are only ideas, tap one only if it inspires you.`});
+Object.assign(GI18N.es.ui,{bIdea:`¿Necesitas una idea?`,bIdeaD:`Escribe lo que quieras: solo son ideas, toca una únicamente si te inspira.`});
+Object.assign(GI18N.it.ui,{bIdea:`Serve un'idea?`,bIdeaD:`Scrivi quello che vuoi: sono solo idee, toccane una solo se ti ispira.`});
+Object.assign(GI18N.de.ui,{bIdea:`Brauchst du eine Idee?`,bIdeaD:`Schreib, was du willst: Das sind nur Ideen – tipp eine nur an, wenn sie dich inspiriert.`});
+Object.assign(GI18N.ru.ui,{bIdea:`Нужна идея?`,bIdeaD:`Пиши что угодно: это лишь идеи, нажми на одну, только если она вдохновляет.`});
+Object.assign(GI18N.zh.ui,{bIdea:`需要灵感吗？`,bIdeaD:`想写什么都行：这些只是灵感，喜欢再点。`});
+Object.assign(GI18N.he.ui,{bIdea:`צריכים רעיון?`,bIdeaD:`כתבו מה שבא לכם: אלה רק רעיונות, הקישו על אחד רק אם הוא נותן השראה.`});
+Object.assign(GI18N.pt.ui,{bIdea:`Precisa de uma ideia?`,bIdeaD:`Escreva o que quiser: são só ideias, toque numa apenas se ela te inspirar.`});
+/* 📖 guides : navigation */
+Object.assign(GI18N.fr.ui,{tuPrev:`Précédent`,tuClose:`Fermer`});
+Object.assign(GI18N.en.ui,{tuPrev:`Back`,tuClose:`Close`});
+Object.assign(GI18N.es.ui,{tuPrev:`Anterior`,tuClose:`Cerrar`});
+Object.assign(GI18N.it.ui,{tuPrev:`Indietro`,tuClose:`Chiudi`});
+Object.assign(GI18N.de.ui,{tuPrev:`Zurück`,tuClose:`Schließen`});
+Object.assign(GI18N.ru.ui,{tuPrev:`Назад`,tuClose:`Закрыть`});
+Object.assign(GI18N.zh.ui,{tuPrev:`上一步`,tuClose:`关闭`});
+Object.assign(GI18N.he.ui,{tuPrev:`הקודם`,tuClose:`סגירה`});
+Object.assign(GI18N.pt.ui,{tuPrev:`Anterior`,tuClose:`Fechar`});
+/* 🔢 nombres lisibles (points, marées, coups) et Tempête : textes */
+Object.assign(GI18N.fr.ui,{pts:`{v} point|{v} points`,ptsS:`{v} pt|{v} pts`,prTn:`Marée {i}`,cqPay:`paie {v} 🪙`,chSkL:`{v}/{n} coulés`,chOkN:`{v} arrivé|{v} arrivés`,tpLeftN:`Tempête dans {v} coup|Tempête dans {v} coups`,tpBeatN:`{v} coup|{v} coups`,tpErrN:`{v} faute|{v} fautes`,tpFocus:`Tes vagues pour ce niveau`,tpFocusS:`Nouveau niveau : chacun découvre ses vagues`,tpFocusD:`Retiens-les bien : {v} de houle avant la tempête.`,tpLgW:`vague lâchée (couleur de qui l'a lâchée)`,tpLgB:`lâchée trop tôt`,tpLgE:`emportée par l'écume`,tpLgL:`coques restantes`,tpLgC:`vagues calmes en réserve`,mGain:`gagne {v}`,mLose:`perd {v}`,pLostN:`{v} perdues`});
+Object.assign(GI18N.en.ui,{pts:`{v} point|{v} points`,ptsS:`{v} pt|{v} pts`,prTn:`Tide {i}`,cqPay:`pays {v} 🪙`,chSkL:`{v}/{n} sunk`,chOkN:`{v} arrived|{v} arrived`,tpLeftN:`Storm in {v} beat|Storm in {v} beats`,tpBeatN:`{v} beat|{v} beats`,tpErrN:`{v} mistake|{v} mistakes`,tpFocus:`Your waves for this level`,tpFocusS:`New level: everyone looks at their waves`,tpFocusD:`Remember them: {v} of swell before the storm.`,tpLgW:`played wave (colour of who played it)`,tpLgB:`played too early`,tpLgE:`swept into the foam`,tpLgL:`hulls left`,tpLgC:`calm waves in reserve`,mGain:`gains {v}`,mLose:`loses {v}`,pLostN:`{v} lost`});
+Object.assign(GI18N.es.ui,{pts:`{v} punto|{v} puntos`,ptsS:`{v} pt|{v} pts`,prTn:`Marea {i}`,cqPay:`paga {v} 🪙`,chSkL:`{v}/{n} hundidos`,chOkN:`{v} llegó|{v} llegaron`,tpLeftN:`Tormenta en {v} golpe|Tormenta en {v} golpes`,tpBeatN:`{v} golpe|{v} golpes`,tpErrN:`{v} fallo|{v} fallos`,tpFocus:`Tus olas para este nivel`,tpFocusS:`Nuevo nivel: cada uno descubre sus olas`,tpFocusD:`Memorízalas: {v} de oleaje antes de la tormenta.`,tpLgW:`ola soltada (color de quien la soltó)`,tpLgB:`soltada demasiado pronto`,tpLgE:`se la llevó la espuma`,tpLgL:`cascos restantes`,tpLgC:`olas calmas en reserva`,mGain:`gana {v}`,mLose:`pierde {v}`,pLostN:`{v} perdidas`});
+Object.assign(GI18N.it.ui,{pts:`{v} punto|{v} punti`,ptsS:`{v} pt|{v} pt`,prTn:`Marea {i}`,cqPay:`paga {v} 🪙`,chSkL:`{v}/{n} affondate`,chOkN:`{v} arrivata|{v} arrivate`,tpLeftN:`Tempesta tra {v} colpo|Tempesta tra {v} colpi`,tpBeatN:`{v} colpo|{v} colpi`,tpErrN:`{v} errore|{v} errori`,tpFocus:`Le tue onde per questo livello`,tpFocusS:`Nuovo livello: ognuno scopre le sue onde`,tpFocusD:`Ricordale bene: {v} di mare prima della tempesta.`,tpLgW:`onda lasciata (colore di chi l'ha lasciata)`,tpLgB:`lasciata troppo presto`,tpLgE:`portata via dalla schiuma`,tpLgL:`scafi rimasti`,tpLgC:`onde calme di riserva`,mGain:`guadagna {v}`,mLose:`perde {v}`,pLostN:`{v} perse`});
+Object.assign(GI18N.de.ui,{pts:`{v} Punkt|{v} Punkte`,ptsS:`{v} Pkt.|{v} Pkt.`,prTn:`Gezeit {i}`,cqPay:`zahlt {v} 🪙`,chSkL:`{v}/{n} gesunken`,chOkN:`{v} angekommen|{v} angekommen`,tpLeftN:`Sturm in {v} Wellenschlag|Sturm in {v} Wellenschlägen`,tpBeatN:`{v} Wellenschlag|{v} Wellenschläge`,tpErrN:`{v} Fehler|{v} Fehler`,tpFocus:`Deine Wellen für dieses Level`,tpFocusS:`Neues Level: Alle sehen sich ihre Wellen an`,tpFocusD:`Merk sie dir: {v} bis zum Sturm.`,tpLgW:`losgelassene Welle (Farbe der Person)`,tpLgB:`zu früh losgelassen`,tpLgE:`vom Schaum verschluckt`,tpLgL:`übrige Rümpfe`,tpLgC:`ruhige Wellen in Reserve`,mGain:`gewinnt {v}`,mLose:`verliert {v}`,pLostN:`{v} verloren`});
+Object.assign(GI18N.ru.ui,{pts:`{v} очко|{v} очка|{v} очков`,ptsS:`{v} очк.`,prTn:`Прилив {i}`,cqPay:`платит {v} 🪙`,chSkL:`{v}/{n} затонуло`,chOkN:`{v} доплыл|{v} доплыли|{v} доплыли`,tpLeftN:`Буря через {v} удар|Буря через {v} удара|Буря через {v} ударов`,tpBeatN:`{v} удар|{v} удара|{v} ударов`,tpErrN:`{v} ошибка|{v} ошибки|{v} ошибок`,tpFocus:`Твои волны на этом уровне`,tpFocusS:`Новый уровень: каждый смотрит на свои волны`,tpFocusD:`Запомни их: до бури {v} волн.`,tpLgW:`отпущенная волна (цвет того, кто отпустил)`,tpLgB:`отпущена слишком рано`,tpLgE:`унесена пеной`,tpLgL:`оставшиеся корпуса`,tpLgC:`спокойные волны в запасе`,mGain:`получает {v}`,mLose:`теряет {v}`,pLostN:`потеряно {v}`});
+Object.assign(GI18N.zh.ui,{pts:`{v} 分`,ptsS:`{v} 分`,prTn:`第 {i} 潮`,cqPay:`支付 {v} 🪙`,chSkL:`已沉 {v}/{n}`,chOkN:`到港 {v}`,tpLeftN:`风暴还有 {v} 拍`,tpBeatN:`{v} 拍`,tpErrN:`{v} 次失误`,tpFocus:`本关你的浪`,tpFocusS:`新关卡：大家各自看自己的浪`,tpFocusD:`记住它们：离风暴还有 {v}。`,tpLgW:`已放出的浪（颜色＝放出的人）`,tpLgB:`放得太早`,tpLgE:`被泡沫卷走`,tpLgL:`剩余船体`,tpLgC:`储备的平静浪`,mGain:`获得 {v}`,mLose:`失去 {v}`,pLostN:`失去 {v}`});
+Object.assign(GI18N.he.ui,{pts:`{v} נקודה|{v} נקודות`,ptsS:`{v} נק׳`,prTn:`גאות {i}`,cqPay:`משלם/ת {v} 🪙`,chSkL:`{v}/{n} טבעו`,chOkN:`{v} הגיעה|{v} הגיעו`,tpLeftN:`סערה בעוד מכה {v}|סערה בעוד {v} מכות`,tpBeatN:`מכה {v}|{v} מכות`,tpErrN:`טעות {v}|{v} טעויות`,tpFocus:`הגלים שלך לשלב הזה`,tpFocusS:`שלב חדש: כל אחד מגלה את הגלים שלו`,tpFocusD:`{g:זכור|זכרי} אותם: {v} עד הסערה.`,tpLgW:`גל ששוחרר (בצבע של מי ששחרר)`,tpLgB:`שוחרר מוקדם מדי`,tpLgE:`נסחף בקצף`,tpLgL:`ספינות שנותרו`,tpLgC:`גלים שקטים במלאי`,mGain:`מרוויח/ה {v}`,mLose:`מפסיד/ה {v}`,pLostN:`{v} אבדו`});
+Object.assign(GI18N.pt.ui,{pts:`{v} ponto|{v} pontos`,ptsS:`{v} pt|{v} pts`,prTn:`Maré {i}`,cqPay:`paga {v} 🪙`,chSkL:`{v}/{n} afundados`,chOkN:`{v} chegou|{v} chegaram`,tpLeftN:`Tempestade em {v} golpe|Tempestade em {v} golpes`,tpBeatN:`{v} golpe|{v} golpes`,tpErrN:`{v} erro|{v} erros`,tpFocus:`Suas ondas neste nível`,tpFocusS:`Novo nível: cada um descobre suas ondas`,tpFocusD:`Guarde-as bem: {v} de ondulação antes da tempestade.`,tpLgW:`onda solta (cor de quem soltou)`,tpLgB:`solta cedo demais`,tpLgE:`levada pela espuma`,tpLgL:`cascos restantes`,tpLgC:`ondas calmas de reserva`,mGain:`ganha {v}`,mLose:`perde {v}`,pLostN:`{v} perdidas`});
+/* ✏️ en train de modifier */
+Object.assign(GI18N.fr.ui,{gEdg:`en train de modifier`});
+Object.assign(GI18N.en.ui,{gEdg:`editing`});
+Object.assign(GI18N.es.ui,{gEdg:`editando`});
+Object.assign(GI18N.it.ui,{gEdg:`sta modificando`});
+Object.assign(GI18N.de.ui,{gEdg:`ändert gerade`});
+Object.assign(GI18N.ru.ui,{gEdg:`редактирует`});
+Object.assign(GI18N.zh.ui,{gEdg:`正在修改`});
+Object.assign(GI18N.he.ui,{gEdg:`עורך/ת`});
+Object.assign(GI18N.pt.ui,{gEdg:`editando`});
+/* 👀 Spectateurs : textes */
+Object.assign(GI18N.fr.ui,{specB:`Je regarde`,specD:`Tu suis la partie sans jouer : tu vois ce qui est public, tu peux réagir et discuter.`,specL:`Regardent : {n}`,specT:`Partie en cours : tu regardes, tu joueras à la prochaine.`,specT2:`Tu regardes cette partie.`,specH:`Tu regardes · réactions et chat ouverts`});
+Object.assign(GI18N.en.ui,{specB:`I'm watching`,specD:`Follow the game without playing: you see what's public, and you can react and chat.`,specL:`Watching: {n}`,specT:`Game in progress: you're watching, you'll play the next one.`,specT2:`You're watching this game.`,specH:`You're watching · reactions and chat are open`});
+Object.assign(GI18N.es.ui,{specB:`Solo miro`,specD:`Sigues la partida sin jugar: ves lo que es público y puedes reaccionar y chatear.`,specL:`Miran: {n}`,specT:`Partida en curso: miras y jugarás la próxima.`,specT2:`Estás mirando esta partida.`,specH:`Estás mirando · reacciones y chat abiertos`});
+Object.assign(GI18N.it.ui,{specB:`Guardo e basta`,specD:`Segui la partita senza giocare: vedi ciò che è pubblico, puoi reagire e chattare.`,specL:`Guardano: {n}`,specT:`Partita in corso: guardi e giocherai la prossima.`,specT2:`Stai guardando questa partita.`,specH:`Stai guardando · reazioni e chat aperte`});
+Object.assign(GI18N.de.ui,{specB:`Ich schaue zu`,specD:`Du verfolgst das Spiel, ohne mitzuspielen: Du siehst alles Öffentliche und kannst reagieren und chatten.`,specL:`Schauen zu: {n}`,specT:`Laufendes Spiel: Du schaust zu und spielst beim nächsten mit.`,specT2:`Du schaust diesem Spiel zu.`,specH:`Du schaust zu · Reaktionen und Chat offen`});
+Object.assign(GI18N.ru.ui,{specB:`Я смотрю`,specD:`Следишь за игрой, не играя: видишь всё открытое, можешь реагировать и писать в чат.`,specL:`Смотрят: {n}`,specT:`Игра уже идёт: ты смотришь и сыграешь в следующей.`,specT2:`Ты смотришь эту игру.`,specH:`Ты смотришь · реакции и чат открыты`});
+Object.assign(GI18N.zh.ui,{specB:`我只观看`,specD:`不参与游戏，只观看：你能看到公开内容，也可以互动和聊天。`,specL:`观看中：{n}`,specT:`游戏进行中：你先观看，下一局再加入。`,specT2:`你正在观看这局游戏。`,specH:`观看中 · 可以互动和聊天`});
+Object.assign(GI18N.he.ui,{specB:`אני צופה`,specD:`עוקבים אחרי המשחק בלי לשחק: רואים את מה שגלוי לכולם, ואפשר להגיב ולצ'וטט.`,specL:`צופים: {n}`,specT:`משחק בעיצומו: {g:אתה צופה ותשחק|את צופה ותשחקי} בסיבוב הבא.`,specT2:`{g:אתה צופה|את צופה} במשחק הזה.`,specH:`במצב צפייה · תגובות וצ'אט פתוחים`});
+Object.assign(GI18N.pt.ui,{specB:`Só assisto`,specD:`Acompanhe a partida sem jogar: você vê o que é público e pode reagir e conversar.`,specL:`Assistindo: {n}`,specT:`Partida em andamento: você assiste e joga a próxima.`,specT2:`Você está assistindo a esta partida.`,specH:`Assistindo · reações e chat abertos`});
+/* /👀 */
 /* 📜 Livre de bord : textes */
 Object.assign(GI18N.fr.ui,{lgT:`Livre de bord`,lgLast:`La dernière fois : {t}`,lg_win:`{a} a remporté {g}`,lg_win2:`{a} et {b} ont remporté {g}`,lg_prlC:`{a} s'est fait démasquer en Perle noire`,lg_prlD:`{a} a plongé 🤿 en Perle noire et trouvé le mot des autres`,lg_prlH:`{a} est passé{g.a:|e|·e} inaperçu{g.a:|e|·e} en Perle noire`,lg_chnC:`{a} s'est fait démasquer en Naufrageur`,lg_chnW:`{a} a coulé la flotte en Naufrageur`,lg_chnW2:`{a} et {b} ont coulé la flotte en Naufrageurs`,lg_mimC:`{a} s'est fait démasquer en Mimétique`,lg_mimW:`{a} a filé avec les perles en Mimétique`,lg_mimW2:`{a} et {b} ont filé avec les perles en Mimétiques`,lg_mskS:`{a} a tout volé à {b} en finale des Masques`,lg_mskP:`{a} et {b} ont partagé le trésor en finale des Masques`,lg_mskB:`{a} et {b} ont voulu tout voler en finale des Masques : perdu pour les deux`,lq_c:`se ferait démasquer le plus vite la prochaine fois`,lq_s:`bluffe le mieux sans en avoir l'air`,lq_v:`volerait tout le trésor sans trembler`,lq_t:`partagerait le trésor sans hésiter`,lq_w:`battrait {a} à la revanche`});
 Object.assign(GI18N.en.ui,{lgT:`Logbook`,lgLast:`Last time: {t}`,lg_win:`{a} won {g}`,lg_win2:`{a} and {b} won {g}`,lg_prlC:`{a} got unmasked as the Black Pearl`,lg_prlD:`{a} dived 🤿 as the Black Pearl and found the others' word`,lg_prlH:`{a} went unnoticed as the Black Pearl`,lg_chnC:`{a} got unmasked as a Wrecker`,lg_chnW:`{a} sank the fleet as a Wrecker`,lg_chnW2:`{a} and {b} sank the fleet as Wreckers`,lg_mimC:`{a} got unmasked as the Mimic`,lg_mimW:`{a} got away with the pearls as the Mimic`,lg_mimW2:`{a} and {b} got away with the pearls as Mimics`,lg_mskS:`{a} stole everything from {b} in the Masks final`,lg_mskP:`{a} and {b} shared the treasure in the Masks final`,lg_mskB:`{a} and {b} both tried to steal it all in the Masks final: both lost`,lq_c:`would get unmasked fastest next time`,lq_s:`bluffs best without showing it`,lq_v:`would steal the whole treasure without blinking`,lq_t:`would share the treasure without hesitating`,lq_w:`would beat {a} in a rematch`});
@@ -3381,4 +3577,418 @@ tu_coq7:`A dois, cada um conhece dois preços: o blefe vira um duelo.`,
 lg_coqS:`{a} reuniu as 5 espécies de conchas`,lg_coqF:`{a} vendeu fumaça: nenhum anúncio verdadeiro em Mercadores de conchas`,lg_coqT:`{a} só disse a verdade em Mercadores de conchas`,lg_coqB:`{a} arrematou um lote gigante de conchas`},
 {coqL:`O cesto da mariscagem|Achado da maré baixa|A caixinha de tesouros da avó|Sacola esquecida no píer|Colheita do amanhecer|Presente de uma foca|O saque de um caranguejo|Vitrine do museu fechado|Os bolsos de um marinheiro|Um baldinho de praia|Coleção de um velho capitão|Pescado depois da tempestade|Pote da cabana|Tesouro de uma sereia distraída|Amostras do professor|Lembranças das férias|Caixa sem etiqueta|Rede embaraçada|A gaveta do farol|Conchas de domingo|Colar desfeito|A bolsa de uma gaivota|O estoque da concorrência|Coleta clandestina|Herança de um pirata|Fundo do porão|Cesto da peixaria|Mergulho da meia-noite|Deixado pela espuma|Última caixa do porto`});
 /* /🐚 i18n */
+/* =====================================================================
+   🫧 MÉMOIRE DES ABYSSES — fiche (mémoire, 2 à 8, ~8 min)
+   9 manches, une épreuve chacune, de plus en plus longues (plan fixe, contenu tiré au hasard) :
+     🔁 Écho 3 · ✨ Lucioles 4 · 🔍 Changement 5 (1 case) · 🔁 Écho 5 · ↩️ Reflux 4 · 👀 Intrus 6 · ✨ Lucioles 6 ·
+     🔍 Changement 7 (2 cases) · ↩️ Reflux 6 (répétitions permises).
+     Écho : des créatures passent une à une, on les rend dans l'ordre. Reflux : à l'envers. Lucioles : des lumières
+     s'allument sur une grille 3×3, dans l'ordre. Changement : un décor 4×3, puis le même avec des cases changées
+     (apparition, disparition ou substitution) à toucher. Intrus : une suite passe, puis tout revient mélangé avec une
+     créature jamais passée.
+   Anti-latence : pendant l'étape « montrer », l'état ne contient qu'une GRAINE (g.sd). Chaque appareil en tire la même
+     suite (abGen, PRNG déterministe) et la joue LOCALEMENT dès que l'étape lui arrive, puis envoie « vu » tout seul ; le
+     rappel s'ouvre quand tout le monde a vu (sablier jamais plus court que la séquence, même en mode rapide). La graine
+     sort de l'état dès la fin de l'étape (hide) : pendant le rappel, chacun ne reçoit que SES données (palette, décor
+     modifié ou candidats). On juge la JUSTESSE ; le temps (mesuré sur l'appareil, de l'ouverture du rappel à la réponse
+     complète) ne sert qu'à départager une égalité en tête à la fin (+1 ⚡ au plus rapide).
+   Points : suites = plus longue sous-suite commune avec la bonne réponse (un oubli coûte 1, pas tout le reste) + 1 si
+     sans faute ; changement / intrus = 4 par case trouvée. Réponses modifiables jusqu'à la fin de l'étape.
+   🤿 Plongée profonde (choisie en secret pendant la révélation précédente ; 2 par partie, 3 à deux ; seulement si on
+     n'est PAS en tête, ex æquo compris, donc jamais à la 1re manche) : la même épreuve avec +2 éléments (créatures /
+     lumières, ou 2 créatures de plus dans le décor), points ×1,5 (arrondi) si au moins la moitié est juste, sinon 0.
+     Un pari à espérance presque neutre mais risqué : de la variance pour qui est derrière, jamais pour la tête.
+   À deux : duel, 3 plongées chacun ; seul·e celui / celle qui est derrière peut plonger.
+   Pas d'élimination, pas de premier joueur : tout est simultané et secret jusqu'à la révélation.
+   SIM (.sim/aby.js, 4000 parties/taille ; modèle : empan 5 / 6 / 7 (faible / moyen / fort) ± bruit, chaque élément retenu
+     selon une logistique (longueur − empan), −1 à l'envers, −0,5 pour les lumières ; changement / intrus selon le nombre de créatures) :
+     styles de plongée, niveau égal, tables mixtes (victoire relative à 1/n), n=2/3/4/6/8 : jamais 98/94/91/83/79 ·
+     dès que possible 101/102/105/111/109 · tard (manches 6+) 100/102/101/102/104 · si 4 pts de retard 102/100/99/97/98 ·
+     au hasard 100/102/103/108/110 → plonger aide un peu, aucun moment ne domine ; 44 % de plongées réussies.
+     Sièges (tous pareils) : 48.4/51.6 · n=4 24.1–25.6 · n=8 12.1–13.5 (attendu 12.5).
+     Niveaux : faible / moyen / fort ≈ 23 / 29 / 35 points (le faible garde ~80 % du score grâce aux points partiels) ;
+     la tête change après la manche 4 dans 46 % des parties ; un·e fort·e contre des moyens gagne 80 % à 2, 62 % à 4, 51 % à 6.
+     Rejetés : ×2 dès la moitié (plonger dès que possible écrasait tout : « jamais » 23–81 %), plongée permise aux ex æquo
+     en tête (tout le monde plongeait à la manche 1, la plus facile), ×2 aux deux tiers (19 % de réussite, frustrant).
+     Vraie logique (.sim/aby_run.js, 600 parties de 2 à 8, dont avec absent) : 0 blocage, 0 fuite (graine, réponses,
+     plongées, temps), jamais de plongée en tête.
+   ===================================================================== */
+const ABY={PL:['🐙','🦑','🪼','🐡','🦀','🐠','🦈','🐚','🦐','🐢','🐳'],TY:'erlci',IC:{e:'🔁',r:'↩️',l:'✨',c:'🔍',i:'👀'},
+ R:[{t:'e',n:3,k:6,v:900},{t:'l',n:4,v:900},{t:'c',n:5,c:1},{t:'e',n:5,k:8,v:800},{t:'r',n:4,k:7,v:800},{t:'i',n:6,c:1,v:750},
+  {t:'l',n:6,v:750},{t:'c',n:7,c:2},{t:'r',n:6,k:8,rep:1,v:750}],
+ X:2,DV:n=>n==2?3:2,DM:1.5,DT:.5,CP:4,LEAD:1800,GAP:260,CS:n=>2400+450*n,AT:m=>14+2*m,RT:25,PT:30,
+ HZ:[392,440,494,523,587,659,698,784,880]};
+/* PRNG déterministe (mulberry32) : même graine → même suite sur tous les appareils */
+const abRng=sd=>{let a=sd>>>0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}};
+const abSh=(a,r)=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+/* contenu d'une manche : D = version plongée profonde (+2), B = version de base (préfixe / sous-ensemble de D) */
+function abGen(sd,R){const r=abRng(sd),X=ABY.X,N=R.n+X,P=abSh([...ABY.PL.keys()],r);
+ if(R.t=='l'){const s=[];while(s.length<N){const v=Math.floor(r()*9);if(v!==s[s.length-1])s.push(v)}return{D:{s},B:{s:s.slice(0,R.n)}}}
+ if(R.t=='e'||R.t=='r'){const pal=P.slice(0,Math.max(R.k,R.rep?0:N));let s;
+  if(R.rep){s=[];while(s.length<N){const v=pal[Math.floor(r()*pal.length)];if(v!==s[s.length-1])s.push(v)}}else s=abSh(pal,r).slice(0,N);
+  return{pal:pal.slice().sort((a,b)=>a-b),D:{s},B:{s:s.slice(0,R.n)}}}
+ if(R.t=='i'){const s=P.slice(0,N),x=P.slice(N,N+R.c),b=s.slice(0,R.n);return{D:{s,x,cand:abSh(s.concat(x),r)},B:{s:b,x,cand:abSh(b.concat(x),r)}}}
+ /* changement : décor 4×3 (-1 = vide) ; les 2 créatures en plus de D ne changent jamais */
+ const cells=abSh([...Array(12).keys()],r),B=Array(12).fill(-1);cells.slice(0,R.n).forEach((c,j)=>B[c]=P[j]);
+ const D=B.slice();cells.slice(R.n,N).forEach((c,j)=>D[c]=P[R.n+j]);
+ const bc=abSh(cells.slice(0,R.n),r),fc=cells.slice(N),Ba=B.slice(),Da=D.slice(),ch=[];let nx=N;
+ for(let j=0;j<R.c;j++){const ty=r();let c;
+  if(ty<.5){c=bc.pop();Ba[c]=Da[c]=P[nx++]}/* substitution */
+  else if(ty<.75||!fc.length){c=bc.pop();Ba[c]=Da[c]=-1}/* disparition */
+  else{c=fc.pop();Ba[c]=Da[c]=P[nx++]}/* apparition */
+  ch.push(c)}
+ return{D:{sc:D,alt:Da,ch},B:{sc:B,alt:Ba,ch}}}
+/* plus longue sous-suite commune + éléments de la réponse qui en font partie */
+function abLcs(a,b){const m=a.length,n=b.length,T=[...Array(m+1)].map(()=>Array(n+1).fill(0));
+ for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)T[i][j]=a[i-1]===b[j-1]?T[i-1][j-1]+1:Math.max(T[i-1][j],T[i][j-1]);
+ const mk=Array(m).fill(0);let i=m,j=n;while(i&&j){if(a[i-1]===b[j-1]){mk[i-1]=1;i--;j--}else if(T[i-1][j]>=T[i][j-1])i--;else j--}return{c:T[m][n],mk}}
+function abScore(R,v,a,dv){a=a||[];let c,N,mk,base,perf;
+ if(R.t=='e'||R.t=='r'||R.t=='l'){const tg=R.t=='r'?v.s.slice().reverse():v.s,L=abLcs(a,tg);c=L.c;N=tg.length;mk=L.mk;perf=c==N&&a.length==N;base=c+(perf?1:0)}
+ else{const S=R.t=='c'?v.ch:v.x;mk=a.map(x=>S.includes(x)?1:0);c=mk.reduce((x,y)=>x+y,0);N=R.c;perf=c==N;base=ABY.CP*c}
+ const ok=!dv||c>=Math.ceil(ABY.DT*N-1e-9);return{c,N,mk,perf:perf?1:0,pts:dv?(ok?Math.round(ABY.DM*base):0):base,fail:ok?0:1}}
+const abLen=(R,dv)=>ABY.LEAD+(R.t=='c'?ABY.CS(R.n):(R.n+(dv?ABY.X:0))*(R.v+ABY.GAP));
+const AG={};/* affichage local (jamais envoyé) : départ de la séquence, brouillon de réponse */
+const abC=(i,cl)=>`<span class="abc ${cl||''}">${ABY.PL[i]}</span>`;
+const abM=(c,cl)=>`<i class="abmg ${cl||''}" dir="ltr">${[...Array(9).keys()].map(j=>`<b class="${j==c?'on':''}"></b>`).join('')}</i>`;
+GAMES.aby={icon:'🫧',min:2,max:8,dur:8,tags:['skill'],ABY,gen:abGen,score:abScore,
+ init(s){const g=s.game,n=s.order.length;g.n=ABY.R.length;g.tk={};g.tt={};g.pf={};g.dok={};g.du={};g.dv={};g.dn=[];g.hist=[];
+  s.order.forEach(p=>{g.tk[p]=ABY.DV(n);g.tt[p]=0;g.pf[p]=0;g.dok[p]=0;g.du[p]=0});gWait(g,ABY.PT,'p',1)},
+ lead(s,p){const g=s.game,mx=Math.max(...s.order.map(x=>g.sc[x]||0));return (g.sc[p]||0)==mx},
+ can(s,p){const g=s.game,ri=g.st=='p'?g.r:g.r+1;return ri<g.n&&(g.tk[p]||0)>0&&!this.lead(s,p)},
+ act(s,from,a){const g=s.game;
+  if(g.rv){if(a.dv==null)return;const v=a.dv?1:0;if(v&&!this.can(s,from))return;g.dv[from]=v;return true}
+  if(g.st=='s'){if(!a.seen)return;g.done[from]=1;return true}
+  if(g.st=='a'){const R=ABY.R[g.r],q=(g.q||{})[from];if(!q||!Array.isArray(a.a))return;const A=a.a.slice(0,q.m).map(x=>+x);
+   if(A.some(x=>!Number.isInteger(x)))return;
+   if(R.t=='l'){if(A.some(x=>x<0||x>8))return}
+   else if(R.t=='c'){if(A.some(x=>x<0||x>11)||new Set(A).size<A.length)return}
+   else if(R.t=='i'){if(A.some(x=>!q.cand.includes(x))||new Set(A).size<A.length)return}
+   else if(A.some(x=>!q.pal.includes(x)))return;
+   g.ans[from]=A;if(A.length==q.m){g.done[from]=1;g.ms[from]=Math.max(0,Math.min(+a.ms||0,(g.sec||60)*1000))}else delete g.ms[from];return true}},
+ next(s){const g=s.game;
+  if(g.st=='p')return this.show(s);
+  if(g.st=='s'){const R=ABY.R[g.r],G=abGen(g.sd,R);g.q={};g.ans={};g.ms={};let mx=0;
+   s.order.forEach(p=>{const v=g.dn.includes(p)?G.D:G.B,q={m:R.t=='c'||R.t=='i'?R.c:v.s.length};if(G.pal)q.pal=G.pal;if(R.t=='c')q.alt=v.alt;if(R.t=='i')q.cand=v.cand;g.q[p]=q;mx=Math.max(mx,R.t=='c'||R.t=='i'?4:q.m)});
+   gWait(g,ABY.AT(mx),'a');return}
+  if(g.st=='a')return this.judge(s);
+  if(g.st=='r'){g.r++;if(g.r>=g.n){g.over=1;return}this.show(s)}},
+ /* nouvelle manche : plongeurs validés (jeton + pas en tête), nouvelle graine, sablier ≥ durée de la séquence */
+ show(s){const g=s.game,R=ABY.R[g.r];g.dn=s.order.filter(p=>g.dv[p]&&(g.tk[p]||0)>0&&!this.lead(s,p));g.dn.forEach(p=>{g.tk[p]--;g.du[p]++});
+  g.dv={};g.res=null;g.q=null;g.ans={};g.sd=Math.floor(Math.random()*4294967296);
+  const need=Math.ceil(abLen(R,1)/1000)+5;gWait(g,need,'s');if(g.dl>0&&g.sec<need){g.sec=need;g.dl=Date.now()+need*1000}},
+ judge(s){const g=s.game,R=ABY.R[g.r],G=abGen(g.sd,R),P={};
+  s.order.forEach(p=>{const dv=g.dn.includes(p),sc=abScore(R,dv?G.D:G.B,g.ans[p],dv);sc.a=(g.ans[p]||[]).slice();sc.dv=dv?1:0;
+   g.sc[p]=(g.sc[p]||0)+sc.pts;if(sc.perf)g.pf[p]++;if(dv&&!sc.fail)g.dok[p]++;
+   g.tt[p]+=g.ms[p]!=null?g.ms[p]:(g.sec||60)*1000;P[p]=sc});
+  g.res={B:G.B,D:G.D,p:P};g.hist.push(Object.fromEntries(s.order.map(p=>[p,P[p].pts])));g.dv={};gWait(g,ABY.RT,'r',1)},
+ /* secrets : la graine seulement pendant « montrer » ; chacun ne reçoit que SES données de rappel, SA réponse, SON choix de plongée */
+ hide(g,n){const o={...g};if(g.st!='s')delete o.sd;delete o.ms;delete o.tt;
+  if(g.q)o.q={[n]:g.q[n]};if(g.st=='a')o.ans={[n]:(g.ans||{})[n]};if(g.rv)o.dv={[n]:(g.dv||{})[n]};return o},
+ /* fin : égalité en tête → +1 ⚡ au plus rapide (temps cumulé mesuré sur chaque appareil) */
+ fin(s){const g=s.game;if(!g.fz){g.fz=1;const mx=Math.max(...s.order.map(p=>g.sc[p]||0)),T=s.order.filter(p=>(g.sc[p]||0)==mx);g.tb=null;
+   if(T.length>1&&mx>0){const t=T.map(p=>g.tt[p]||0),mn=Math.min(...t);if(t.filter(x=>x==mn).length==1){g.tb=T[t.indexOf(mn)];g.sc[g.tb]++}}}return{pts:g.sc}},
+ log(s){const g=s.game,L=[];s.order.forEach(p=>{if((g.pf[p]||0)>=6)L.push({k:'abyP',n:[p]});if((g.dok[p]||0)>=2)L.push({k:'abyD',n:[p]})});
+  const h=g.hist||[];if(h.length>=g.n&&s.order.length>2){const c={};s.order.forEach(p=>c[p]=0);h.slice(0,4).forEach(r=>{for(const p in r)if(p in c)c[p]+=r[p]});
+   const mn=Math.min(...Object.values(c)),last=s.order.filter(p=>c[p]==mn),mx=Math.max(...s.order.map(p=>g.sc[p]||0));
+   if(last.length==1&&(g.sc[last[0]]||0)==mx&&s.order.filter(p=>(g.sc[p]||0)==mx).length==1)L.push({k:'abyC',n:last})}return L},/* 📜 */
+ /* ---------- vue ---------- */
+ tn(R,k){return GT(k,{v:R.c||''}).split('|')[ABY.TY.indexOf(R.t)]||''},
+ top(R,k,dv){return `<div class="abhd"><span class="abti">${ABY.IC[R.t]}</span><b>${this.tn(R,'abT')}</b>${dv?'<span class="abdvt">🤿 +2</span>':''}</div><p class="abins">${this.tn(R,k)}</p>`},
+ nx(R){return `<div class="abnx ga" ${dl(1)}><span class="abti">${ABY.IC[R.t]}</span><span><b>${this.tn(R,'abT')}</b><small>${this.tn(R,'abS')} · ${GT('abN',{v:R.n})}</small></span></div>`},
+ /* seuil concret de la plongée pour l'épreuve R : au moins k justes sur n */
+ dvk(R){const n=R.t=='c'||R.t=='i'?R.c:R.n+ABY.X;return{n,k:Math.ceil(ABY.DT*n-1e-9)}},
+ dive(s,g,m){if(!s.order.includes(m))return '';const ri=g.st=='p'?g.r:g.r+1;if(ri>=g.n)return '';const t=g.tk[m]||0,on=!!(g.dv||{})[m];
+  if(!t)return `<p class="abdv0">🤿 ${GT('abDv0')}</p>`;if(!this.can(s,m))return `<p class="abdv0">🤿 ${GT('abDvL')}</p>`;
+  return `<button class="abdvb ga ${on?'sel':''}" ${dl(2)} data-abdv="${on?0:1}" aria-pressed="${on}"><span class="abdvi">🤿</span><span class="abdvx"><b>${GT('abDv')}</b><small>${GT('abDvD',this.dvk(ABY.R[ri]))}</small></span><span class="abtk" aria-label="${t}">${'🫧'.repeat(t)}</span></button>`},
+ crew(s,g,m,sh){return `<div class="abcr">${s.order.map(p=>`<span class="abm ${p==m?'me':''}">${DT(p)}<b>${p==m?esc(GT('me')):esc(p)}</b>${sh&&(g.dn||[]).includes(p)?'<i>🤿</i>':''}<em dir="ltr">${g.sc[p]||0}</em>${g.done[p]&&!g.rv?'<i class="tpok" aria-hidden="true"></i>':''}</span>`).join('')}</div>`},
+ /* la séquence, jouée localement : délais négatifs → un nouveau rendu continue l'animation sans la relancer */
+ stage(R,v,e){const L=ABY.LEAD,d=t=>((t-e)/1000).toFixed(2)+'s',at=j=>L+j*(R.v+ABY.GAP);let h='';
+  if(R.t=='l')h=`<div class="abgl" dir="ltr">${[...Array(9).keys()].map(c=>`<span class="abln">${v.s.map((x,j)=>x==c?`<i class="abfl" style="animation-duration:${R.v}ms;animation-delay:${d(at(j))}"></i>`:'').join('')}</span>`).join('')}</div>`;
+  else if(R.t=='c')h=`<div class="abgc abshow" dir="ltr" style="animation-duration:${ABY.CS(R.n)}ms;animation-delay:${d(L)}">${v.sc.map(x=>`<span class="abcl">${x>=0?ABY.PL[x]:''}</span>`).join('')}</div>`;
+  else h=v.s.map((x,j)=>`<span class="abit" style="animation-duration:${R.v}ms;animation-delay:${d(at(j))};--x:${((j*37)%5-2)*16}px;--y:${((j*53)%3-1)*10}px"><b>${ABY.PL[x]}</b></span>`).join('');
+  const dots=R.t=='c'?'':`<div class="abdots">${v.s.map((_,j)=>`<i style="animation-delay:${d(at(j))}"></i>`).join('')}</div>`;
+  return `<div class="abs ${R.t=='l'?'l':''}" data-gan aria-hidden="true"><i class="abb"></i><i class="abb b2"></i><i class="abb b3"></i><span class="abcd" style="animation-delay:${d(0)};animation-duration:${L}ms"><b>👁️</b></span>${h}${dots}</div>`},
+ showV(s,g,m){const R=ABY.R[g.r],play=s.order.includes(m),dv=(g.dn||[]).includes(m),K=s.gid+'.'+g.k;
+  if(g.sd==null)return{html:`<div class="card c">${this.top(R,'abS')}${this.crew(s,g,m,1)}</div>`};
+  const G=abGen(g.sd,R),v=dv?G.D:G.B,T=abLen(R,dv);
+  if(AG.sk!==K){AG.sk=K;AG.st=Date.now();AG.sent=0;clearTimeout(AG.to);
+   if(typeof tone=='function'&&R.t!='c')try{tone(v.s.map((x,j)=>[R.t=='l'?ABY.HZ[x]:523,(ABY.LEAD+j*(R.v+ABY.GAP))/1000,R.t=='l'?.32:.12]))}catch(e){}
+   if(play)AG.to=setTimeout(()=>{if(AG.sk===K&&!AG.sent){AG.sent=1;try{gs({seen:1})}catch(e){}}},T+150)}
+  const e=Date.now()-AG.st,dvs=(g.dn||[]).filter(p=>p!=m);
+  return{html:`<div class="card c abcard">${this.top(R,'abS',dv)}${this.stage(R,v,e)}
+   ${play?`<p class="abok" data-gan style="animation-delay:${((T-e)/1000).toFixed(2)}s">✓ ${GT('abSeen')}</p>`:''}${dvs.length?`<p class="abdvs">🤿 ${GT('abDvs',{n:dvs.map(B).join(', ')})}</p>`:''}${this.crew(s,g,m,1)}</div>`,
+   ...(play&&!g.done[m]?{hint:GT('abWatch'),mine:false}:{})}},
+ recV(s,g,m){const R=ABY.R[g.r],q=(g.q||{})[m],K=s.gid+'.'+g.k,dv=(g.dn||[]).includes(m);
+  if(!q)return{html:`<div class="card c">${this.top(R,'abA')}${this.crew(s,g,m,1)}</div>`};
+  if(AG.ak!==K){AG.ak=K;AG.t0=Date.now();AG.a=((g.ans||{})[m]||[]).slice();AG.fl=null}
+  const A=AG.a,need=q.m,seq=R.t=='e'||R.t=='r'||R.t=='l',it=x=>R.t=='l'?abM(x):ABY.PL[x];
+  let body;
+  if(seq){const hit=AG.fl&&Date.now()-AG.fl.t<450?AG.fl.c:-1;
+   body=`<div class="abslots">${[...Array(need).keys()].map(j=>A[j]!=null?`<span class="absl f">${it(A[j])}</span>`:`<span class="absl ${j==A.length?'nx':''}"><small dir="ltr">${j+1}</small></span>`).join('')}</div>
+    ${R.t=='l'?`<div class="abgl abpick" dir="ltr">${[...Array(9).keys()].map(c=>`<button class="abln ${c==hit?'hit':''}" data-abp="${c}" aria-label="${c+1}" ${A.length>=need?'disabled':''}></button>`).join('')}</div>`
+     :`<div class="abpal">${q.pal.map(x=>`<button data-abp="${x}" ${A.length>=need?'disabled':''}>${ABY.PL[x]}</button>`).join('')}</div>`}
+    <div class="abctl"><button class="ghost" data-abu="1" ${A.length?'':'disabled'} aria-label="⌫">⌫</button><button class="ghost" data-abu="0" ${A.length?'':'disabled'}>${GT('abClr')}</button></div>`}
+  else if(R.t=='c')body=`<div class="abgc abpick" dir="ltr">${q.alt.map((x,c)=>`<button class="abcl ${A.includes(c)?'sel':''}" data-abt="${c}" aria-pressed="${A.includes(c)}">${x>=0?ABY.PL[x]:''}</button>`).join('')}</div><p class="abcnt" dir="ltr">${A.length} / ${need}</p>`;
+  else body=`<div class="abpal abcand">${q.cand.map(x=>`<button class="${A.includes(x)?'sel':''}" data-abt="${x}" aria-pressed="${A.includes(x)}">${ABY.PL[x]}</button>`).join('')}</div><p class="abcnt" dir="ltr">${A.length} / ${need}</p>`;
+  const put=a=>{AG.a=a;render();gs({a,ms:Date.now()-AG.t0})};
+  return{html:`<div class="card c abcard">${this.top(R,'abA',dv)}${body}${this.crew(s,g,m,1)}</div>`,
+   bind(){$$('[data-abp]').forEach(b=>b.onclick=()=>{const x=+b.dataset.abp;if(AG.a.length>=need)return;if(R.t=='l'){AG.fl={c:x,t:Date.now()};if(typeof tone=='function')try{tone([[ABY.HZ[x],0,.25]])}catch(e){}}put([...AG.a,x])});
+    $$('[data-abu]').forEach(b=>b.onclick=()=>put(b.dataset.abu=='1'?AG.a.slice(0,-1):[]));
+    $$('[data-abt]').forEach(b=>b.onclick=()=>{const x=+b.dataset.abt;let a=AG.a.includes(x)?AG.a.filter(y=>y!=x):[...AG.a,x];if(a.length>need)a=a.slice(-need);put(a)})}}},
+ /* révélation : la bonne réponse (de MA version), ma réponse, puis tout le monde ; et la prochaine épreuve */
+ revV(s,g,m){const R=ABY.R[g.r],X=g.res||{p:{}},me=X.p[m],v=me&&me.dv?X.D:X.B;let h='';
+  if(!v)return{html:''};
+  if(R.t=='e'||R.t=='r'||R.t=='l'){const tg=R.t=='r'?v.s.slice().reverse():v.s,it=x=>R.t=='l'?abM(x):abC(x);
+   h=`<p class="gpre">${GT('abAns')}</p><div class="abrow">${tg.map((x,j)=>`<span class="abrc ga" ${dl(j)}>${it(x)}</span>`).join('')}</div>`+
+    (me?`<p class="gpre">${GT('abMine')}</p><div class="abrow">${me.a.length?me.a.map((x,j)=>`<span class="abrc ga ${me.mk[j]?'ok':'no'}" ${dl(j,.3)}>${it(x)}</span>`).join(''):`<span class="mut">${GT('abNone')}</span>`}</div>`:'')}
+  else if(R.t=='c')h=`<div class="abgc abrv" dir="ltr">${v.alt.map((x,c)=>{const ch=v.ch.includes(c),pk=me&&me.a.includes(c);
+   return `<span class="abcl ${ch?'chg':''} ${pk?(ch?'ok':'no'):''}">${ch?`<small>${v.sc[c]>=0?ABY.PL[v.sc[c]]:'·'}</small><i>›</i>`:''}${x>=0?ABY.PL[x]:ch?'·':''}</span>`}).join('')}</div>`;
+  else h=`<div class="abpal abrv">${v.cand.map(x=>{const xi=v.x.includes(x),pk=me&&me.a.includes(x);return `<span class="abrc ${xi?'chg':''} ${pk?(xi?'ok':'no'):''}">${ABY.PL[x]}</span>`}).join('')}</div>`;
+  const msg=me?(me.fail?`<p class="abmsg no ga" ${dl(3)}>🤿 ${GT('abFail')}</p>`:me.perf?`<p class="abmsg ok ga" ${dl(3)}>✨ ${GT('abPerf')}</p>`:''):'';
+  const rows=[...s.order].sort((a,b)=>(g.sc[b]||0)-(g.sc[a]||0)).map((p,i)=>{const r=X.p[p]||{c:0,N:0,pts:0};
+   return `<div class="abrr ga ${p==m?'me':''}" ${dl(i,.4)}>${DT(p)}<b class="abnm">${p==m?esc(GT('me')):esc(p)}</b>${r.dv?'<span>🤿</span>':''}${r.perf?'<span>✨</span>':''}<span class="abac" dir="ltr">${r.c}/${r.N}</span><span class="abpt ${r.pts?'':'z'}" dir="ltr">+${r.pts}</span><b class="abto" dir="ltr">${g.sc[p]||0}</b></div>`}).join('');
+  const nr=ABY.R[g.r+1];
+  return{html:`<div class="card c abcard">${this.top(R,'abA',me&&me.dv)}${h}${msg}<div class="abres">${rows}</div>
+   ${nr?`<p class="gpre abnxh">${GT('abNx')}</p>${this.nx(nr)}${this.dive(s,g,m)}`:''}</div>`,
+   bind(){$$('[data-abdv]').forEach(b=>b.onclick=()=>gs({dv:+b.dataset.abdv}));if(me&&me.perf&&!RM()&&GV.abp!=='abp'+s.gid+g.k){GV.abp='abp'+s.gid+g.k;try{sparkles($('.abmsg'),12)}catch(e){}}}}},
+ view(s){const g=s.game,m=meN();
+  if(g.st=='p')return{html:`<div class="card c abcard"><div class="gbig ga gfloat">🫧</div><p class="gpre">${GT('abNx')}</p>${this.nx(ABY.R[g.r])}${this.crew(s,g,m)}</div>`,
+   bind(){$$('[data-abdv]').forEach(b=>b.onclick=()=>gs({dv:+b.dataset.abdv}))}};
+  if(g.st=='s')return this.showV(s,g,m);
+  if(g.st=='a')return this.recV(s,g,m);
+  return this.revV(s,g,m)},
+ endView(s){const g=s.game,m=meN();
+  return `${g.tb?`<p class="gnote ga">⚡ ${GT('abTb',{n:B(g.tb)})}</p>`:''}<div class="abres abfin">${[...s.order].sort((a,b)=>(g.sc[b]||0)-(g.sc[a]||0)).map((p,i)=>
+   `<div class="abrr ga ${p==m?'me':''}" ${dl(i,.3)}>${DT(p)}<b class="abnm">${esc(p)}</b><span class="abac" dir="ltr">✨ ${g.pf[p]||0} · 🤿 ${g.dok[p]||0}/${g.du[p]||0}</span><b class="abto" dir="ltr">${g.sc[p]||0}</b></div>`).join('')}</div>
+   <p class="mut cqlg">✨ ${GT('abPf')} · 🤿 ${GT('abDk')}</p>`}};
+/* 🫧 tutoriel : créatures qui passent, réponses simultanées, points partiels, épreuves, plongée profonde */
+const tuAb3=()=>[0,1,2].map(i=>TU.e(60+90*i,152,TU.av(i))).join('');
+GAMES.aby.tut=[
+ {k:'tu_aby1',d:6,s:()=>'<i class="tcave"></i>'+['🐙','🦀','🪼'].map((x,i)=>TU.e(150,66,x,.3+1.1*i,'p big o','--o:'+(1.2+1.1*i).toFixed(1)+'s')).join('')+[0,1,2].map(i=>TU.e(130+20*i,128,'<i class="tudt"></i>',.3+1.1*i,'p')).join('')},
+ {k:'tu_aby2',d:6,s:()=>tuAb3()+[0,1,2].map(i=>['🐙','🦀','🪼'].map((x,j)=>TU.e(60+90*i+(j-1)*28,108,x,.4+.5*j+.15*i,'p')).join('')).join('')+TU.e(150,36,'👆🏻',.2,'p big')},
+ {k:'tu_aby3',d:6,s:()=>TU.e(150,26,TU.cd('🐙 🦀 🪼 🐡','ok'),0,'p')+TU.e(80,150,TU.av(0))+TU.e(220,150,TU.av(1))+TU.e(80,98,TU.cd('🐙 🦀 🪼 🐡'),.4,'p')+TU.e(220,98,TU.cd('🐙 <s>🐠</s> 🪼 🐡'),.7,'p')+TU.e(80,62,TU.pt('+5'),1.5,'p')+TU.e(220,62,TU.pt('+3'),1.8,'p')},
+ {k:'tu_aby4',d:6,s:()=>[['↩️','🪼 🦀 🐙'],['✨','💡💡'],['🔍','🐙 › 🦈'],['👀','🐢 ?']].map(([a,b],i)=>TU.e(45+70*i,70,'<span class="tuab">'+a+'</span>',.2+.4*i,'p big')+TU.e(45+70*i,124,TU.cd(b,'sm2'),.5+.4*i,'p')).join('')},
+ {k:'tu_aby5',d:7,s:()=>TU.e(80,150,TU.av(0))+TU.e(80,104,'🤿',.3,'p big')+TU.e(150,40,TU.cd('🐙 🦀 🪼 <b>🐡 🦈</b>'),.8,'p')+TU.e(220,96,TU.pt('×1½'),1.8,'p')+TU.e(220,132,TU.pt('&lt;½ → 0','no'),3,'p')},
+ {k:'tu_aby6',x:'2',s:()=>TU.e(80,150,TU.av(0))+TU.e(220,150,TU.av(1))+TU.e(80,104,'🥇',.3,'p')+TU.e(220,104,'🤿',.8,'p big')+TU.e(220,62,TU.cd('🫧🫧🫧'),1.3,'p')}];
+if(typeof document!='undefined'){const c=document.createElement('style');c.id='aby-css';c.textContent=`
+.abcard{--abA:#0d2a45;--abB:#04101e;--abG:#7ff3e0}
+.abhd{display:flex;align-items:center;justify-content:center;gap:8px;font:600 18px Fredoka,Nunito,sans-serif;color:var(--deep)}
+.abti{font-size:22px;line-height:1}.abdvt{font:800 12px Nunito;padding:2px 8px;border-radius:99px;background:color-mix(in srgb,var(--ink) 18%,transparent);color:var(--ink)}
+.abins{font:700 14px Nunito;color:var(--mut);margin:2px 0 10px}
+.abs{position:relative;height:200px;border-radius:20px;overflow:hidden;background:radial-gradient(120% 90% at 50% 0%,var(--abA),var(--abB));box-shadow:inset 0 0 0 2px #ffffff14,inset 0 -30px 60px #0008;isolation:isolate}
+.abb{position:absolute;bottom:-14px;inset-inline-start:18%;width:8px;height:8px;border-radius:50%;border:1.5px solid #bfefff55;animation:abBub 7s linear infinite}
+.abb.b2{inset-inline-start:72%;width:6px;height:6px;animation-duration:9s;animation-delay:-3s}.abb.b3{inset-inline-start:46%;width:5px;height:5px;animation-duration:11s;animation-delay:-6s}
+@keyframes abBub{to{transform:translateY(-230px)}}
+.abcd{position:absolute;inset:0;display:grid;place-items:center;opacity:0;animation-name:abCd;animation-fill-mode:both;animation-timing-function:ease-in}
+.abcd b{font-size:34px;width:74px;height:74px;display:grid;place-items:center;border-radius:50%;box-shadow:0 0 0 3px #7ff3e066,0 0 24px #7ff3e033}
+@keyframes abCd{0%{opacity:0;transform:scale(1.2)}15%{opacity:1;transform:none}80%{opacity:1;transform:scale(.9)}100%{opacity:0;transform:scale(.6)}}
+.abit{position:absolute;inset:0 0 22px;display:grid;place-items:center;opacity:0;animation-name:abIt;animation-fill-mode:both;animation-timing-function:ease-out;pointer-events:none}
+.abit b{font-size:66px;line-height:1;filter:drop-shadow(0 0 14px #7ff3e055)}
+@keyframes abIt{0%{opacity:0;transform:translate(var(--x),var(--y)) scale(.55)}14%{opacity:1;transform:translate(var(--x),var(--y)) scale(1)}84%{opacity:1;transform:translate(var(--x),var(--y)) scale(1)}100%{opacity:0;transform:translate(var(--x),var(--y)) scale(1.08)}}
+.abdots{position:absolute;inset-inline:0;bottom:10px;display:flex;justify-content:center;gap:6px}
+.abdots i{width:8px;height:8px;border-radius:50%;background:var(--abG);opacity:.22;animation:abDot .25s ease-out both}
+@keyframes abDot{from{opacity:.22;transform:scale(.7)}to{opacity:.95;transform:none}}
+.abgl{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:min(156px,62%);margin:0 auto}
+.abs .abgl{position:absolute;inset:16px 0 auto;margin:0 auto}
+.abln{position:relative;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 40% 35%,#2b5878,#123048);box-shadow:inset 0 0 0 2px #ffffff12;display:block;padding:0;border:0;min-width:0}
+.abfl{position:absolute;inset:-3px;border-radius:50%;background:radial-gradient(circle,#fff 0,#b6fff2 30%,#4fe0c8 60%,#4fe0c800 72%);opacity:0;animation-name:abFl;animation-fill-mode:both;animation-timing-function:ease-out}
+@keyframes abFl{0%{opacity:0;transform:scale(.6)}15%{opacity:1;transform:scale(1.08)}82%{opacity:1;transform:none}100%{opacity:0;transform:scale(.9)}}
+.abgc{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;width:min(280px,100%);margin:0 auto}
+.abs .abgc{position:absolute;inset:14px 0 auto;margin:0 auto;width:min(250px,86%)}
+.abshow{opacity:0;animation-name:abScn;animation-fill-mode:both;animation-timing-function:linear}
+@keyframes abScn{0%{opacity:0;transform:scale(.97)}6%{opacity:1;transform:none}94%{opacity:1}100%{opacity:0}}
+.abcl{position:relative;aspect-ratio:1.25;display:grid;place-items:center;border-radius:12px;background:#ffffff0d;box-shadow:inset 0 0 0 1.5px #ffffff14;font-size:28px;line-height:1;padding:0;min-width:0}
+.abok{font:700 13px Nunito;color:var(--ink);margin:8px 0 0;opacity:0;animation:abIn .4s ease-out both}
+@keyframes abIn{from{opacity:0;transform:translateY(6px)}}
+.abdvs{font-size:12.5px;color:var(--mut);margin:6px 0 0}
+.abcr{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px}
+.abm{position:relative;display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border:1.5px solid var(--edge);border-radius:99px;background:var(--paper2);font-size:13px;max-width:100%}
+.abm.me{border-color:var(--acc)}.abm b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:9em}.abm em{font:600 13px Fredoka,Nunito,sans-serif;font-style:normal;color:var(--ink)}.abm i{font-style:normal}
+.abslots{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:2px 0 12px;min-height:46px}
+.absl{width:44px;height:44px;display:grid;place-items:center;border-radius:12px;border:2px dashed var(--edge);font-size:26px;line-height:1;color:var(--mut)}
+.absl small{font:700 12px Nunito;opacity:.6}.absl.nx{border-color:var(--acc)}
+.absl.f{border-style:solid;border-color:color-mix(in srgb,var(--acc) 55%,var(--edge));background:var(--paper2);animation:abPop .25s var(--gease) both}
+@keyframes abPop{from{transform:scale(.6);opacity:.3}}
+.abpal{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-width:340px;margin:0 auto}
+.abpal button,.abpal .abrc{font-size:30px;line-height:1;padding:9px 0;border-radius:14px;min-width:0;height:auto}
+.abpal button:disabled{opacity:.45}
+.abcand button.sel,.abgc button.sel{outline:3px solid var(--acc);outline-offset:1px}
+.abpick.abgl{width:min(210px,66%)}.abpick .abln{cursor:pointer;transition:transform .15s var(--gease)}.abpick .abln:not(:disabled):active{transform:scale(.9)}
+.abpick .abln.hit::after{content:'';position:absolute;inset:-3px;border-radius:50%;background:radial-gradient(circle,#fff 0,#b6fff2 30%,#4fe0c8 60%,#4fe0c800 72%);animation:abHit .45s ease-out both}
+@keyframes abHit{from{opacity:1}to{opacity:0;transform:scale(1.15)}}
+.abpick .abln:disabled{opacity:.6}
+.abpick.abgc,.abrv.abgc{padding:10px;border-radius:18px;background:radial-gradient(120% 90% at 50% 0%,var(--abA),var(--abB))}
+.abpick .abcl{cursor:pointer;border:0;color:inherit}
+.abctl{display:flex;gap:8px;justify-content:center;margin-top:10px}.abctl button{padding:7px 16px;font-size:15px}
+.abcnt{font:700 13px Nunito;color:var(--mut);margin:8px 0 0}
+.abmg{display:inline-grid;grid-template-columns:repeat(3,1fr);gap:2px;width:26px;height:26px;vertical-align:middle}
+.abmg b{border-radius:50%;background:color-mix(in srgb,var(--mut) 30%,transparent)}.abmg b.on{background:#2fc7ae;box-shadow:0 0 5px #4fe0c8}
+.abrow{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin:4px 0 10px}
+.abrc{display:inline-grid;place-items:center;min-width:42px;height:42px;padding:0 4px;border-radius:12px;background:var(--paper2);border:2px solid var(--edge);font-size:24px;line-height:1}
+.abrc.ok{border-color:var(--ink);background:color-mix(in srgb,var(--ink) 14%,var(--paper2))}.abrc.no{border-color:var(--bad);opacity:.7}
+.abrc.chg{box-shadow:0 0 0 3px #f2c94c}
+.abc{display:inline-block;line-height:1}
+.abrv .abcl{font-size:24px}.abrv .abcl small{font-size:13px;opacity:.75;position:absolute;top:3px;inset-inline-start:4px}.abrv .abcl i{position:absolute;top:2px;inset-inline-start:21px;font-size:11px;font-style:normal;color:#f2c94c}
+.abrv .abcl.chg{box-shadow:inset 0 0 0 2.5px #f2c94c}.abrv .abcl.ok{box-shadow:inset 0 0 0 3px #4fe0c8}.abrv .abcl.no{box-shadow:inset 0 0 0 3px var(--bad)}
+.abmsg{font:600 17px Fredoka,Nunito,sans-serif;margin:4px 0 8px}.abmsg.ok{color:var(--ink)}.abmsg.no{color:var(--bad)}
+.abres{display:flex;flex-direction:column;gap:5px;margin-top:10px}
+.abrr{display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:12px;background:var(--paper2);font-size:13.5px;text-align:start;min-width:0}
+.abrr.me{outline:2px solid var(--acc)}.abnm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.abac{color:var(--mut);font-weight:700;font-size:12px}.abpt{font:700 13px Nunito;color:var(--ink);min-width:2.2em;text-align:end}.abpt.z{color:var(--mut)}
+.abto{font:600 18px Fredoka,Nunito,sans-serif;color:var(--deep);min-width:1.6em;text-align:end}
+.abnxh{margin-top:16px}
+.abnx{display:flex;align-items:center;gap:10px;justify-content:center;text-align:start;padding:8px 14px;border-radius:14px;background:var(--paper2);margin:6px auto 0;width:fit-content;max-width:100%}
+.abnx .abti{font-size:26px}.abnx b{display:block;font:600 16px Fredoka,Nunito,sans-serif}.abnx small{display:block;font-size:12.5px;color:var(--mut)}
+.abdvb{display:flex;align-items:center;gap:10px;width:100%;max-width:380px;margin:10px auto 0;padding:10px 12px;text-align:start;border-radius:16px}
+.abdvb .abdvi{font-size:26px}.abdvx{flex:1;min-width:0}.abdvx b{display:block;font-size:15px}.abdvx small{display:block;font-size:12px;color:var(--mut);font-weight:600}
+.abtk{font-size:13px;letter-spacing:-1px;white-space:nowrap}
+.abdv0{font-size:12.5px;color:var(--mut);margin:10px 0 0}
+.tudt{display:block;width:8px;height:8px;border-radius:50%;background:#4fe0c8;box-shadow:0 0 6px #4fe0c8}
+.tuab{font-size:28px}
+[data-theme=dark] .abcard{--abA:#0f3150;--abB:#020a14}
+[data-theme=dark] .abdvt{color:#7ff3e0}
+@media (max-width:420px){.abs{height:184px}.abit b{font-size:58px}.abpal{gap:6px}.abpal button,.abpal .abrc{font-size:26px;padding:8px 0}.absl{width:38px;height:38px;font-size:22px}.abcl{font-size:24px}.abrc{min-width:36px;height:36px;font-size:20px}.abmg{width:22px;height:22px}}
+@media (prefers-reduced-motion:reduce){.abb{display:none}.abit,.abfl,.abcd,.abshow{animation-name:abItR}.abdots i,.absl.f,.abok,.abpick .abln.hit::after{animation-duration:.01s}}
+@keyframes abItR{0%,100%{opacity:0}2%,96%{opacity:1}}
+`;(document.head||document.documentElement).appendChild(c)}
+/* /🫧 */
+
+/* 🫧 textes de Mémoire des abysses (9 langues) ; abT/abS/abA : listes alignées sur ABY.TY (Écho, Reflux, Lucioles, Changement, Intrus) */
+const GAB=(l,o)=>Object.assign(GI18N[l].ui,o);
+GAB('fr',{n_aby:`Mémoire des abysses`,d_aby:`Retenir créatures et lumières, tous en même temps`,
+r_aby:`Des créatures et des lumières passent dans l'abysse : retiens-les, puis tout le monde répond en même temps. Chaque élément juste rapporte, sans faute +1. Les épreuves changent : à l'envers, ce qui a changé, l'intrus. 🤿 Plongée profonde (2 fois, seulement si tu n'es pas en tête) : +2 éléments, points ×1,5 si au moins la moitié est juste, sinon 0.`,
+r_aby2:`À deux, c'est un duel de mémoire : l'abysse montre, vous répondez en même temps. Chaque élément juste rapporte, sans faute +1. 🤿 Plongée profonde (3 fois chacun, pas quand tu mènes) : +2 éléments, points ×1,5 si au moins la moitié est juste, sinon 0.`,
+abT:`Écho|Reflux|Lucioles|Le changement|L'intrus`,abS:`Retiens l'ordre|Retiens l'ordre, tu le rendras à l'envers|Retiens les lumières dans l'ordre|Retiens le décor|Retiens qui passe`,
+abA:`Dans le même ordre|À l'envers : du dernier au premier|Les lumières, dans l'ordre|Touche ce qui a changé ({v})|Qui n'est jamais passé ? ({v})`,abN:`{v} à retenir`,
+abSeen:`Mémorisé ! On attend les autres…`,abWatch:`Regarde bien : l'abysse ne montre qu'une fois`,abClr:`Effacer`,abDv:`Plongée profonde`,abDvD:`+2 éléments · ×1,5 si au moins {k} sur {n} sont justes, sinon 0`,
+abDvL:`En tête : pas de plongée profonde`,abDv0:`Plus de plongée profonde`,abDvs:`En plongée profonde : {n}`,abNx:`Prochaine épreuve`,abAns:`La bonne réponse`,abMine:`Ta réponse`,
+abPerf:`Sans faute !`,abFail:`Plongée ratée : moins de la moitié, 0 cette fois`,abNone:`pas de réponse`,abTb:`Égalité en tête : {n} a répondu le plus vite (+1)`,abPf:`sans-faute`,abDk:`plongées profondes réussies`,
+tu_aby1:`Des créatures passent une à une dans l'abysse. Retiens-les dans l'ordre : elles ne passent qu'une fois.`,
+tu_aby2:`Puis tout le monde répond en même temps, en touchant les créatures dans l'ordre. On peut corriger jusqu'à la fin.`,
+tu_aby3:`Chaque créature à sa place rapporte 1 : un oubli ne coûte qu'un point. Sans faute : +1 en plus.`,
+tu_aby4:`Les épreuves changent : à l'envers, des lumières, ce qui a changé dans un décor, l'intrus jamais passé.`,
+tu_aby5:`🤿 Plongée profonde, quelques fois par partie, seulement si tu n'es pas en tête : +2 éléments, points ×1,5 si au moins la moitié est juste, sinon 0.`,
+tu_aby6:`À deux : 3 plongées chacun. Qui mène ne peut pas plonger : le duel se rattrape.`,
+lg_abyP:`{a} n'a presque rien oublié dans les abysses`,lg_abyD:`{a} a réussi deux plongées profondes`,lg_abyC:`{a} est {g.a:remonté|remontée|remonté·e} de la dernière place jusqu'à la victoire dans les abysses`});
+GAB('en',{n_aby:`Memory of the Deep`,d_aby:`Remember creatures and lights, all at once`,
+r_aby:`Creatures and lights pass through the deep: remember them, then everyone answers at the same time. Every right element scores, a perfect answer +1. The trials change: backwards, what changed, the odd one out. 🤿 Deep dive (twice, only when you're not in the lead): +2 elements, points ×1.5 if at least half is right, otherwise 0.`,
+r_aby2:`For two, it's a memory duel: the deep shows, you both answer at once. Every right element scores, a perfect answer +1. 🤿 Deep dive (3 times each, not while you lead): +2 elements, points ×1.5 if at least half is right, otherwise 0.`,
+abT:`Echo|Ebb|Fireflies|Spot the change|Odd one out`,abS:`Remember the order|Remember the order, you'll give it backwards|Remember the lights in order|Remember the scene|Remember who passes`,
+abA:`In the same order|Backwards: from last to first|The lights, in order|Tap what changed ({v})|Who never passed? ({v})`,abN:`{v} to remember`,
+abSeen:`Memorised! Waiting for the others…`,abWatch:`Watch closely: the deep only shows once`,abClr:`Clear`,abDv:`Deep dive`,abDvD:`+2 elements · ×1.5 if at least {k} of {n} are right, otherwise 0`,
+abDvL:`In the lead: no deep dive`,abDv0:`No deep dives left`,abDvs:`Deep diving: {n}`,abNx:`Next trial`,abAns:`The right answer`,abMine:`Your answer`,
+abPerf:`Perfect!`,abFail:`Dive failed: less than half, 0 this time`,abNone:`no answer`,abTb:`Tied at the top: {n} answered fastest (+1)`,abPf:`perfect rounds`,abDk:`deep dives landed`,
+tu_aby1:`Creatures pass one by one through the deep. Remember them in order: they only pass once.`,
+tu_aby2:`Then everyone answers at the same time, tapping the creatures in order. You can fix it until the end.`,
+tu_aby3:`Each creature in its place scores 1: forgetting one only costs a point. Perfect: +1 more.`,
+tu_aby4:`The trials change: backwards, lights, what changed in a scene, the odd one out that never passed.`,
+tu_aby5:`🤿 Deep dive, a few times per game, only when you're not in the lead: +2 elements, points ×1.5 if at least half is right, otherwise 0.`,
+tu_aby6:`For two: 3 dives each. Whoever leads can't dive, so the duel swings back.`,
+lg_abyP:`{a} forgot almost nothing in the deep`,lg_abyD:`{a} landed two deep dives`,lg_abyC:`{a} climbed from last place to victory in the deep`});
+GAB('es',{n_aby:`Memoria del abismo`,d_aby:`Recordar criaturas y luces, todos a la vez`,
+r_aby:`Criaturas y luces pasan por el abismo: recuérdalas y luego todos responden a la vez. Cada elemento correcto puntúa, sin fallos +1. Las pruebas cambian: al revés, qué ha cambiado, el intruso. 🤿 Inmersión profunda (2 veces, solo si no vas en cabeza): +2 elementos, puntos ×1,5 si aciertas al menos la mitad, si no 0.`,
+r_aby2:`A dos es un duelo de memoria: el abismo muestra y respondéis a la vez. Cada elemento correcto puntúa, sin fallos +1. 🤿 Inmersión profunda (3 veces cada uno, no cuando vas en cabeza): +2 elementos, puntos ×1,5 si aciertas al menos la mitad, si no 0.`,
+abT:`Eco|Resaca|Luciérnagas|El cambio|El intruso`,abS:`Recuerda el orden|Recuerda el orden, lo darás al revés|Recuerda las luces en orden|Recuerda el decorado|Recuerda quién pasa`,
+abA:`En el mismo orden|Al revés: del último al primero|Las luces, en orden|Toca lo que ha cambiado ({v})|¿Quién no ha pasado nunca? ({v})`,abN:`{v} por recordar`,
+abSeen:`¡Memorizado! Esperando a los demás…`,abWatch:`Mira bien: el abismo solo lo muestra una vez`,abClr:`Borrar`,abDv:`Inmersión profunda`,abDvD:`+2 elementos · ×1,5 si aciertas al menos {k} de {n}, si no 0`,
+abDvL:`En cabeza: sin inmersión profunda`,abDv0:`No quedan inmersiones profundas`,abDvs:`En inmersión profunda: {n}`,abNx:`Próxima prueba`,abAns:`La respuesta correcta`,abMine:`Tu respuesta`,
+abPerf:`¡Sin fallos!`,abFail:`Inmersión fallida: menos de la mitad, 0 esta vez`,abNone:`sin respuesta`,abTb:`Empate en cabeza: {n} respondió más rápido (+1)`,abPf:`sin fallos`,abDk:`inmersiones profundas logradas`,
+tu_aby1:`Las criaturas pasan una a una por el abismo. Recuérdalas en orden: solo pasan una vez.`,
+tu_aby2:`Luego todos responden a la vez, tocando las criaturas en orden. Se puede corregir hasta el final.`,
+tu_aby3:`Cada criatura en su sitio da 1: un olvido solo cuesta un punto. Sin fallos: +1 más.`,
+tu_aby4:`Las pruebas cambian: al revés, luces, qué ha cambiado en un decorado, el intruso que nunca pasó.`,
+tu_aby5:`🤿 Inmersión profunda, pocas veces por partida, solo si no vas en cabeza: +2 elementos, puntos ×1,5 si aciertas al menos la mitad, si no 0.`,
+tu_aby6:`A dos: 3 inmersiones cada uno. Quien va en cabeza no puede bajar: el duelo se equilibra.`,
+lg_abyP:`{a} casi no olvidó nada en el abismo`,lg_abyD:`{a} logró dos inmersiones profundas`,lg_abyC:`{a} pasó del último puesto a la victoria en el abismo`});
+GAB('it',{n_aby:`Memoria degli abissi`,d_aby:`Ricordare creature e luci, tutti insieme`,
+r_aby:`Creature e luci passano negli abissi: ricordale, poi tutti rispondono insieme. Ogni elemento giusto vale, senza errori +1. Le prove cambiano: al contrario, cosa è cambiato, l'intruso. 🤿 Immersione profonda (2 volte, solo se non sei in testa): +2 elementi, punti ×1,5 se almeno metà è giusta, altrimenti 0.`,
+r_aby2:`In due è un duello di memoria: l'abisso mostra, rispondete insieme. Ogni elemento giusto vale, senza errori +1. 🤿 Immersione profonda (3 volte a testa, non quando sei in testa): +2 elementi, punti ×1,5 se almeno metà è giusta, altrimenti 0.`,
+abT:`Eco|Risacca|Lucciole|Il cambiamento|L'intruso`,abS:`Ricorda l'ordine|Ricorda l'ordine, lo darai al contrario|Ricorda le luci in ordine|Ricorda la scena|Ricorda chi passa`,
+abA:`Nello stesso ordine|Al contrario: dall'ultimo al primo|Le luci, in ordine|Tocca cosa è cambiato ({v})|Chi non è mai passato? ({v})`,abN:`{v} da ricordare`,
+abSeen:`Memorizzato! Si aspettano gli altri…`,abWatch:`Guarda bene: l'abisso mostra una volta sola`,abClr:`Cancella`,abDv:`Immersione profonda`,abDvD:`+2 elementi · ×1,5 se almeno {k} su {n} sono giusti, altrimenti 0`,
+abDvL:`In testa: niente immersione profonda`,abDv0:`Niente più immersioni profonde`,abDvs:`In immersione profonda: {n}`,abNx:`Prossima prova`,abAns:`La risposta giusta`,abMine:`La tua risposta`,
+abPerf:`Senza errori!`,abFail:`Immersione fallita: meno della metà, 0 stavolta`,abNone:`nessuna risposta`,abTb:`Pari in testa: {n} ha risposto più in fretta (+1)`,abPf:`senza errori`,abDk:`immersioni profonde riuscite`,
+tu_aby1:`Le creature passano una alla volta negli abissi. Ricordale in ordine: passano una volta sola.`,
+tu_aby2:`Poi tutti rispondono insieme, toccando le creature in ordine. Si può correggere fino alla fine.`,
+tu_aby3:`Ogni creatura al suo posto vale 1: una dimenticanza costa solo un punto. Senza errori: +1 in più.`,
+tu_aby4:`Le prove cambiano: al contrario, luci, cosa è cambiato in una scena, l'intruso mai passato.`,
+tu_aby5:`🤿 Immersione profonda, poche volte a partita, solo se non sei in testa: +2 elementi, punti ×1,5 se almeno metà è giusta, altrimenti 0.`,
+tu_aby6:`In due: 3 immersioni a testa. Chi è in testa non può scendere: il duello si riequilibra.`,
+lg_abyP:`{a} non ha dimenticato quasi niente negli abissi`,lg_abyD:`{a} ha completato due immersioni profonde`,lg_abyC:`{a} è {g.a:passato|passata|passato/a} dall'ultimo posto alla vittoria negli abissi`});
+GAB('de',{n_aby:`Gedächtnis der Tiefe`,d_aby:`Wesen und Lichter merken, alle gleichzeitig`,
+r_aby:`Wesen und Lichter ziehen durch die Tiefe: Merk sie dir, dann antworten alle gleichzeitig. Jedes richtige Element zählt, fehlerfrei +1. Die Prüfungen wechseln: rückwärts, was sich verändert hat, der Eindringling. 🤿 Tieftauchen (2-mal, nur wenn du nicht führst): +2 Elemente, Punkte ×1,5, wenn mindestens die Hälfte stimmt, sonst 0.`,
+r_aby2:`Zu zweit ist es ein Gedächtnisduell: Die Tiefe zeigt, ihr antwortet gleichzeitig. Jedes richtige Element zählt, fehlerfrei +1. 🤿 Tieftauchen (je 3-mal, nicht wenn du führst): +2 Elemente, Punkte ×1,5, wenn mindestens die Hälfte stimmt, sonst 0.`,
+abT:`Echo|Ebbe|Glühwürmchen|Die Veränderung|Der Eindringling`,abS:`Merk dir die Reihenfolge|Merk dir die Reihenfolge, du gibst sie rückwärts wieder|Merk dir die Lichter der Reihe nach|Merk dir das Bild|Merk dir, wer vorbeizieht`,
+abA:`In derselben Reihenfolge|Rückwärts: vom letzten zum ersten|Die Lichter, der Reihe nach|Tippe an, was sich verändert hat ({v})|Wer ist nie vorbeigezogen? ({v})`,abN:`{v} zum Merken`,
+abSeen:`Gemerkt! Warten auf die anderen…`,abWatch:`Schau genau hin: Die Tiefe zeigt es nur einmal`,abClr:`Löschen`,abDv:`Tieftauchen`,abDvD:`+2 Elemente · ×1,5, wenn mindestens {k} von {n} stimmen, sonst 0`,
+abDvL:`In Führung: kein Tieftauchen`,abDv0:`Kein Tieftauchen mehr`,abDvs:`Beim Tieftauchen: {n}`,abNx:`Nächste Prüfung`,abAns:`Die richtige Antwort`,abMine:`Deine Antwort`,
+abPerf:`Fehlerfrei!`,abFail:`Tauchgang gescheitert: weniger als die Hälfte, diesmal 0`,abNone:`keine Antwort`,abTb:`Gleichstand an der Spitze: {n} hat am schnellsten geantwortet (+1)`,abPf:`fehlerfreie Runden`,abDk:`gelungene Tieftauchgänge`,
+tu_aby1:`Wesen ziehen eins nach dem anderen durch die Tiefe. Merk sie dir der Reihe nach: Sie kommen nur einmal.`,
+tu_aby2:`Dann antworten alle gleichzeitig und tippen die Wesen der Reihe nach an. Korrigieren geht bis zum Schluss.`,
+tu_aby3:`Jedes Wesen am richtigen Platz bringt 1: Ein vergessenes kostet nur einen Punkt. Fehlerfrei: +1 dazu.`,
+tu_aby4:`Die Prüfungen wechseln: rückwärts, Lichter, was sich in einem Bild verändert hat, der Eindringling, der nie vorbeikam.`,
+tu_aby5:`🤿 Tieftauchen, ein paarmal pro Partie, nur wenn du nicht führst: +2 Elemente, Punkte ×1,5, wenn mindestens die Hälfte stimmt, sonst 0.`,
+tu_aby6:`Zu zweit: je 3 Tauchgänge. Wer führt, darf nicht tauchen: So holt man im Duell auf.`,
+lg_abyP:`{a} hat in der Tiefe fast nichts vergessen`,lg_abyD:`{a} hat zwei Tieftauchgänge geschafft`,lg_abyC:`{a} ist in der Tiefe vom letzten Platz bis zum Sieg aufgestiegen`});
+GAB('ru',{n_aby:`Память бездны`,d_aby:`Запоминать существ и огни, все одновременно`,
+r_aby:`Через бездну проплывают существа и огни: запомни их, потом все отвечают одновременно. Каждый верный элемент приносит очко, без ошибок +1. Испытания меняются: задом наперёд, что изменилось, лишний. 🤿 Глубокое погружение (2 раза, только если ты не впереди): +2 элемента, очки ×1,5, если верна хотя бы половина, иначе 0.`,
+r_aby2:`Вдвоём — дуэль памяти: бездна показывает, вы отвечаете одновременно. Каждый верный элемент приносит очко, без ошибок +1. 🤿 Глубокое погружение (по 3 раза, но не когда ты впереди): +2 элемента, очки ×1,5, если верна хотя бы половина, иначе 0.`,
+abT:`Эхо|Отлив|Светлячки|Что изменилось|Лишний`,abS:`Запомни порядок|Запомни порядок, ответишь задом наперёд|Запомни огни по порядку|Запомни картину|Запомни, кто проплывает`,
+abA:`В том же порядке|Задом наперёд: с последнего до первого|Огни, по порядку|Отметь, что изменилось ({v})|Кто ни разу не проплывал? ({v})`,abN:`запомнить: {v}`,
+abSeen:`Запомнено! Ждём остальных…`,abWatch:`Смотри внимательно: бездна показывает только раз`,abClr:`Стереть`,abDv:`Глубокое погружение`,abDvD:`+2 элемента · ×1,5, если верны хотя бы {k} из {n}, иначе 0`,
+abDvL:`Ты впереди: без глубокого погружения`,abDv0:`Глубоких погружений больше нет`,abDvs:`В глубоком погружении: {n}`,abNx:`Следующее испытание`,abAns:`Правильный ответ`,abMine:`Твой ответ`,
+abPerf:`Без ошибок!`,abFail:`Погружение не удалось: меньше половины, в этот раз 0`,abNone:`нет ответа`,abTb:`Ничья на первом месте: {n} {g.n:ответил|ответила|ответил(а)} быстрее (+1)`,abPf:`без ошибок`,abDk:`удачные погружения`,
+tu_aby1:`Существа проплывают через бездну по одному. Запомни их по порядку: они проплывают только раз.`,
+tu_aby2:`Потом все отвечают одновременно, нажимая на существ по порядку. Исправлять можно до самого конца.`,
+tu_aby3:`Каждое существо на своём месте приносит 1: забытое стоит лишь одного очка. Без ошибок: ещё +1.`,
+tu_aby4:`Испытания меняются: задом наперёд, огни, что изменилось в картине, лишний, который не проплывал.`,
+tu_aby5:`🤿 Глубокое погружение, несколько раз за игру и только если ты не впереди: +2 элемента, очки ×1,5, если верна хотя бы половина, иначе 0.`,
+tu_aby6:`Вдвоём: по 3 погружения. Лидер нырять не может, поэтому дуэль выравнивается.`,
+lg_abyP:`{a} почти ничего не {g.a:забыл|забыла|забыл(а)} в бездне`,lg_abyD:`{a} {g.a:совершил|совершила|совершил(а)} два удачных глубоких погружения`,lg_abyC:`{a} {g.a:поднялся|поднялась|поднялся(ась)} с последнего места до победы в бездне`});
+GAB('zh',{n_aby:`深渊记忆`,d_aby:`记住生物和光点，大家同时作答`,
+r_aby:`生物和光点在深渊中依次出现：记住它们，然后大家同时作答。每个正确的元素都得分，全对 +1。挑战会变化：倒序、哪里变了、找出闯入者。🤿 深潜（2 次，仅在未领先时可用）：+2 个元素，至少对一半则得分 ×1.5，否则 0。`,
+r_aby2:`两人对局是一场记忆对决：深渊展示，你们同时作答。每个正确的元素都得分，全对 +1。🤿 深潜（每人 3 次，领先时不可用）：+2 个元素，至少对一半则得分 ×1.5，否则 0。`,
+abT:`回声|退潮|萤火|哪里变了|闯入者`,abS:`记住顺序|记住顺序，之后倒着答|按顺序记住光点|记住画面|记住谁游过`,
+abA:`按相同顺序|倒序：从最后一个到第一个|光点，按顺序|点出变化的格子（{v}）|谁从没出现过？（{v}）`,abN:`要记 {v} 个`,
+abSeen:`记住了！等待其他人……`,abWatch:`看仔细：深渊只展示一次`,abClr:`清除`,abDv:`深潜`,abDvD:`+2 个元素 · 至少对 {k}/{n} 则 ×1.5，否则 0`,
+abDvL:`领先中：不能深潜`,abDv0:`深潜次数已用完`,abDvs:`正在深潜：{n}`,abNx:`下一项挑战`,abAns:`正确答案`,abMine:`你的答案`,
+abPerf:`全对！`,abFail:`深潜失败：不到一半，这次 0 分`,abNone:`没有作答`,abTb:`并列第一：{n} 答得最快（+1）`,abPf:`全对轮数`,abDk:`成功深潜`,
+tu_aby1:`生物在深渊中一个接一个游过。按顺序记住它们：只出现一次。`,
+tu_aby2:`然后大家同时作答，按顺序点选生物。结束前都可以修改。`,
+tu_aby3:`每个位置正确的生物得 1 分：忘了一个只扣一分。全对：再 +1。`,
+tu_aby4:`挑战会变化：倒序、光点、画面里哪里变了、从没出现过的闯入者。`,
+tu_aby5:`🤿 深潜，每局几次，仅在未领先时可用：+2 个元素，至少对一半则得分 ×1.5，否则 0。`,
+tu_aby6:`两人对局：每人 3 次深潜。领先者不能深潜，对决因此此消彼长。`,
+lg_abyP:`{a} 在深渊里几乎什么都没忘`,lg_abyD:`{a} 成功完成了两次深潜`,lg_abyC:`{a} 在深渊里从最后一名逆袭夺冠`});
+GAB('he',{n_aby:`זיכרון המעמקים`,d_aby:`לזכור יצורים ואורות, כולם בבת אחת`,
+r_aby:`יצורים ואורות חולפים במעמקים: {g:זכור|זכרי|לזכור} אותם, ואז כולם עונים בו־זמנית. כל פריט נכון מזכה, בלי טעויות +1. המשימות משתנות: הפוך, מה השתנה, הזר. 🤿 צלילה עמוקה (פעמיים, רק למי שלא מוביל): +2 פריטים, נקודות ×1.5 אם לפחות חצי נכון, אחרת 0.`,
+r_aby2:`בשניים זה דו־קרב זיכרון: המעמקים מראים, ושניכם עונים בו־זמנית. כל פריט נכון מזכה, בלי טעויות +1. 🤿 צלילה עמוקה (3 פעמים לכל אחד, לא למי שמוביל): +2 פריטים, נקודות ×1.5 אם לפחות חצי נכון, אחרת 0.`,
+abT:`הד|שפל|גחליליות|מה השתנה|הזר`,abS:`{g:זכור|זכרי|לזכור} את הסדר|{g:זכור|זכרי|לזכור} את הסדר, התשובה הפוכה|{g:זכור|זכרי|לזכור} את האורות לפי הסדר|{g:זכור|זכרי|לזכור} את התמונה|{g:זכור|זכרי|לזכור} מי חולף`,
+abA:`באותו סדר|הפוך: מהאחרון לראשון|האורות, לפי הסדר|{g:גע|געי|לגעת} במה שהשתנה ({v})|מי אף פעם לא חלף? ({v})`,abN:`{v} לזכור`,
+abSeen:`בזיכרון! מחכים לאחרים…`,abWatch:`{g:הסתכל|הסתכלי|להסתכל} היטב: המעמקים מראים רק פעם אחת`,abClr:`מחיקה`,abDv:`צלילה עמוקה`,abDvD:`+2 פריטים · ×1.5 אם לפחות {k} מתוך {n} נכונים, אחרת 0`,
+abDvL:`{g:מוביל|מובילה|מוביל/ה}: אין צלילה עמוקה`,abDv0:`לא נשארו צלילות עמוקות`,abDvs:`בצלילה עמוקה: {n}`,abNx:`המשימה הבאה`,abAns:`התשובה הנכונה`,abMine:`התשובה שלך`,
+abPerf:`בלי טעויות!`,abFail:`הצלילה נכשלה: פחות מחצי, הפעם 0`,abNone:`אין תשובה`,abTb:`תיקו בראש: {n} {g.n:ענה|ענתה|ענה/תה} הכי מהר (+1)`,abPf:`סבבים בלי טעויות`,abDk:`צלילות עמוקות מוצלחות`,
+tu_aby1:`יצורים חולפים אחד אחד במעמקים. {g:זכור|זכרי|לזכור} אותם לפי הסדר: הם חולפים רק פעם אחת.`,
+tu_aby2:`ואז כולם עונים בו־זמנית ונוגעים ביצורים לפי הסדר. אפשר לתקן עד הסוף.`,
+tu_aby3:`כל יצור במקומו מזכה ב־1: שכחה עולה רק נקודה. בלי טעויות: עוד +1.`,
+tu_aby4:`המשימות משתנות: הפוך, אורות, מה השתנה בתמונה, הזר שאף פעם לא חלף.`,
+tu_aby5:`🤿 צלילה עמוקה, כמה פעמים במשחק ורק למי שלא מוביל: +2 פריטים, נקודות ×1.5 אם לפחות חצי נכון, אחרת 0.`,
+tu_aby6:`בשניים: 3 צלילות לכל אחד. מי שמוביל לא יכול לצלול, כך הדו־קרב מתאזן.`,
+lg_abyP:`{a} כמעט לא {g.a:שכח|שכחה|שכח/ה} כלום במעמקים`,lg_abyD:`{a} {g.a:הצליח|הצליחה|הצליח/ה} בשתי צלילות עמוקות`,lg_abyC:`{a} {g.a:טיפס|טיפסה|טיפס/ה} מהמקום האחרון עד הניצחון במעמקים`});
+GAB('pt',{n_aby:`Memória do abismo`,d_aby:`Lembrar criaturas e luzes, todos ao mesmo tempo`,
+r_aby:`Criaturas e luzes passam pelo abismo: memorize-as e depois todos respondem ao mesmo tempo. Cada elemento certo pontua, sem erros +1. As provas mudam: ao contrário, o que mudou, o intruso. 🤿 Mergulho profundo (2 vezes, só se você não estiver na frente): +2 elementos, pontos ×1,5 se acertar pelo menos metade, senão 0.`,
+r_aby2:`A dois é um duelo de memória: o abismo mostra e vocês respondem ao mesmo tempo. Cada elemento certo pontua, sem erros +1. 🤿 Mergulho profundo (3 vezes cada, não quando você lidera): +2 elementos, pontos ×1,5 se acertar pelo menos metade, senão 0.`,
+abT:`Eco|Refluxo|Vaga-lumes|A mudança|O intruso`,abS:`Memorize a ordem|Memorize a ordem, você vai dar ao contrário|Memorize as luzes em ordem|Memorize o cenário|Memorize quem passa`,
+abA:`Na mesma ordem|Ao contrário: do último ao primeiro|As luzes, em ordem|Toque no que mudou ({v})|Quem nunca passou? ({v})`,abN:`{v} para lembrar`,
+abSeen:`Memorizado! Esperando os outros…`,abWatch:`Olhe bem: o abismo só mostra uma vez`,abClr:`Apagar`,abDv:`Mergulho profundo`,abDvD:`+2 elementos · ×1,5 se acertar pelo menos {k} de {n}, senão 0`,
+abDvL:`Na liderança: sem mergulho profundo`,abDv0:`Sem mergulhos profundos restantes`,abDvs:`Em mergulho profundo: {n}`,abNx:`Próxima prova`,abAns:`A resposta certa`,abMine:`Sua resposta`,
+abPerf:`Sem erros!`,abFail:`Mergulho falhou: menos da metade, 0 desta vez`,abNone:`sem resposta`,abTb:`Empate na liderança: {n} respondeu mais rápido (+1)`,abPf:`rodadas sem erros`,abDk:`mergulhos profundos certeiros`,
+tu_aby1:`As criaturas passam uma a uma pelo abismo. Memorize-as em ordem: elas só passam uma vez.`,
+tu_aby2:`Depois todos respondem ao mesmo tempo, tocando as criaturas em ordem. Dá para corrigir até o fim.`,
+tu_aby3:`Cada criatura no lugar certo vale 1: um esquecimento custa só um ponto. Sem erros: +1 a mais.`,
+tu_aby4:`As provas mudam: ao contrário, luzes, o que mudou num cenário, o intruso que nunca passou.`,
+tu_aby5:`🤿 Mergulho profundo, poucas vezes por partida, só se você não estiver na liderança: +2 elementos, pontos ×1,5 se acertar pelo menos metade, senão 0.`,
+tu_aby6:`A dois: 3 mergulhos cada. Quem lidera não pode mergulhar: o duelo se equilibra.`,
+lg_abyP:`{a} quase não esqueceu nada no abismo`,lg_abyD:`{a} acertou dois mergulhos profundos`,lg_abyC:`{a} foi do último lugar à vitória no abismo`});
+/* /🫧 i18n */
 })();
