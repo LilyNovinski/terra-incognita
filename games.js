@@ -78,7 +78,13 @@ const gWt=s=>s.order.filter(n=>{const p=P(n);if(!p)return false;if(p.online!==fa
 /* spectateurs 👀 : au salon, chacun peut choisir de regarder (s.gspec) ; en partie, toute personne hors s.order regarde
    (arrivée en cours de partie → elle joue à la suivante). gPl = qui jouera la prochaine partie. */
 const gPl=s=>s.players.filter(p=>p.online&&!(s.gspec||[]).includes(p.name)).map(p=>p.name);
-W.GSpec=(s,n)=>!!(s&&P(n)&&(s.phase=='game'||s.phase=='gend'?s.order&&!s.order.includes(n):s.phase=='lobby'&&s.gsel&&(s.gspec||[]).includes(n)));
+/* 👀 à tout moment : en pleine partie, « Regarder » sort de s.order (comme une exclusion, sans quitter la salle) ; les points
+   sont gardés, figés (g.xs), hors classement. « Revenir jouer » : à la prochaine manche si le jeu le permet (G.join : il
+   appelle gJn() en début de manche, s.gjoin = file d'attente), sinon à la partie suivante. Expédition : voir act('watch'). */
+const GEXA=W.GEXA=['map','question','judge','reveal','name','landed','pfiche'];/* étapes actives de l'Expédition */
+W.GSpec=(s,n)=>!!(s&&P(n)&&(s.phase=='game'||s.phase=='gend'||GEXA.includes(s.phase)?s.order&&!s.order.includes(n):s.phase=='lobby'&&s.gsel&&(s.gspec||[]).includes(n)));
+function gJn(s){const g=s.game,G=GAMES[g.id],J=s.gjoin||[];s.gjoin=[];
+ J.forEach(n=>{const p=P(n);if(!p||p.online===false||s.order.includes(n)||s.order.length>=G.max)return;s.order.push(n);g.sc[n]=g.xs&&g.xs[n]!=null?g.xs[n]:0;if(g.xs)delete g.xs[n]})}
 /* scores toujours propres : nombre fini, arrondi au dixième, 0 pour qui n'en a pas */
 const gNum=v=>{v=+v;return isFinite(v)?Math.round(v*10)/10:0};
 function gScl(s){const g=s.game;if(!g)return;g.sc=g.sc||{};s.order.forEach(n=>g.sc[n]=gNum(g.sc[n]))}
@@ -89,10 +95,10 @@ function gWait(g,sec,st,rv){const f=gTF();sec=Math.round(sec*(f||1));g.st=st;g.k
 const gLate=g=>g.dl>0&&Date.now()>g.dl;
 const gNeed=s=>{const g=s.game;return gWt(s).filter(n=>!g.need||g.need.includes(n))};
 const gAll=s=>gNeed(s).every(n=>s.game.done[n]);
-function gFin(s){const g=s.game;gScl(s);const r=GAMES[g.id].fin(s)||{},rp=r.pts||g.sc,pts={};s.order.forEach(n=>pts[n]=gNum(rp[n]));s.gres={pts,coop:r.coop?{...r.coop,v:gNum(r.coop.v),max:gNum(r.coop.max)}:null};g.dl=0;s.phase='gend';if(g.over)try{gLogGame(s,r)}catch(e){}}
+function gFin(s){const g=s.game;gScl(s);const r=GAMES[g.id].fin(s)||{},rp=r.pts||g.sc,pts={};s.order.forEach(n=>pts[n]=gNum(rp[n]));const xs={};for(const n in g.xs||{})if(P(n)&&!s.order.includes(n))xs[n]=gNum(g.xs[n]);s.gres={pts,xs,coop:r.coop?{...r.coop,v:gNum(r.coop.v),max:gNum(r.coop.max)}:null};g.dl=0;s.phase='gend';if(g.over)try{gLogGame(s,r)}catch(e){}}
 function gCheck(s){const g=s.game;let i=0;
  while(s.phase=='game'&&g.dl&&(gAll(s)||gLate(g))&&i++<6){g.dl=0;GAMES[g.id].next(s);gScl(s);if(g.over){gFin(s);break}}}
-function gStart(s){const id=s.gsel;gPlayAdd(s,id);s.game={id,k:0,r:0,n:0,sc:{},done:{},rx:{}};s.order.forEach(n=>s.game.sc[n]=0);s.gres=null;s.phase='game';s.gid=Date.now().toString(36);GAMES[id].init(s);
+function gStart(s){const id=s.gsel;gPlayAdd(s,id);s.game={id,k:0,r:0,n:0,sc:{},done:{},rx:{}};s.gjoin=[];s.order.forEach(n=>s.game.sc[n]=0);s.gres=null;s.phase='game';s.gid=Date.now().toString(36);GAMES[id].init(s);
  /* 📜 clin d'œil : le dernier temps fort de CE jeu entre ces personnes, en tête de la 1re étape (sauf si Le Phare en pose déjà un) */
  try{const g=s.game,e=!g.lq&&typeof localStorage!='undefined'&&gLogFor(s.order).find(e=>e.g==id);if(e)g.nod={k:e.k,n:e.n}}catch(e){}gCheck(s)}
 /* @games : appelé en tête de act() ; true = géré ici */
@@ -108,6 +114,9 @@ W.GAct=function(s,from,a){const t=a&&a.t;
  /* 🔞 options propres à un jeu (G.opts), réglées par l'hôte au salon */
  if(t=='gopt'){const G=GAMES[s.gsel];if(from==s.host&&s.phase=='lobby'&&G&&(G.opts||[]).includes(a.k)){s.gopt={...(s.gopt||{}),[a.k]:!!a.v};bump()}return true}
  if(t=='gspec'){if(s.phase=='lobby'&&P(from)){const L=(s.gspec||[]).filter(n=>n!=from&&P(n));s.gspec=a.v?[...L,from]:L;bump()}return true}
+ if(t=='watch'&&(s.phase=='game'||s.phase=='gend')){if(s.game&&P(from)){const g=s.game,G=GAMES[g.id],L=(s.gspec||[]).filter(n=>n!=from&&P(n)),J=(s.gjoin||[]).filter(n=>n!=from);
+   if(a.v){s.gspec=[...L,from];s.gjoin=J;if(s.phase=='game'&&s.order.includes(from)){(g.xs=g.xs||{})[from]=gNum(g.sc[from]);W.GKick(s,from)}}
+   else{s.gspec=L;s.gjoin=s.phase=='game'&&!s.order.includes(from)&&G.join?[...J,from]:J}bump()}return true}
  if(t=='gtie'){/* liens connus (couples…) : n'importe qui peut lier deux personnes ; seul·es les autres peuvent délier */
   if(s.phase=='lobby'&&s.players.some(p=>p.name==from)&&Array.isArray(a.v)&&a.v.length==2&&a.v[0]!==a.v[1]&&a.v.every(n=>typeof n=='string'&&s.players.some(p=>p.name==n))){
    const k=a.v[0]<a.v[1]?a.v[0]+'|'+a.v[1]:a.v[1]+'|'+a.v[0],L=s.gtie||[];if(L.includes(k)){if(a.v.includes(from))return true;s.gtie=L.filter(x=>x!=k)}else s.gtie=[...L,k].slice(-8);bump()}return true}
@@ -125,8 +134,19 @@ W.GAct=function(s,from,a){const t=a&&a.t;
    const was=g.done[from];if(was&&!g.rv)delete g.done[from];ch=!!GAMES[g.id].act(s,from,a);if(!ch&&was)g.done[from]=was;if(ch&&g.edt)delete g.edt[from]}
   if(ch){gCheck(s);bump()}return true}
  return false};
-W.GHide=function(name,s){if(!s||s.phase!='game'||!s.game)return s;const G=GAMES[s.game.id];return G&&G.hide?{...s,game:G.hide(s.game,name,s)}:s};
-W.GKick=function(s,name){s.order=s.order.filter(x=>x!=name);if(s.phase!='game'||!s.game)return;if(s.order.length<2)gFin(s);else gCheck(s)};
+W.GHide=function(name,s){if(!s||s.phase!='game'||!s.game)return s;const G=GAMES[s.game.id];let gm=G&&G.hide?G.hide(s.game,name,s):s.game;
+ if(gm.xs)gm={...gm,xs:gm.xs[name]!=null?{[name]:gm.xs[name]}:{}};/* points figés : chacun ne voit que les siens (scores parfois secrets) */return gm===s.game?s:{...s,game:gm}};
+/* sortie de l'ordre de jeu (exclusion, ou passage spectateur) : sous le minimum du jeu, la partie se termine proprement */
+W.GKick=function(s,name){s.order=s.order.filter(x=>x!=name);s.gjoin=(s.gjoin||[]).filter(x=>x!=name);if(s.phase!='game'||!s.game)return;if(s.order.length<Math.max(2,GAMES[s.game.id].min||2))gFin(s);else gCheck(s)};
+/* 👀 bouton « Regarder / Revenir jouer » (barre du haut, ligne spectateur) : état de la personne et confirmation */
+W.GWatchSt=()=>{try{if(!st||!me)return null;const n=me.name,ex=GEXA.includes(st.phase),gm=(st.phase=='game'||st.phase=='gend')&&st.game&&GAMES[st.game.id];if(!ex&&!gm)return null;
+ if(st.order.includes(n)&&!(gm&&st.phase=='gend'&&(st.gspec||[]).includes(n)))return 'on';if(ex)return 'off';return (st.gspec||[]).includes(n)?'off':'q'}catch(e){return null}};
+W.GWatch=function(v){const s=st,n=me.name;if(!v){send({t:'watch',v:0});return}
+ if(GEXA.includes(s.phase)){const L=s.order.length-1;ask(GT('wAskX')+(L<2?' '+GT('wEnd',{n:L}):''),'👀 '+GT('wBtn')).then(ok=>ok&&send({t:'watch',v:1}));return}
+ if(s.phase!='game'||!s.order.includes(n)){send({t:'watch',v:1});return}
+ const G=GAMES[s.game.id],L=s.order.length-1,end=L<Math.max(2,G.min||2);
+ ask(GT('wAsk')+' '+(end?GT('wEnd',{n:L}):GT(G.join?'wNx':'wNg')),'👀 '+GT('wBtn')).then(ok=>ok&&send({t:'watch',v:1}))};
+if(typeof document!='undefined')document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-watch]');if(b){e.preventDefault();W.GWatch(b.dataset.watch=='1')}});
 W.gTick=function(){try{if(isHost&&st&&st.phase=='game'&&st.game&&st.game.dl&&(gLate(st.game)||gAll(st))){gCheck(st);bump()}}catch(e){}};
 if(typeof setInterval!='undefined'&&typeof document!='undefined')setInterval(W.gTick,1000);
 
@@ -204,7 +224,8 @@ W.GView=function(){const s=isHost?GHide(meN(),st):st,g=s.game;if(!g||!GAMES[g.id
  const rem=gRem(s);
  const rk='r_'+g.id+(two&&GI18N.fr.ui['r_'+g.id+'2']?'2':'');
  const head=`<div class="ghd"><span class="gic">${G.icon}</span><b>${GT('n_'+g.id)}</b>${g.n?`<span class="grd">${Math.min(g.r+1,g.n)} / ${g.n}</span>`:''}${meN()==s.host?`<button class="gstop" id="gstop" aria-label="${esc(GT('stopAsk'))}" data-tip="${esc(GT('stopAsk'))}">✕</button>`:''}</div>
- ${spc?`<p class="gspc0">👀 ${GT((s.gspec||[]).includes(meN())?'specT2':'specT')}</p>`:''}${g.dl>0&&!(G.clk&&G.clk(g))?`<div class="gsab" data-gan aria-hidden="true"><i style="animation-duration:${g.sec}s;animation-delay:-${Math.max(0,g.sec-rem).toFixed(2)}s"></i></div>`:''}
+ ${spc?(()=>{const n=meN(),q=(s.gjoin||[]).includes(n),w=(s.gspec||[]).includes(n),xv=(g.xs||{})[n];
+  return `<p class="gspc0">👀 ${GT(q?'specJ':w?'specT2':'specT')}${xv!=null?` <span class="gxsv">· ${GT('specP',{v:`<b dir="ltr">${xv}</b>`})}</span>`:''} <button class="ghost gwb" data-watch="${w?0:1}">${w?'🎮 '+GT('wOff'):'👀 '+GT('wQ')}</button></p>`})():''}${g.dl>0&&!(G.clk&&G.clk(g))?`<div class="gsab" data-gan aria-hidden="true"><i style="animation-duration:${g.sec}s;animation-delay:-${Math.max(0,g.sec-rem).toFixed(2)}s"></i></div>`:''}
  ${g.k<=1?`<p class="grule">${GT(rk)}</p>${g.nod?`<p class="gnod ga" ${dl(2)}>📜 ${GT('lgLast',{t:gLogT({g:g.id,...g.nod})})}</p>`:''}`:''}`;
  const h={...gHint(s),...v};const ob=v.bind;
  if(spc){delete h.hintBtn;h.mine=false}
@@ -215,7 +236,8 @@ W.GView=function(){const s=isHost?GHide(meN(),st):st,g=s.game;if(!g||!GAMES[g.id
 
 function gEndView(s){const g=s.game,G=GAMES[g.id],R=s.gres||{pts:{}},host=meN()==s.host,two=s.order.length==2;
  const rows=Object.entries(R.pts).sort((a,b)=>b[1]-a[1]);let rank=0,prev=null;
- const list=R.coop?'':`<div class="gsc">${rows.map(([n,p],i)=>{if(p!==prev){rank=i;prev=p}return `<div class="grow ga ${n==meN()?'me':''}" ${dl(i,.1)}><span class="gmd">${gMedal(rank)}</span>${DT(n)}<span class="gnm">${NM(n)}</span><b class="gpt">${p}</b></div>`}).join('')}</div>`;
+ const XS=Object.entries(R.xs||{});
+ const list=R.coop?'':`<div class="gsc">${rows.map(([n,p],i)=>{if(p!==prev){rank=i;prev=p}return `<div class="grow ga ${n==meN()?'me':''}" ${dl(i,.1)}><span class="gmd">${gMedal(rank)}</span>${DT(n)}<span class="gnm">${NM(n)}</span><b class="gpt">${p}</b></div>`}).join('')}${XS.map(([n,p],i)=>`<div class="grow ga gxo ${n==meN()?'me':''}" ${dl(rows.length+i,.1)} title="${esc(GT('specFz'))}"><span class="gmd" aria-label="${esc(GT('specFz'))}">👀</span>${DT(n)}<span class="gnm">${NM(n)}</span><b class="gpt">${p}</b></div>`).join('')}</div>`;
  const html=`<div class="gw g-${g.id}"><div class="ghd"><span class="gic">${G.icon}</span><b>${GT('n_'+g.id)}</b></div>
  <div class="card"><h3>${GT(R.coop?(GI18N.fr.ui['coop_'+g.id]?'coop_'+g.id:'coopT'):'scores')}</h3>${list}${G.endView?G.endView(s):''}</div>
  ${host?`<div class="gbtns"><button class="pri wide" data-gend="again">${GT('again')}</button><button class="ghost wide" data-gend="lobby">${GT('lobby')}</button></div>`:''}${gRxBar()}</div>`;
@@ -641,9 +663,9 @@ GAMES.arc={icon:'🏝️',min:2,max:8,dur:12,tags:['skill'],T:arcT,V:arcV,gd:arc
 const MKE=['🐙','🪼','🐡','🦀','🐢','🦑','🐠','🦞','🐬','🦭'];
 const mkPair=(a,b)=>a<b?a+'|'+b:b+'|'+a;
 const mkPay=(c1,c2,k)=>c1=='P'&&c2=='P'?(k==0?4:k==1?3:2):c1=='G'&&c2=='P'?4:c1=='P'?1:2;/* 1re rencontre 4, puis 3, puis 2 (habitude) */
-GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,ties:true,MKE,pay:mkPay,nbf:k=>2*(k-1),POT:16,BET:4,TIEP:0,SHK:4,MKC:1,
+GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,ties:true,join:1,MKE,pay:mkPay,nbf:k=>2*(k-1),POT:16,BET:4,TIEP:0,SHK:4,MKC:1,
  init(s){const g=s.game;g.n=4+Math.floor(Math.random()*3);g.r=0;g.pc={};g.mt={};g.net={};g.h=[];g.pub=[];g.q=gPool(s,'msk',6);g.tie=(s.gtie||[]).filter(k=>k.split('|').every(p=>s.order.includes(p)));this.round(s)},
- round(s){const g=s.game,on=s.order;let best=null,bv=1e9;
+ round(s){gJn(s);/* 👀 qui revient jouer entre ici */const g=s.game,on=s.order;let best=null,bv=1e9;
   for(let t=0;t<40;t++){const o=shuf(on),gr=[];for(let i=0;i+1<o.length;i+=2)gr.push([o[i],o[i+1]]);if(o.length%2)gr[gr.length-1].push(o[o.length-1]);
    let v=0;gr.forEach(x=>{for(let i=0;i<x.length;i++)for(let j=i+1;j<x.length;j++){const k=mkPair(x[i],x[j]);v+=(g.mt[k]||0)**2+(g.tie.includes(k)?this.TIEP:0)}});v+=Math.random()*.1;if(v<bv){bv=v;best=gr}}
   g.grp=best;g.mk={};const ms=shuf(MKE.map((x,i)=>i));on.forEach((p,i)=>g.mk[p]=ms[i]);g.msg={};g.ch={};g.gain={};g.nb={};g.hab={};g.tm={};gWait(g,75,'m')},
@@ -659,33 +681,39 @@ GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,ties:true,MK
   if(g.st=='r'){g.r++;if(g.r<g.n){this.round(s);return}this.final(s);return}
   if(g.st=='f'){this.fres(s);gWait(g,25,'F',1);return}
   if(g.st=='F'){g.over=1}},
- resolve(s){const g=s.game,ch={},rec={grp:g.grp.map(x=>[...x]),mk:{...g.mk},ch:{},msg:{...g.msg},gain:{}},pub=[];
+ resolve(s){const g=s.game,ch={},on=new Set(s.order)/* parti·e (spectateur, exclu·e) en cours de manche : ni choix ni points */,rec={grp:g.grp.map(x=>x.filter(p=>on.has(p))),mk:{...g.mk},ch:{},msg:{...g.msg},gain:{}},pub=[];
   const C=(a,b)=>(g.ch[a]||{})[b]||'G';const tr={},tie=g.tie||[];g.tr=g.tr||{};
   /* lien connu (déclaré par l'hôte) : leur face-à-face vaut la moyenne des autres face-à-face de la manche, et leur lien
      ne compte que si la majorité des autres duos a partagé → se connaître ne rapporte ni plus ni moins */
-  let fs=0,fn=0,pp=0,pn=0;g.grp.forEach(x=>{for(let i=0;i<x.length;i++)for(let j=i+1;j<x.length;j++){const a=x[i],b=x[j],k=mkPair(a,b);if(tie.includes(k))continue;
+  let fs=0,fn=0,pp=0,pn=0;g.grp.forEach(x=>{for(let i=0;i<x.length;i++)for(let j=i+1;j<x.length;j++){const a=x[i],b=x[j],k=mkPair(a,b);if(tie.includes(k)||!on.has(a)||!on.has(b))continue;
    const pc=g.pc[k]||0,ca=C(a,b),cb=C(b,a);fs+=this.pay(ca,cb,pc)+this.pay(cb,ca,pc);fn+=2;pn++;if(ca=='P'&&cb=='P')pp++}});
-  const avg=fn?fs/fn:3,link=pn?pp*2>=pn:true;
+  const avg=fn?fs/fn:3,link=pn?pp*2>=pn:true,du=g.du={};/* du[a][b] : le face-à-face vu par a (révélation lisible) */
+  const D=(a,b,o)=>{(du[a]=du[a]||{})[b]=o};
   g.grp.forEach(x=>{const tot={},nb={};x.forEach(p=>{tot[p]=0;nb[p]=0});
    for(let i=0;i<x.length;i++)for(let j=i+1;j<x.length;j++){const a=x[i],b=x[j],k=mkPair(a,b),pc=g.pc[k]||0;
-    if(tie.includes(k)){tot[a]+=avg;tot[b]+=avg;g.tm[a]=g.tm[b]=1;if(link&&!g.mt[k])[a,b].forEach(p=>{g.net[p]=(g.net[p]||0)+1;nb[p]+=this.nbf(g.net[p],s.order.length)});g.mt[k]=(g.mt[k]||0)+1;continue}
-    const ca=C(a,b),cb=C(b,a);tot[a]+=this.pay(ca,cb,pc);tot[b]+=this.pay(cb,ca,pc);
-    if(ca!=cb){const t=ca=='G'?a:b,u=t==a?b:a;if(!g.tr[u])tr[t]=1}/* garder face à un 🦈 ne marque pas */
-    if(ca=='P'&&cb=='P'){if(pc)g.hab[a]=g.hab[b]=1;g.pc[k]=pc+1;if(!pc)[a,b].forEach(p=>{g.net[p]=(g.net[p]||0)+1;nb[p]+=this.nbf(g.net[p],s.order.length)})}g.mt[k]=(g.mt[k]||0)+1}
-   x.forEach(p=>{const v=Math.round((tot[p]/(x.length-1)+nb[p])*2)/2;g.gain[p]=v;g.nb[p]=nb[p];g.sc[p]+=v;rec.gain[p]=v;const m={};x.forEach(q=>{if(q!=p)m[q]=C(p,q)});rec.ch[p]=m;const mv=Object.values(m);ch[p]=mv.every(c=>c=='P')?'P':mv.every(c=>c=='G')?'G':'M'});
-   pub.push(shuf(x).map(p=>[g.mk[p],ch[p],g.gain[p]]))});
+    if(!on.has(a)||!on.has(b)){const v=Math.round(avg*10)/10;/* masque parti : ce face-à-face vaut la moyenne de la manche */
+     if(on.has(a)){tot[a]+=avg;D(a,b,{t:2,v})}if(on.has(b)){tot[b]+=avg;D(b,a,{t:2,v})}continue}
+    if(tie.includes(k)){tot[a]+=avg;tot[b]+=avg;g.tm[a]=g.tm[b]=1;const v=Math.round(avg*10)/10;D(a,b,{t:1,v});D(b,a,{t:1,v});
+     if(link&&!g.mt[k])[a,b].forEach(p=>{g.net[p]=(g.net[p]||0)+1;const w=this.nbf(g.net[p],s.order.length);nb[p]+=w;Object.assign(du[p][p==a?b:a],{nk:g.net[p],nw:w})});g.mt[k]=(g.mt[k]||0)+1;continue}
+    const ca=C(a,b),cb=C(b,a),va=this.pay(ca,cb,pc),vb=this.pay(cb,ca,pc);tot[a]+=va;tot[b]+=vb;
+    const hb=ca=='P'&&cb=='P'&&pc?1:0;D(a,b,{m:ca,o:cb,v:va,w:vb,h:hb});D(b,a,{m:cb,o:ca,v:vb,w:va,h:hb});
+    if(ca!=cb){const t=ca=='G'?a:b,u=t==a?b:a;if(!g.tr[u])tr[t]=1;/* garder face à un 🦈 ne marque pas */
+     du[t][u].s=g.tr[u]?'x':'m';du[u][t].s=g.tr[u]?'X':'M'}/* m : je prends un 🦈 · x : excusé (l'autre en portait un) · M/X : idem pour l'autre */
+    if(ca=='P'&&cb=='P'){if(pc)g.hab[a]=g.hab[b]=1;g.pc[k]=pc+1;if(!pc)[a,b].forEach(p=>{g.net[p]=(g.net[p]||0)+1;const w=this.nbf(g.net[p],s.order.length);nb[p]+=w;Object.assign(du[p][p==a?b:a],{nk:g.net[p],nw:w})})}g.mt[k]=(g.mt[k]||0)+1}
+   x.forEach(p=>{if(!on.has(p))return;const v=Math.round((tot[p]/(x.length-1)+nb[p])*2)/2;g.gain[p]=v;g.nb[p]=nb[p];g.sc[p]+=v;rec.gain[p]=v;const m={};x.forEach(q=>{if(q!=p)m[q]=C(p,q)});rec.ch[p]=m;const mv=Object.values(m);ch[p]=mv.every(c=>c=='P')?'P':mv.every(c=>c=='G')?'G':'M'});
+   pub.push(shuf(x.filter(p=>on.has(p))).map(p=>[g.mk[p],ch[p],g.gain[p]]))});
   for(const p in tr)g.tr[p]=(g.tr[p]||0)+1;/* réputation : nb de manches où ce joueur a gardé face à quelqu'un qui partageait */
   g.h.push(rec);g.pub.push(shuf(pub))},
  final(s){const g=s.game;if(this.MKC)for(const p in g.tr||{})g.sc[p]-=this.MKC*g.tr[p];/* chaque 🦈 coûte à la fin */const so=shuf(s.order).sort((a,b)=>g.sc[b]-g.sc[a]),fin=[so[0],so.slice(1).find(p=>!(g.tie||[]).includes(mkPair(so[0],p)))||so[1]];/* ex æquo : tirage au sort (symétrique) */
   g.fin=fin;g.pot=this.POT;g.fc={};g.bet={};delete g.grp;g.mk={};gWait(g,90,'f')},
- fres(s){const g=s.game,c={};g.fin.forEach(p=>c[p]=g.fc[p]||'V');const st=g.fin.filter(p=>c[p]=='V'),out=st.length==0?0:st.length==1?1:2,add={};
+ fres(s){const g=s.game,c={};g.fin.forEach(p=>c[p]=g.fc[p]||(s.order.includes(p)?'V':'P'));/* finaliste parti·e : lâche la mise */const st=g.fin.filter(p=>c[p]=='V'),out=st.length==0?0:st.length==1?1:2,add={};
   g.fin.forEach(p=>add[p]=out==0?Math.floor(g.pot/g.fin.length):out==1?(c[p]=='V'?Math.max(0,g.pot-this.SHK*((g.tr||{})[p]||0)):0):(c[p]=='V'?-g.pot/2:0));
   s.order.forEach(p=>{if(!g.fin.includes(p))add[p]=g.bet[p]===out?this.BET:0});for(const p in add)g.sc[p]+=add[p];g.fr={c,out,add}},
  hide(g,n,s){const o={...g};delete o.grp;delete o.mk;delete o.h;delete o.pc;delete o.mt;delete o.msg;delete o.ch;delete o.gain;
   o.sc={[n]:g.sc[n]};o.n=0;/* nombre de manches caché (4 à 6) */const gr=(g.grp||[]).find(x=>x.includes(n))||[],pt=gr.filter(p=>p!=n);
   o.me={m:g.mk?g.mk[n]:null,pt:pt.map(p=>g.mk[p]),ptr:pt.map(p=>(g.tr||{})[p]||0),mtr:(g.tr||{})[n]||0,msg:g.msg?g.msg[n]:null,ch:pt.map(p=>((g.ch||{})[n]||{})[p]||null)};delete o.tr;
   if(g.st=='c'||g.st=='r')o.me.pm=pt.map(p=>g.msg[p]||'');
-  if(g.st=='r'){o.me.pc=pt.map(p=>(g.ch[p]||{})[n]||'G');o.me.gain=g.gain[n];o.me.nb=(g.nb||{})[n]||0;o.me.ch=o.me.ch.map(c=>c||'G');o.me.hab=(g.hab||{})[n]||0;o.me.tm=(g.tm||{})[n]||0}delete o.nb;delete o.net;delete o.hab;delete o.tm;delete o.tie;o.tie=(g.tie||[]).filter(k=>k.split('|').includes(n)).length?1:0;
+  if(g.st=='r'){o.me.pc=pt.map(p=>(g.ch[p]||{})[n]||'G');o.me.gain=g.gain[n];o.me.nb=(g.nb||{})[n]||0;o.me.ch=o.me.ch.map(c=>c||'G');o.me.hab=(g.hab||{})[n]||0;o.me.tm=(g.tm||{})[n]||0;o.me.du=pt.map(p=>((g.du||{})[n]||{})[p]||null)}delete o.du;delete o.nb;delete o.net;delete o.hab;delete o.tm;delete o.tie;o.tie=(g.tie||[]).filter(k=>k.split('|').includes(n)).length?1:0;
   if(g.fin)o.ftr=g.fin.map(p=>(g.tr||{})[p]||0);if(g.st=='f'){o.fc=hideOwn(g.fc,n);o.bet=hideOwn(g.bet,n)}return o},
  mn(i){return `<span class="mkm"><span class="mke">${MKE[i]||'❔'}</span> ${esc(GL('mkn')[i]||'')}</span>`},
  view(s){const g=s.game,m=meN(),me=g.me||{},R=GAMES.msk;
@@ -706,23 +734,32 @@ GAMES.msk={icon:'🎭',min:3,max:8,dur:10,tags:['social'],tone:true,ties:true,MK
    bind(){$$('[data-gm]').forEach(x=>x.onclick=()=>gs(x.dataset.to!=null?{v:x.dataset.gm,to:+x.dataset.to}:{v:x.dataset.gm}))}};
   if(g.st=='r'){const sea=(g.pub[g.r]||[]).map((gr,i)=>`<div class="mksea ga" ${dl(i,.4)}>${gr.map(([k,c,v])=>`<span class="mkc ${c=='P'?'p':'g'} ${k===me.m?'me':''}">${MKE[k]} ${c=='P'?'🤝🏻':'🔒'} <b dir="ltr">${gPs(v)}</b></span>`).join('')}</div>`).join('');
    if(sp)return{html:`<div class="card c"><h3 class="gh3">🌊 ${GT('msea')}</h3>${sea}</div>`};
-   const rep=me.hab;
-   return{html:`<div class="card c">${head}<div class="mkres">${(me.pc||[]).map((c,i)=>`<p class="ga" ${dl(i+1)}>${MKE[me.pt[i]]} ${GT(c=='P'?'mshared':'mkept')}${me.pt.length>1?` <span class="mut">· ${esc(GT('me'))} ${me.ch[i]=='P'?'🤝🏻':'🔒'}</span>`:''}</p>`).join('')}
-    <p class="gbig2 ga ${me.gain>=4?'ok':''}" ${dl(3)}>${gP(me.gain)}</p>${me.nb?`<p class="mknet ga" ${dl(4)}>🕸️ ${GT('mnet',{v:me.nb})}</p>`:''}${rep?`<p class="mut ga" ${dl(4)}>🔁 ${GT('mrep')}</p>`:''}${me.tm?`<p class="mut ga" ${dl(4)}>🔗 ${GT('mtieM')}</p>`:''}${me.mtr?`<p class="mut ga" ${dl(5)}>${sh(me.mtr)} ${GT('myshk',{v:me.mtr})}</p>`:''}<p class="gcof">🔒 ${GT('mtot',{v:g.sc[m]??0})}</p></div>
+   /* verdict par face-à-face, lisible d'un coup d'œil : qui a fait quoi, combien chacun, et pourquoi (habitude, lien connu, 🦈, réseau) */
+   const DU=me.du||[],tri=DU.length>1,N=v=>`<b class="mkvn" dir="ltr">${gSg(v)}</b>`;
+   const vd=DU.map((d,i)=>{if(!d)return'';const cl=d.t?'t':d.m=='P'?(d.o=='P'?'pp':'pg'):d.o=='P'?'gp':'gg',x=[];
+    if(d.s&&d.s!='m')x.push(GT('msh'+{x:'X',M:'M2',X:'X2'}[d.s]));if(d.nk)x.push(d.nk>1?GT('mvN',{k:d.nk,v:N(d.nw)}):GT('mvN1'));
+    return `<div class="mkv ${cl} ga" ${dl(i+1)}><div class="mkvh">${R.mn(me.pt[i])}</div><p>${GT(d.t?(d.t==2?'mvL':'mvT'):{pp:d.h?'mvPPh':'mvPP',pg:'mvPG',gp:'mvGP',gg:'mvGG'}[cl],{v:N(d.v),w:N(d.w)})}</p>${x.map(t=>`<p class="mkvx">${t}</p>`).join('')}</div>`}).join('');
+   const pv=DU.map(d=>d?d.v:0),fx=tri||me.nb,f=(tri?`(${pv.join(' + ')}) ÷ ${pv.length}`:pv[0])+(me.nb?` + 🕸️ ${me.nb}`:'')+` = ${gSg(me.gain)}`;
+   return{html:`<div class="card c">${head}<div class="mkres">${vd}${tri?`<p class="mkvx ga" ${dl(3)}>${GT('mtri')}</p>`:''}
+    ${fx?`<p class="mkfm ga" ${dl(3)}>${GT('mform',{f:`<b dir="ltr">${f}</b>`})}</p>`:''}<p class="gbig2 ga ${me.gain>=4?'ok':''}" ${dl(3)}>${gP(me.gain)}</p>${DU.some(d=>d&&d.s=='m')?`<p class="mkshk ga" ${dl(4)}>${GT('mshM')}</p>`:''}${me.mtr?`<p class="mut ga" ${dl(5)}>${sh(me.mtr)} ${GT('myshk',{v:me.mtr})}</p>`:''}<p class="gcof">🔒 ${GT('mtot',{v:g.sc[m]??0})}</p></div>
     <h3 class="gh3">🌊 ${GT('msea')}</h3>${sea}</div>`,bind(){if(me.gain>=4&&!RM())sparkles($('.mkres .gbig2'),me.nb?14:8)}}}
   const fin=g.fin||[],isF=fin.includes(m),names=fin.map((p,i)=>NM(p)+((g.ftr||[])[i]?' 🦈'+(g.ftr[i]>1?'×'+g.ftr[i]:''):'')).join(' & ');
-  if(g.st=='f'){const top=`<div class="mkfin ga"><span class="gbig">🎭</span><b>${GT('mfinT')}</b><p>${GT('mfinD',{n:names,v:g.pot})}</p><p class="mut">${GT('mfinC')}</p></div>`;
+  const sk=i=>'🦈'.repeat((g.ftr||[])[i]||0),stl=i=>{const k=(g.ftr||[])[i]||0;return k?`${g.pot} − ${R.SHK} × ${sk(i)} = ${Math.max(0,g.pot-R.SHK*k)}`:gSg(g.pot)},LT=t=>`<b dir="ltr" class="mkf">${t}</b>`;
+  if(g.st=='f'){const top=`<div class="mkfin ga"><span class="gbig">🎭</span><b>${GT('mfinT')}</b><p>${GT('mfinD',{n:names,v:g.pot})}</p><p class="mut">${GT('mfinC')}</p>${fin.map((p,i)=>(g.ftr||[])[i]?`<p class="mkfx">${GT('mfIf',{n:NM(p),f:LT(stl(i))})}</p>`:'').join('')}</div>`;
    if(sp)return{html:`<div class="card c">${top}</div>`};
    if(isF)return{html:`<div class="card c">${top}<div class="gpk mkch">${['P','V'].map((v,i)=>`<button class="ga gdec ${g.fc[m]==v?'sel':''}" ${dl(i,.3)} data-gf="${v}">${GT('k'+v)}</button>`).join('')}</div><p class="gcof">🔒 ${GT('mtot',{v:g.sc[m]??0})}</p></div>`,
     bind(){$$('[data-gf]').forEach(x=>x.onclick=()=>gs({v:x.dataset.gf}))}};
    return{html:`<div class="card c">${top}<p class="gq2">${GT('mbet')}</p><div class="gab">${[0,1,2].map(i=>`<button class="gopt ga ${g.bet[m]===i?'sel':''}" ${dl(i,.3)} data-gb="${i}">${GT('mb'+i)}</button>`).join('')}</div></div>`,
     bind(){$$('[data-gb]').forEach(x=>x.onclick=()=>gs({b:+x.dataset.gb}))}}}
-  const fr=g.fr||{c:{},add:{}};
+  const fr=g.fr||{c:{},add:{}},N=v=>`<b dir="ltr">${gSg(v)}</b>`;
+  /* le calcul en clair : partage 16 ÷ 2 ; vol 16 − 4 × 🦈 ; la personne volée 0 ; double vol −8 */
+  const calc=fr.out==0?GT('mfP',{f:LT(`${g.pot} ÷ 2 = ${gSg(g.pot/2)}`)}):fr.out==2?GT('mfB',{v:N(-g.pot/2)}):fin.map((p,i)=>fr.c[p]=='V'?GT('mfS',{n:NM(p),f:LT(stl(i))}):GT('mfV',{n:NM(p),v:N(0)})).join('<br>'),
+   bt=g.bet[m],bl=isF||sp?'':bt==null?GT('mb_'):GT(bt===fr.out?'mbY':'mbN',{b:GT('mb'+bt),v:N(bt===fr.out?R.BET:0)});
   return{html:`<div class="card c"><div class="mkfin"><b>${GT('mfinT')}</b></div><div class="gduo mkduo">${fin.map((p,i)=>`<div class="ga" ${dl(i*2,.1)}>${DT(p)}<b>${esc(p)}</b><br><span class="gtag ${fr.c[p]=='P'?'':'no'}">${GT('k'+fr.c[p])}</span><br><b class="mkadd ${(fr.add[p]||0)<0?'neg':''}">${(fr.add[p]||0)<0?GT('mLose',{v:GTn('pts',-fr.add[p])}):fr.add[p]?GT('mGain',{v:GTn('pts',fr.add[p])}):gP(0)}</b></div>`).join('')}</div>
-   <p class="gbig2 ga ok" ${dl(4)}>${GT('mb'+fr.out)}</p>${isF||sp?'':`<p class="gnote ga" ${dl(5)}>${g.bet[m]===fr.out?GT('mbetok'):'—'}</p>`}</div>`,
+   <p class="gbig2 ga ok" ${dl(4)}>${GT('mb'+fr.out)}</p><p class="mkcalc ga" ${dl(5)}>${calc}</p>${bl?`<p class="gnote ga mkbt ${bt===fr.out?'ok':''}" ${dl(6)}>${bl}</p>`:''}</div>`,
    bind(){if(fr.out==0&&!RM())sparkles($('.mkduo'),16)}}},
  endView(s){const g=s.game,o=s.order,n=o.length,W=220,cx=110,cy=110,rr=82,pos={};o.forEach((p,i)=>{const a=2*Math.PI*i/n-Math.PI/2;pos[p]=[cx+rr*Math.cos(a),cy+rr*Math.sin(a)]});
-  const E={};(g.h||[]).forEach(r=>r.grp.forEach(x=>{for(let i=0;i<x.length;i++)for(let j=i+1;j<x.length;j++){const a=x[i],b=x[j],k=mkPair(a,b),e=E[k]=E[k]||{a:a<b?a:b,b:a<b?b:a,pp:0,gg:0,t:{}};
+  const E={};(g.h||[]).forEach(r=>r.grp.forEach(x=>{x=x.filter(p=>pos[p]);for(let i=0;i<x.length;i++)for(let j=i+1;j<x.length;j++){const a=x[i],b=x[j],k=mkPair(a,b),e=E[k]=E[k]||{a:a<b?a:b,b:a<b?b:a,pp:0,gg:0,t:{}};
    const ca=(r.ch[a]||{})[b]||'G',cb=(r.ch[b]||{})[a]||'G';if(ca=='P'&&cb=='P')e.pp++;else if(ca=='G'&&cb=='G')e.gg++;else{const tr=ca=='G'?a:b;e.t[tr]=(e.t[tr]||0)+1}}}));
   const f=v=>v.toFixed(1);let svg=`<svg class="mkcst" viewBox="0 0 ${W} ${W}" role="img" aria-label="${esc(GT('mconst'))}"><defs><marker id="mkar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--bad)"/></marker></defs>`;
   const ln=(a,b,cl,off,mk)=>{const [x1,y1]=pos[a],[x2,y2]=pos[b],dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy)||1,nx=-dy/L*off,ny=dx/L*off,sh=14/L;
@@ -1662,8 +1699,9 @@ div.gtile{cursor:default}
 .gpk{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
 .gpk>button{flex:1 1 42%;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 10px;min-width:0;font-size:16px}
 .gpk>button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.gw button{transition:transform .15s var(--gease),box-shadow .15s,background .2s,border-color .2s}
-.gw button:not(:disabled):active{transform:translateY(3px) scale(.98);box-shadow:0 1px 0 var(--edge2)}
+/* la barre de réactions garde le comportement de l'Expédition (charge .chg/.rdy pendant l'appui long) */
+.gw button:not(.reacts>button){transition:transform .15s var(--gease),box-shadow .15s,background .2s,border-color .2s}
+.gw button:not(:disabled):not(.reacts>button):active{transform:translateY(3px) scale(.98);box-shadow:0 1px 0 var(--edge2)}
 .gw button.sel{border-color:var(--acc);background:#fff1e4;box-shadow:0 4px 0 var(--acc-d)}
 .ga{animation:gin .34s var(--gease,ease) both}
 @keyframes gin{from{opacity:0;transform:translateY(8px) scale(.97)}}
@@ -1799,6 +1837,12 @@ section>.gw.gnx{animation:none}.gw.gnx>.card{animation:gstep .28s var(--gease) b
 .mked{margin-top:10px;font-size:14px;padding:6px 14px}
 .mkch{margin-top:14px}.mkch>button{flex:1 1 40%}
 .mkres p{margin:4px 0;font:700 16px Nunito}.mknet{color:var(--ink)}
+.mkv{margin:8px 0;padding:8px 12px;border-radius:14px;border:2px solid var(--edge);background:var(--paper);text-align:start}
+.mkv p{font:600 15px/1.4 Nunito;margin:2px 0}.mkv .mkvh{font:700 14px Nunito;color:var(--mut);margin-bottom:2px}.mkv .mkvn{font-size:17px}
+.mkv.pp{border-color:#5cc39c;background:#eefaf4}.mkv.pg{border-color:#ee9a8e;background:#fff1ee}.mkv.gp{border-color:#f2c46a;background:#fff8e6}.mkv.t{border-style:dashed}
+.mkres p.mkvx{font:600 13px/1.4 Nunito;color:var(--mut)}.mkres .mkfm{font:600 15px Nunito}.mkres .mkshk{font:600 14px/1.4 Nunito;color:var(--bad)}
+.mkf{white-space:nowrap;unicode-bidi:isolate}.mkfin .mkfx{font:600 14px Nunito;color:var(--bad)}.mkcalc{font:600 15px/1.6 Nunito;margin:4px 0}.mkbt.ok{color:var(--ink)}
+[data-theme=dark] .mkv.pp{background:#123d33;border-color:#2c7a62}[data-theme=dark] .mkv.pg{background:#43231d;border-color:#9a4a3c}[data-theme=dark] .mkv.gp{background:#3e321a;border-color:#8a6a2a}
 .mksea{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:6px 0;padding:6px;border-radius:14px;background:var(--paper2)}
 .mkc{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;font:700 14px Nunito;background:var(--paper);border:2px solid var(--edge)}
 .mkc.p{border-color:#8fd8bd}.mkc.g{border-color:#f3b88c}.mkc.me{outline:2px solid var(--acc);outline-offset:1px}.mkc b{font-size:13px}
@@ -1963,6 +2007,7 @@ button.prch{cursor:pointer;width:auto}button.prch:hover{border-color:var(--edge2
 .gidc:hover{border-color:var(--acc)}.gidc:active{transform:scale(.97)}
 .gidd{margin:8px 0 0;font-size:12px;color:var(--mut);line-height:1.4}
 /* 👀 spectateurs */
+.wtb.on{border-color:var(--acc)}.gspc0 .gwb{margin-inline-start:6px;padding:3px 10px;font-size:13px;border-radius:99px;vertical-align:middle}.gspc0 .gxsv{white-space:nowrap}.gsc .gxo{opacity:.6}
 .gspc0{font-size:13px;color:var(--mut);margin:0 0 10px;padding:6px 11px;border-inline-start:3px solid var(--acc);border-radius:4px 12px 12px 4px;background:color-mix(in srgb,var(--acc) 8%,transparent);line-height:1.4}
 .gw.gspc .card :is(textarea,input,#gsend,.gedit,.grow2,.gwr,.gidea,.gpk,.chno,.gab,.tpbt,.gbtns2,.mipk){display:none!important}
 .gw.gspc .card button:not(.gtutb){pointer-events:none}
@@ -2571,6 +2616,70 @@ GMK2('pt',{r_msk:`Em cada rodada (de 4 a 6, ninguém sabe quantas) você está m
 mrep:`Costume: vocês já tinham dividido juntos, rende menos.`,mfinC:`Ambos Dividir: divide-se. Um só Rouba: leva tudo, menos 4 por 🦈. Ambos Roubam: −8 cada.`,
 mshT:`Já guardou contra alguém que dividia`,mshD:`já traiu alguém que dividia. Guardar contra um 🦈 não te marca.`,myshk:`Você carrega {v} 🦈: −{v} no fim.`,
 mtieM:`Laço conhecido: o seu frente a frente vale a média da rodada.`,mtieT:`Laços conhecidos`,mtieD:`Casal, colegas de casa…: o frente a frente deles vale a média da rodada e eles nunca se enfrentam na final. Se conhecer não dá vantagem.`,mtieH:`Toque em dois nomes para ligá-los (ou desligar).`,mtie0:`Nenhum laço declarado.`});
+/* Les Masques v3 : révélation lisible (verdict par face-à-face, calcul de la manche, 🦈 et réseau en clair, calcul de la finale) */
+GMK2('fr',{mvPP:`Vous avez partagé tous les deux → {v} chacun·e : confiance payante.`,mvPPh:`Vous avez encore partagé ensemble → {v} chacun·e (l'habitude rapporte moins).`,
+mvPG:`Tu as partagé, ton masque a gardé → toi {v}, lui {w} : il t'a {g:eu|eue|eu·e}.`,mvGP:`Tu as gardé, ton masque a partagé → toi {v}, lui {w} : tu l'as eu.`,mvGG:`Vous avez gardé tous les deux → {v} chacun·e : méfiance mutuelle.`,
+mvT:`Lien connu : ce face-à-face vaut la moyenne de la manche, {v}.`,mvN:`🕸️ Nouveau lien : personne n° {k} de ton réseau → {v}`,mvN1:`🕸️ Premier lien de ton réseau (le bonus commence à la 2e personne).`,
+mshM:`🦈 Tu as gardé face à un partage : tu prends un 🦈 visible de tous (−1 à la fin, −4 sur un vol en finale).`,mshX:`🦈 Ton masque en portait déjà un : garder ne te marque pas.`,mshM2:`🦈 Ton masque prend un 🦈 pour avoir gardé face à ton partage.`,mshX2:`🦈 Tu en portais un : ton masque a pu garder sans être marqué.`,
+mform:`Ta manche : {f}`,mtri:`À 3 : ta manche = la moyenne de tes 2 face-à-face.`,
+mfS:`{n} vole : {f}`,mfV:`{n} a fait confiance : {v}`,mfP:`Partage : {f} chacun·e`,mfB:`Les deux volent : {v} chacun·e`,mfIf:`Si {n} vole {g.n:seul|seule|seul·e} : {f}`,
+mbY:`Ton pari « {b} » : gagné, {v}`,mbN:`Ton pari « {b} » : raté, {v}`,mb_:`Pas de pari : 0`});
+GMK2('en',{mvPP:`You both shared → {v} each: trust pays off.`,mvPPh:`You shared together again → {v} each (habit pays less).`,
+mvPG:`You shared, your mask kept → you {v}, them {w}: they got you.`,mvGP:`You kept, your mask shared → you {v}, them {w}: you got them.`,mvGG:`You both kept → {v} each: mutual mistrust.`,
+mvT:`Known bond: this face-off is worth the round's average, {v}.`,mvN:`🕸️ New link: person no. {k} in your network → {v}`,mvN1:`🕸️ First link in your network (the bonus starts from the 2nd person).`,
+mshM:`🦈 You kept against a sharer: you get a 🦈 everyone can see (−1 at the end, −4 on a final steal).`,mshX:`🦈 Your mask already wore one: keeping doesn't mark you.`,mshM2:`🦈 Your mask gets a 🦈 for keeping against your share.`,mshX2:`🦈 You wore one: your mask could keep without being marked.`,
+mform:`Your round: {f}`,mtri:`In a trio: your round = the average of your 2 face-offs.`,
+mfS:`{n} steals: {f}`,mfV:`{n} trusted: {v}`,mfP:`Shared: {f} each`,mfB:`Both steal: {v} each`,mfIf:`If {n} steals alone: {f}`,
+mbY:`Your bet “{b}”: won, {v}`,mbN:`Your bet “{b}”: missed, {v}`,mb_:`No bet: 0`});
+GMK2('es',{mvPP:`Compartisteis los dos → {v} cada uno: la confianza compensa.`,mvPPh:`Volvisteis a compartir juntos → {v} cada uno (la costumbre da menos).`,
+mvPG:`Compartiste, tu máscara guardó → tú {v}, ella {w}: te la jugó.`,mvGP:`Guardaste, tu máscara compartió → tú {v}, ella {w}: se la jugaste.`,mvGG:`Guardasteis los dos → {v} cada uno: desconfianza mutua.`,
+mvT:`Vínculo conocido: este cara a cara vale la media de la ronda, {v}.`,mvN:`🕸️ Nuevo vínculo: persona n.º {k} de tu red → {v}`,mvN1:`🕸️ Primer vínculo de tu red (el bonus empieza en la 2.ª persona).`,
+mshM:`🦈 Guardaste frente a quien compartía: te llevas un 🦈 visible para todos (−1 al final, −4 en un robo en la final).`,mshX:`🦈 Tu máscara ya llevaba uno: guardar no te marca.`,mshM2:`🦈 Tu máscara se lleva un 🦈 por guardar frente a tu reparto.`,mshX2:`🦈 Tú llevabas uno: tu máscara pudo guardar sin quedar marcada.`,
+mform:`Tu ronda: {f}`,mtri:`En trío: tu ronda = la media de tus 2 cara a cara.`,
+mfS:`{n} roba: {f}`,mfV:`{n} confió: {v}`,mfP:`Reparto: {f} cada uno`,mfB:`Los dos roban: {v} cada uno`,mfIf:`Si {n} roba {g.n:solo|sola|en solitario}: {f}`,
+mbY:`Tu apuesta «{b}»: acertada, {v}`,mbN:`Tu apuesta «{b}»: fallada, {v}`,mb_:`Sin apuesta: 0`});
+GMK2('it',{mvPP:`Avete condiviso entrambi → {v} a testa: la fiducia paga.`,mvPPh:`Avete condiviso di nuovo insieme → {v} a testa (l'abitudine rende meno).`,
+mvPG:`Hai condiviso, la tua maschera ha tenuto → tu {v}, lei {w}: ti ha {g:fregato|fregata|fregato}.`,mvGP:`Hai tenuto, la tua maschera ha condiviso → tu {v}, lei {w}: l'hai fregata.`,mvGG:`Avete tenuto entrambi → {v} a testa: sfiducia reciproca.`,
+mvT:`Legame noto: questo faccia a faccia vale la media del round, {v}.`,mvN:`🕸️ Nuovo legame: persona n° {k} della tua rete → {v}`,mvN1:`🕸️ Primo legame della tua rete (il bonus parte dalla 2ª persona).`,
+mshM:`🦈 Hai tenuto contro chi condivideva: prendi uno 🦈 visibile a tutti (−1 alla fine, −4 su un furto in finale).`,mshX:`🦈 La tua maschera ne portava già uno: tenere non ti marchia.`,mshM2:`🦈 La tua maschera prende uno 🦈 per aver tenuto contro la tua condivisione.`,mshX2:`🦈 Ne portavi uno tu: la tua maschera ha potuto tenere senza essere marchiata.`,
+mform:`Il tuo round: {f}`,mtri:`In trio: il tuo round = la media dei tuoi 2 faccia a faccia.`,
+mfS:`{n} ruba: {f}`,mfV:`{n} si è {g.n:fidato|fidata|fidato/a}: {v}`,mfP:`Condivisione: {f} a testa`,mfB:`Rubano entrambi: {v} a testa`,mfIf:`Se {n} ruba da {g.n:solo|sola|solo/a}: {f}`,
+mbY:`La tua scommessa «{b}»: vinta, {v}`,mbN:`La tua scommessa «{b}»: persa, {v}`,mb_:`Nessuna scommessa: 0`});
+GMK2('de',{mvPP:`Ihr habt beide geteilt → je {v}: Vertrauen zahlt sich aus.`,mvPPh:`Ihr habt wieder zusammen geteilt → je {v} (Gewohnheit bringt weniger).`,
+mvPG:`Du hast geteilt, deine Maske hat behalten → du {v}, sie {w}: sie hat dich reingelegt.`,mvGP:`Du hast behalten, deine Maske hat geteilt → du {v}, sie {w}: du hast sie reingelegt.`,mvGG:`Ihr habt beide behalten → je {v}: gegenseitiges Misstrauen.`,
+mvT:`Bekannte Verbindung: dieses Duell zählt den Rundendurchschnitt, {v}.`,mvN:`🕸️ Neue Verbindung: Person Nr. {k} in deinem Netz → {v}`,mvN1:`🕸️ Erste Verbindung in deinem Netz (der Bonus beginnt ab der 2. Person).`,
+mshM:`🦈 Du hast gegen jemanden behalten, der teilte: du bekommst einen 🦈, für alle sichtbar (−1 am Ende, −4 bei einem Diebstahl im Finale).`,mshX:`🦈 Deine Maske trug schon einen: Behalten markiert dich nicht.`,mshM2:`🦈 Deine Maske bekommt einen 🦈, weil sie gegen dein Teilen behalten hat.`,mshX2:`🦈 Du trugst einen: deine Maske konnte ohne Markierung behalten.`,
+mform:`Deine Runde: {f}`,mtri:`Im Trio: deine Runde = der Durchschnitt deiner 2 Duelle.`,
+mfS:`{n} stiehlt: {f}`,mfV:`{n} hat vertraut: {v}`,mfP:`Geteilt: je {f}`,mfB:`Beide stehlen: je {v}`,mfIf:`Wenn {n} allein stiehlt: {f}`,
+mbY:`Deine Wette „{b}“: gewonnen, {v}`,mbN:`Deine Wette „{b}“: daneben, {v}`,mb_:`Keine Wette: 0`});
+GMK2('ru',{mvPP:`Вы оба поделились → по {v}: доверие окупилось.`,mvPPh:`Вы снова поделились вместе → по {v} (привычка приносит меньше).`,
+mvPG:`Ты {g:поделился|поделилась|поделился(-ась)}, маска оставила себе → тебе {v}, ей {w}: она тебя обхитрила.`,mvGP:`Ты {g:оставил|оставила|оставил(а)} себе, маска поделилась → тебе {v}, ей {w}: ты её {g:обхитрил|обхитрила|обхитрил(а)}.`,mvGG:`Вы оба оставили себе → по {v}: взаимное недоверие.`,
+mvT:`Известная связь: эта дуэль стоит среднего за раунд, {v}.`,mvN:`🕸️ Новая связь: человек № {k} в твоей сети → {v}`,mvN1:`🕸️ Первая связь в твоей сети (бонус — со 2-го человека).`,
+mshM:`🦈 Ты {g:оставил|оставила|оставил(а)} себе против того, кто делился: тебе 🦈, видная всем (−1 в конце, −4 при краже в финале).`,mshX:`🦈 На маске уже была 🦈: оставить себе — тебя не помечает.`,mshM2:`🦈 Маска получает 🦈: она оставила себе против твоего «делиться».`,mshX2:`🦈 На тебе была 🦈: маска могла оставить себе без метки.`,
+mform:`Твой раунд: {f}`,mtri:`В тройке: твой раунд = среднее твоих 2 дуэлей.`,
+mfS:`{n} крадёт: {f}`,mfV:`{n} {g.n:доверился|доверилась|доверился(-ась)}: {v}`,mfP:`Поровну: по {f}`,mfB:`Оба крадут: по {v}`,mfIf:`Если {n} крадёт в одиночку: {f}`,
+mbY:`Твоя ставка «{b}»: {g:угадал|угадала|угадал(а)}, {v}`,mbN:`Твоя ставка «{b}»: мимо, {v}`,mb_:`Без ставки: 0`});
+GMK2('zh',{mvPP:`你们都选择了分享 → 各 {v}：信任有回报。`,mvPPh:`你们又一起分享了 → 各 {v}（习惯了，得分变少）。`,
+mvPG:`你分享，对方独占 → 你 {v}，对方 {w}：你被坑了。`,mvGP:`你独占，对方分享 → 你 {v}，对方 {w}：你坑了对方。`,mvGG:`你们都选择了独占 → 各 {v}：互不信任。`,
+mvT:`已知关系：这场对决按本轮平均分计算，{v}。`,mvN:`🕸️ 新人脉：你人脉中的第 {k} 人 → {v}`,mvN1:`🕸️ 你人脉中的第一人（从第2人起有奖励）。`,
+mshM:`🦈 你对分享者选择了独占：你得到一个所有人可见的🦈（结束时−1，决赛偷成功时−4）。`,mshX:`🦈 对方已带着🦈：独占不会给你打标记。`,mshM2:`🦈 对方对你的分享选择独占，得到一个🦈。`,mshX2:`🦈 你带着🦈：对方独占也不会被标记。`,
+mform:`你本轮：{f}`,mtri:`三人组：本轮得分 = 你两场对决的平均分。`,
+mfS:`{n}偷：{f}`,mfV:`{n}选择了信任：{v}`,mfP:`平分：各 {f}`,mfB:`两人都偷：各 {v}`,mfIf:`如果只有{n}偷：{f}`,
+mbY:`你的押注「{b}」：猜中，{v}`,mbN:`你的押注「{b}」：没猜中，{v}`,mb_:`没有押注：0`});
+GMK2('he',{mvPP:`שניכם חלקתם ← {v} לכל אחד: האמון משתלם.`,mvPPh:`חלקתם שוב יחד ← {v} לכל אחד (ההרגל שווה פחות).`,
+mvPG:`חלקת, המסכה שמרה ← לך {v}, לה {w}: היא עבדה עליך.`,mvGP:`שמרת, המסכה חלקה ← לך {v}, לה {w}: עבדת עליה.`,mvGG:`שניכם שמרתם ← {v} לכל אחד: חוסר אמון הדדי.`,
+mvT:`קשר ידוע: הדו־קרב הזה שווה את ממוצע הסבב, {v}.`,mvN:`🕸️ קשר חדש: אדם מס׳ {k} ברשת שלך ← {v}`,mvN1:`🕸️ הקשר הראשון ברשת שלך (הבונוס מתחיל מהאדם השני).`,
+mshM:`🦈 שמרת מול מי שחלק/ה: קיבלת 🦈 שכולם רואים (‎−1 בסוף, ‎−4 בגניבה בגמר).`,mshX:`🦈 המסכה כבר נשאה 🦈: שמירה לא מסמנת אותך.`,mshM2:`🦈 המסכה מקבלת 🦈 כי שמרה מול החלוקה שלך.`,mshX2:`🦈 נשאת 🦈: המסכה יכלה לשמור בלי סימון.`,
+mform:`הסבב שלך: {f}`,mtri:`בשלישייה: הסבב שלך = ממוצע שני הדו־קרבות שלך.`,
+mfS:`{n} {g.n:גונב|גונבת|גונב/ת}: {f}`,mfV:`{n} {g.n:בטח|בטחה|בטח/ה}: {v}`,mfP:`חלוקה: {f} לכל אחד`,mfB:`שניהם גונבים: {v} לכל אחד`,mfIf:`אם {n} {g.n:גונב|גונבת|גונב/ת} לבד: {f}`,
+mbY:`ההימור שלך „{b}”: הצלחת, {v}`,mbN:`ההימור שלך „{b}”: פספסת, {v}`,mb_:`בלי הימור: 0`});
+GMK2('pt',{mvPP:`Vocês dois dividiram → {v} cada: a confiança compensa.`,mvPPh:`Vocês dividiram juntos de novo → {v} cada (o costume rende menos).`,
+mvPG:`Você dividiu, sua máscara guardou → você {v}, ela {w}: ela te passou a perna.`,mvGP:`Você guardou, sua máscara dividiu → você {v}, ela {w}: você passou a perna nela.`,mvGG:`Vocês dois guardaram → {v} cada: desconfiança mútua.`,
+mvT:`Laço conhecido: este frente a frente vale a média da rodada, {v}.`,mvN:`🕸️ Novo laço: pessoa nº {k} da sua rede → {v}`,mvN1:`🕸️ Primeiro laço da sua rede (o bônus começa na 2ª pessoa).`,
+mshM:`🦈 Você guardou diante de quem dividia: leva um 🦈 visível para todos (−1 no fim, −4 num roubo na final).`,mshX:`🦈 Sua máscara já carregava um: guardar não te marca.`,mshM2:`🦈 Sua máscara leva um 🦈 por guardar diante da sua divisão.`,mshX2:`🦈 Você carregava um: sua máscara pôde guardar sem ser marcada.`,
+mform:`Sua rodada: {f}`,mtri:`Em trio: sua rodada = a média dos seus 2 frente a frente.`,
+mfS:`{n} rouba: {f}`,mfV:`{n} {g.n:confiou|confiou|confiou}: {v}`,mfP:`Divisão: {f} cada`,mfB:`Os dois roubam: {v} cada`,mfIf:`Se {n} roubar {g.n:sozinho|sozinha|sozinho/a}: {f}`,
+mbY:`Sua aposta “{b}”: acertou, {v}`,mbN:`Sua aposta “{b}”: errou, {v}`,mb_:`Sem aposta: 0`});
 /* 📖 Tutoriels animés : légendes (noms et mots d'exemple localisés) */
 const GTUT=(l,o)=>Object.assign(GI18N[l].ui,o);
 GTUT('fr',{tuB:`Les règles en images`,tuOk:`J'ai compris`,tuAgain:`Revoir`,tuAll:`Depuis le début`,tun:`Ana|Ben|Cléo|Dan`,tuw:`Plage|Sable|Soleil|Été`,
@@ -2611,7 +2720,7 @@ tu_msk2:`Écris-leur un message anonyme, puis choisis en secret : 🤝🏻 Parta
 tu_msk3:`🤝🏻 + 🤝🏻 : 4 chacun, et un lien de plus dans ton réseau (bonus dès la 2e personne).`,
 tu_msk4:`🔒 face à 🤝🏻 : 4 pour toi, 1 pour l'autre… et un 🦈 que tous verront (−1 à la fin).`,
 tu_msk5:`🔒 + 🔒 : 2 chacun. Garder face à un 🦈 ne te marque pas.`,
-tu_msk6:`Finale à 16 points : les deux partagent, 8 chacun ; un seul vole, tout pour lui ; les deux volent, −8 chacun.`});
+tu_msk6:`Finale à 16 points : les deux partagent, 8 chacun·e ; un seul vole, 16 pour lui moins 4 par 🦈 (l'autre : 0) ; les deux volent, −8 chacun·e.`});
 GTUT('en',{tuB:`Rules in pictures`,tuOk:`Got it`,tuAgain:`Replay`,tuAll:`From the start`,tun:`Ana|Ben|Cleo|Dan`,tuw:`Beach|Sand|Sun|Summer`,
 tu_bot1:`Everyone secretly writes 2 or 3 true things about themselves, slipped into bottles.`,
 tu_bot2:`The bottles open one by one, with no name: "I once slept in a lighthouse." Who wrote it?`,
@@ -2650,7 +2759,7 @@ tu_msk2:`Write them an anonymous message, then secretly choose: 🤝🏻 Share o
 tu_msk3:`🤝🏻 + 🤝🏻: 4 each, and one more link in your network (bonus from the 2nd person).`,
 tu_msk4:`🔒 against 🤝🏻: 4 for you, 1 for them… and a 🦈 everyone will see (−1 at the end).`,
 tu_msk5:`🔒 + 🔒: 2 each. Keeping against a 🦈 doesn't mark you.`,
-tu_msk6:`Final for 16 points: both share, 8 each; one steals, all for them; both steal, −8 each.`});
+tu_msk6:`Final for 16 points: both share, 8 each; one steals, 16 for them minus 4 per 🦈 (the other: 0); both steal, −8 each.`});
 GTUT('es',{tuB:`Las reglas en imágenes`,tuOk:`Entendido`,tuAgain:`Repetir`,tuAll:`Desde el principio`,tun:`Ana|Ben|Cleo|Dan`,tuw:`Playa|Arena|Sol|Verano`,
 tu_bot1:`Cada uno escribe en secreto 2 o 3 cosas verdaderas sobre sí, metidas en botellas.`,
 tu_bot2:`Las botellas se abren una a una, sin nombre: «Una vez dormí en un faro». ¿Quién la escribió?`,
@@ -2689,7 +2798,7 @@ tu_msk2:`Escríbeles un mensaje anónimo y elige en secreto: 🤝🏻 Compartir 
 tu_msk3:`🤝🏻 + 🤝🏻: 4 cada uno y un vínculo más en tu red (bonus desde la 2.ª persona).`,
 tu_msk4:`🔒 frente a 🤝🏻: 4 para ti, 1 para el otro… y un 🦈 que todos verán (−1 al final).`,
 tu_msk5:`🔒 + 🔒: 2 cada uno. Guardar frente a un 🦈 no te marca.`,
-tu_msk6:`Final por 16 puntos: ambos comparten, 8 cada uno; uno roba, todo para él; ambos roban, −8 cada uno.`});
+tu_msk6:`Final por 16 puntos: ambos comparten, 8 cada uno; uno roba, 16 para él menos 4 por 🦈 (el otro: 0); ambos roban, −8 cada uno.`});
 GTUT('it',{tuB:`Le regole per immagini`,tuOk:`Ho capito`,tuAgain:`Rivedi`,tuAll:`Dall'inizio`,tun:`Ana|Ben|Cleo|Dan`,tuw:`Spiaggia|Sabbia|Sole|Estate`,
 tu_bot1:`Ognuno scrive in segreto 2 o 3 cose vere su di sé, infilate nelle bottiglie.`,
 tu_bot2:`Le bottiglie si aprono una a una, senza nome: «Una volta ho dormito in un faro». Chi l'ha scritto?`,
@@ -2728,7 +2837,7 @@ tu_msk2:`Scrivi loro un messaggio anonimo, poi scegli in segreto: 🤝🏻 Condi
 tu_msk3:`🤝🏻 + 🤝🏻: 4 a testa e un legame in più nella tua rete (bonus dalla 2ª persona).`,
 tu_msk4:`🔒 contro 🤝🏻: 4 per te, 1 per l'altro… e uno 🦈 che tutti vedranno (−1 alla fine).`,
 tu_msk5:`🔒 + 🔒: 2 a testa. Tenere contro uno 🦈 non ti marchia.`,
-tu_msk6:`Finale da 16 punti: entrambi condividono, 8 a testa; uno ruba, tutto a lui; entrambi rubano, −8 a testa.`});
+tu_msk6:`Finale da 16 punti: entrambi condividono, 8 a testa; uno ruba, 16 a lui meno 4 per 🦈 (l'altro: 0); entrambi rubano, −8 a testa.`});
 GTUT('de',{tuB:`Regeln in Bildern`,tuOk:`Verstanden`,tuAgain:`Nochmal`,tuAll:`Von vorn`,tun:`Ana|Ben|Cleo|Dan`,tuw:`Strand|Sand|Sonne|Sommer`,
 tu_bot1:`Alle schreiben heimlich 2 oder 3 wahre Dinge über sich, die in Flaschen landen.`,
 tu_bot2:`Die Flaschen öffnen sich nacheinander, ohne Namen: „Ich habe mal in einem Leuchtturm geschlafen." Wer war's?`,
@@ -2767,7 +2876,7 @@ tu_msk2:`Schreib ihnen eine anonyme Nachricht und wähle dann geheim: 🤝🏻 T
 tu_msk3:`🤝🏻 + 🤝🏻: je 4 und eine Verbindung mehr in deinem Netz (Bonus ab der 2. Person).`,
 tu_msk4:`🔒 gegen 🤝🏻: 4 für dich, 1 für die andere Person… und ein 🦈, den alle sehen (−1 am Ende).`,
 tu_msk5:`🔒 + 🔒: je 2. Behalten gegen einen 🦈 markiert dich nicht.`,
-tu_msk6:`Finale um 16 Punkte: beide teilen, je 8; einer stiehlt, alles für ihn; beide stehlen, je −8.`});
+tu_msk6:`Finale um 16 Punkte: beide teilen, je 8; einer stiehlt, 16 für ihn minus 4 pro 🦈 (der andere: 0); beide stehlen, je −8.`});
 GTUT('ru',{tuB:`Правила в картинках`,tuOk:`Понятно`,tuAgain:`Ещё раз`,tuAll:`С начала`,tun:`Аня|Бен|Клео|Дэн`,tuw:`Пляж|Песок|Солнце|Лето`,
 tu_bot1:`Каждый тайно пишет 2–3 правдивых факта о себе — они уплывают в бутылках.`,
 tu_bot2:`Бутылки открываются по одной, без имени: «Однажды я ночевал(а) в маяке». Кто это написал?`,
@@ -2806,7 +2915,7 @@ tu_msk2:`Напиши им анонимное сообщение, затем т�
 tu_msk3:`🤝🏻 + 🤝🏻: по 4 и ещё одна связь в твоей сети (бонус со 2-го человека).`,
 tu_msk4:`🔒 против 🤝🏻: тебе 4, другому 1… и 🦈, которую все увидят (−1 в конце).`,
 tu_msk5:`🔒 + 🔒: по 2. Оставить против 🦈 — не помечает тебя.`,
-tu_msk6:`Финал на 16 очков: оба делятся — по 8; один крадёт — всё ему; оба крадут — по −8.`});
+tu_msk6:`Финал на 16 очков: оба делятся — по 8; один крадёт — ему 16 минус 4 за каждую 🦈 (другому 0); оба крадут — по −8.`});
 GTUT('zh',{tuB:`图解规则`,tuOk:`明白了`,tuAgain:`再看一遍`,tuAll:`从头开始`,tun:`安娜|本|克莱奥|丹`,tuw:`海滩|沙子|太阳|夏天`,
 tu_bot1:`每人秘密写下2到3件关于自己的真事，装进漂流瓶。`,
 tu_bot2:`瓶子一个个打开，没有名字：“我曾经在灯塔里睡过一晚。”是谁写的？`,
@@ -2845,7 +2954,7 @@ tu_msk2:`给他们写一条匿名消息，然后秘密选择：🤝🏻分享或
 tu_msk3:`🤝🏻+🤝🏻：各得4分，你的人脉多一条联系（从第2个人起有奖励）。`,
 tu_msk4:`🔒对🤝🏻：你得4分，对方1分……还会带上人人可见的🦈（结束时−1）。`,
 tu_msk5:`🔒+🔒：各2分。对🦈独占不会给你打标记。`,
-tu_msk6:`16分决赛：都分享各8分；一人偷全归他；都偷各−8。`});
+tu_msk6:`16分决赛：都分享各8分；一人偷得16分，每个🦈减4（另一人0分）；都偷各−8。`});
 GTUT('he',{tuB:`החוקים בתמונות`,tuOk:`הבנתי`,tuAgain:`שוב`,tuAll:`מההתחלה`,tun:`אנה|בן|קלאו|דן`,tuw:`חוף|חול|שמש|קיץ`,
 tu_bot1:`כל אחד כותב בסוד 2 או 3 דברים אמיתיים על עצמו, שנכנסים לבקבוקים.`,
 tu_bot2:`הבקבוקים נפתחים אחד אחד, בלי שם: „פעם ישנתי במגדלור". מי כתב?`,
@@ -2884,7 +2993,7 @@ tu_msk2:`כתבו להם הודעה אנונימית, ואז בחרו בסוד: 
 tu_msk3:`🤝🏻 + 🤝🏻: 4 לכל אחד, ועוד קשר ברשת שלך (בונוס מהאדם השני).`,
 tu_msk4:`🔒 מול 🤝🏻: 4 לך, 1 לשני… ו־🦈 שכולם יראו (‎−1 בסוף).`,
 tu_msk5:`🔒 + 🔒: 2 לכל אחד. שמירה מול 🦈 לא מסמנת אותך.`,
-tu_msk6:`גמר על 16 נקודות: שניהם חולקים, 8 לכל אחד; אחד גונב, הכול שלו; שניהם גונבים, ‎−8 לכל אחד.`});
+tu_msk6:`גמר על 16 נקודות: שניהם חולקים, 8 לכל אחד; אחד גונב, 16 לו פחות 4 לכל 🦈 (לשני: 0); שניהם גונבים, ‎−8 לכל אחד.`});
 GTUT('pt',{tuB:`As regras em imagens`,tuOk:`Entendi`,tuAgain:`Rever`,tuAll:`Do começo`,tun:`Ana|Ben|Cleo|Dan`,tuw:`Praia|Areia|Sol|Verão`,
 tu_bot1:`Cada um escreve em segredo 2 ou 3 coisas verdadeiras sobre si, colocadas em garrafas.`,
 tu_bot2:`As garrafas se abrem uma a uma, sem nome: "Já dormi num farol." Quem escreveu?`,
@@ -2923,7 +3032,7 @@ tu_msk2:`Escreva uma mensagem anônima e escolha em segredo: 🤝🏻 Dividir ou
 tu_msk3:`🤝🏻 + 🤝🏻: 4 para cada e mais um laço na sua rede (bônus a partir da 2ª pessoa).`,
 tu_msk4:`🔒 contra 🤝🏻: 4 para você, 1 para o outro… e um 🦈 que todos verão (−1 no fim).`,
 tu_msk5:`🔒 + 🔒: 2 para cada. Guardar contra um 🦈 não marca você.`,
-tu_msk6:`Final valendo 16 pontos: os dois dividem, 8 cada; um rouba, tudo para ele; os dois roubam, −8 cada.`});
+tu_msk6:`Final valendo 16 pontos: os dois dividem, 8 cada; um rouba, 16 para ele menos 4 por 🦈 (o outro: 0); os dois roubam, −8 cada.`});
 /* Réserves élargies (vague 2) : ~2-4× plus de contenus par ton + idées de Bouteilles (bot/bot1/bot2).
    Ajout en fin de liste : les index existants ne bougent pas, toutes les langues restent alignées sur fr. */
 const GXP=(l,o)=>{for(const k in o)GI18N[l][k]=GI18N[l][k]?GI18N[l][k]+'|'+o[k]:o[k]};
@@ -3478,6 +3587,16 @@ Object.assign(GI18N.ru.ui,{specB:`Я смотрю`,specD:`Следишь за и
 Object.assign(GI18N.zh.ui,{specB:`我只观看`,specD:`不参与游戏，只观看：你能看到公开内容，也可以互动和聊天。`,specL:`观看中：{n}`,specT:`游戏进行中：你先观看，下一局再加入。`,specT2:`你正在观看这局游戏。`,specH:`观看中 · 可以互动和聊天`});
 Object.assign(GI18N.he.ui,{specB:`אני צופה`,specD:`עוקבים אחרי המשחק בלי לשחק: רואים את מה שגלוי לכולם, ואפשר להגיב ולצ'וטט.`,specL:`צופים: {n}`,specT:`משחק בעיצומו: {g:אתה צופה ותשחק|את צופה ותשחקי} בסיבוב הבא.`,specT2:`{g:אתה צופה|את צופה} במשחק הזה.`,specH:`במצב צפייה · תגובות וצ'אט פתוחים`});
 Object.assign(GI18N.pt.ui,{specB:`Só assisto`,specD:`Acompanhe a partida sem jogar: você vê o que é público e pode reagir e conversar.`,specL:`Assistindo: {n}`,specT:`Partida em andamento: você assiste e joga a próxima.`,specT2:`Você está assistindo a esta partida.`,specH:`Assistindo · reações e chat abertos`});
+/* 👀 spectateur à tout moment (+ masque parti en cours de manche) */
+Object.assign(GI18N.fr.ui,{wOn:`Regarder sans jouer`,wOff:`Revenir jouer`,wQ:`Finalement, juste regarder`,wBtn:`Regarder`,wAsk:`Passer {g:spectateur|spectatrice|spectateur·rice} ? Tu sors de la partie en cours : tes points sont gardés, mais figés et hors classement.`,wNx:`Tu pourras revenir jouer dès la manche suivante.`,wNg:`Tu pourras revenir jouer à la partie suivante.`,wEnd:`Sans toi, trop peu de joueurs ({n}) : la partie s'arrêtera ici.`,wAskX:`Passer {g:spectateur|spectatrice|spectateur·rice} ? Tu sors de l'expédition en cours (ta carte reste) et tu pourras revenir quand tu veux.`,specJ:`Tu rejoins la partie à la prochaine manche.`,specP:`tes points (figés) : {v}`,specX:`Tu regardes l'expédition.`,specFz:`Points figés : a regardé la fin de la partie`,mvL:`Ton masque a quitté la partie : ce face-à-face vaut la moyenne de la manche, {v}.`});
+Object.assign(GI18N.en.ui,{wOn:`Watch without playing`,wOff:`Play again`,wQ:`Just watch after all`,wBtn:`Watch`,wAsk:`Switch to watching? You leave the current game: your points are kept, but frozen and out of the ranking.`,wNx:`You can come back from the next round.`,wNg:`You can come back for the next game.`,wEnd:`Too few players without you ({n}): the game will stop here.`,wAskX:`Switch to watching? You leave the current expedition (your map stays) and can come back whenever you like.`,specJ:`You rejoin the game at the next round.`,specP:`your points (frozen): {v}`,specX:`You're watching the expedition.`,specFz:`Frozen points: watched the end of the game`,mvL:`Your mask left the game: this face-off is worth the round's average, {v}.`});
+Object.assign(GI18N.es.ui,{wOn:`Mirar sin jugar`,wOff:`Volver a jugar`,wQ:`Al final, solo mirar`,wBtn:`Mirar`,wAsk:`¿Pasar a mirar? Sales de la partida en curso: tus puntos se guardan, pero congelados y fuera de la clasificación.`,wNx:`Podrás volver a jugar desde la próxima ronda.`,wNg:`Podrás volver a jugar en la próxima partida.`,wEnd:`Sin ti quedan muy pocos jugadores ({n}): la partida terminará aquí.`,wAskX:`¿Pasar a mirar? Sales de la expedición en curso (tu mapa se queda) y puedes volver cuando quieras.`,specJ:`Vuelves a la partida en la próxima ronda.`,specP:`tus puntos (congelados): {v}`,specX:`Estás mirando la expedición.`,specFz:`Puntos congelados: miró el final de la partida`,mvL:`Tu máscara dejó la partida: este cara a cara vale la media de la ronda, {v}.`});
+Object.assign(GI18N.it.ui,{wOn:`Guarda senza giocare`,wOff:`Torna a giocare`,wQ:`Alla fine, guardo e basta`,wBtn:`Guarda`,wAsk:`Passare a guardare? Esci dalla partita in corso: i tuoi punti restano, ma congelati e fuori classifica.`,wNx:`Potrai tornare a giocare dal prossimo round.`,wNg:`Potrai tornare a giocare alla prossima partita.`,wEnd:`Senza di te restano troppo pochi giocatori ({n}): la partita finirà qui.`,wAskX:`Passare a guardare? Esci dalla spedizione in corso (la tua mappa resta) e puoi tornare quando vuoi.`,specJ:`Rientri in partita al prossimo round.`,specP:`i tuoi punti (congelati): {v}`,specX:`Stai guardando la spedizione.`,specFz:`Punti congelati: ha guardato la fine della partita`,mvL:`La tua maschera ha lasciato la partita: questo faccia a faccia vale la media del round, {v}.`});
+Object.assign(GI18N.de.ui,{wOn:`Zuschauen statt spielen`,wOff:`Wieder mitspielen`,wQ:`Doch nur zuschauen`,wBtn:`Zuschauen`,wAsk:`Zum Zuschauen wechseln? Du verlässt das laufende Spiel: deine Punkte bleiben, aber eingefroren und außerhalb der Wertung.`,wNx:`Ab der nächsten Runde kannst du wieder mitspielen.`,wNg:`Beim nächsten Spiel kannst du wieder mitspielen.`,wEnd:`Ohne dich sind es zu wenige ({n}): das Spiel endet hier.`,wAskX:`Zum Zuschauen wechseln? Du verlässt die laufende Expedition (deine Karte bleibt) und kannst jederzeit zurückkommen.`,specJ:`Du steigst in der nächsten Runde wieder ein.`,specP:`deine Punkte (eingefroren): {v}`,specX:`Du schaust der Expedition zu.`,specFz:`Eingefrorene Punkte: hat dem Ende zugeschaut`,mvL:`Deine Maske hat das Spiel verlassen: dieses Duell zählt den Rundendurchschnitt, {v}.`});
+Object.assign(GI18N.ru.ui,{wOn:`Смотреть, не играя`,wOff:`Вернуться в игру`,wQ:`Всё-таки просто смотреть`,wBtn:`Смотреть`,wAsk:`Перейти в зрители? Ты выходишь из текущей игры: очки сохраняются, но замораживаются и не идут в зачёт.`,wNx:`Вернуться можно со следующего раунда.`,wNg:`Вернуться можно в следующей игре.`,wEnd:`Без тебя игроков слишком мало ({n}): игра закончится здесь.`,wAskX:`Перейти в зрители? Ты выходишь из текущей экспедиции (твоя карта остаётся) и можешь вернуться, когда захочешь.`,specJ:`Ты вернёшься в игру в следующем раунде.`,specP:`твои очки (заморожены): {v}`,specX:`Ты смотришь экспедицию.`,specFz:`Очки заморожены: досматривал(а) игру`,mvL:`Твоя маска вышла из игры: эта дуэль стоит среднего за раунд, {v}.`});
+Object.assign(GI18N.zh.ui,{wOn:`只观看不参与`,wOff:`回来玩`,wQ:`还是只观看`,wBtn:`观看`,wAsk:`切换为观看？你将退出当前这局：分数会保留，但会冻结且不计入排名。`,wNx:`你可以从下一轮起回来玩。`,wNg:`你可以在下一局回来玩。`,wEnd:`没有你人数太少（{n}人）：这局将在此结束。`,wAskX:`切换为观看？你将退出当前探险（你的地图会保留），随时可以回来。`,specJ:`你将在下一轮重新加入。`,specP:`你的分数（已冻结）：{v}`,specX:`你正在观看探险。`,specFz:`分数已冻结：观看了这局的结尾`,mvL:`你的面具已离开游戏：这场对决按本轮平均分计算，{v}。`});
+Object.assign(GI18N.he.ui,{wOn:`לצפות בלי לשחק`,wOff:`לחזור לשחק`,wQ:`בעצם רק לצפות`,wBtn:`לצפות`,wAsk:`לעבור לצפייה? {g:אתה יוצא|את יוצאת} מהמשחק הנוכחי: הנקודות שלך נשמרות, אבל מוקפאות ומחוץ לדירוג.`,wNx:`אפשר לחזור לשחק מהסבב הבא.`,wNg:`אפשר לחזור לשחק במשחק הבא.`,wEnd:`בלעדיך נשארים מעט מדי שחקנים ({n}): המשחק ייגמר כאן.`,wAskX:`לעבור לצפייה? {g:אתה יוצא|את יוצאת} מהמסע הנוכחי (המפה שלך נשארת) ואפשר לחזור מתי שרוצים.`,specJ:`{g:אתה חוזר|את חוזרת} למשחק בסבב הבא.`,specP:`הנקודות שלך (מוקפאות): {v}`,specX:`{g:אתה צופה|את צופה} במסע.`,specFz:`נקודות מוקפאות: צפה/תה בסוף המשחק`,mvL:`המסכה שלך עזבה את המשחק: הדו־קרב הזה שווה את ממוצע הסבב, {v}.`});
+Object.assign(GI18N.pt.ui,{wOn:`Assistir sem jogar`,wOff:`Voltar a jogar`,wQ:`Afinal, só assistir`,wBtn:`Assistir`,wAsk:`Passar a assistir? Você sai da partida em curso: seus pontos ficam guardados, mas congelados e fora da classificação.`,wNx:`Você pode voltar a jogar a partir da próxima rodada.`,wNg:`Você pode voltar a jogar na próxima partida.`,wEnd:`Sem você ficam poucos jogadores ({n}): a partida vai acabar aqui.`,wAskX:`Passar a assistir? Você sai da expedição em curso (seu mapa fica) e pode voltar quando quiser.`,specJ:`Você volta à partida na próxima rodada.`,specP:`seus pontos (congelados): {v}`,specX:`Você está assistindo à expedição.`,specFz:`Pontos congelados: assistiu ao fim da partida`,mvL:`Sua máscara saiu da partida: este frente a frente vale a média da rodada, {v}.`});
 /* /👀 */
 /* 📜 Livre de bord : textes */
 Object.assign(GI18N.fr.ui,{lgT:`Livre de bord`,lgLast:`La dernière fois : {t}`,lg_win:`{a} a remporté {g}`,lg_win2:`{a} et {b} ont remporté {g}`,lg_prlC:`{a} s'est fait démasquer en Perle noire`,lg_prlD:`{a} a plongé 🤿 en Perle noire et trouvé le mot des autres`,lg_prlH:`{a} est passé{g.a:|e|·e} inaperçu{g.a:|e|·e} en Perle noire`,lg_chnC:`{a} s'est fait démasquer en Naufrageur`,lg_chnW:`{a} a coulé la flotte en Naufrageur`,lg_chnW2:`{a} et {b} ont coulé la flotte en Naufrageurs`,lg_mimC:`{a} s'est fait démasquer en Mimétique`,lg_mimW:`{a} a filé avec les perles en Mimétique`,lg_mimW2:`{a} et {b} ont filé avec les perles en Mimétiques`,lg_mskS:`{a} a tout volé à {b} en finale des Masques`,lg_mskP:`{a} et {b} ont partagé le trésor en finale des Masques`,lg_mskB:`{a} et {b} ont voulu tout voler en finale des Masques : perdu pour les deux`,lq_c:`se ferait démasquer le plus vite la prochaine fois`,lq_s:`bluffe le mieux sans en avoir l'air`,lq_v:`volerait tout le trésor sans trembler`,lq_t:`partagerait le trésor sans hésiter`,lq_w:`battrait {a} à la revanche`});
