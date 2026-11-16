@@ -10,7 +10,8 @@
                      Ouvre l'étape suivante (gWait) ou met g.over=1.
      view(s)       : -> {html, hint?, hintBtn?, mine?, bind?}  (s = état VU par ce joueur, déjà filtré)
      hide(g,name)  : optionnel, copie de g sans les secrets des autres (appelé par viewFor côté hôte).
-     fin(s)        : -> {pts:{nom:points}, coop?} quand g.over ; endView(s) optionnel pour l'écran final.
+     fin(s)        : -> {pts:{nom:points}, coop?} quand g.over ; endView(s) optionnel pour l'écran final ;
+                     lost(s) optionnel : true = défaite commune d'un coopératif (pas de confettis).
    }
    Étapes : gWait(g,sec,nom,rv) => nouveau g.k (anime), done={}, sablier g.dl. rv=1 : étape de révélation,
    chacun clique « Continuer » (géré ici) — on avance quand TOUT le monde est prêt ou sablier vide.
@@ -244,7 +245,9 @@ function gEndView(s){const g=s.game,G=GAMES[g.id],R=s.gres||{pts:{}},host=meN()=
  return{html,mine:host,hint:host?GT('hostNext'):GT('waitHostN',{n:B(s.host)}),bind(){
   $$('[data-gend]').forEach(b=>b.onclick=()=>send({t:'gx',v:b.dataset.gend}));
   gAnim($('section>.gw'),'e'+s.gid);
-  if(GV.fx!=='end'+s.gid){GV.fx='end'+s.gid;if(!RM())setTimeout(()=>{try{confetti(rows[0]&&rows[0][0]==meN()||R.coop?50:24)}catch(e){}},350)}}}}
+  /* G.lost(s) : défaite commune d'un jeu coopératif (ex. Le Sauvetage emporté par la tempête) → pas de confettis */
+  const lost=!!(G.lost&&G.lost(s));
+  if(GV.fx!=='end'+s.gid){GV.fx='end'+s.gid;if(!RM()&&!lost)setTimeout(()=>{try{confetti(rows[0]&&rows[0][0]==meN()||R.coop?50:24)}catch(e){}},350)}}}}
 
 /* @games : carte « Salle de jeux » du salon */
 W.GLobby=function(host,on,E){const sel=st.gsel&&GAMES[st.gsel]?st.gsel:'',on0=on;on=gPl(st).length;/* 👀 les spectateurs ne comptent pas */
@@ -4191,400 +4194,350 @@ tu_aby6:`A dois: 3 mergulhos cada. Quem lidera não pode mergulhar: o duelo se e
 lg_abyP:`{a} quase não esqueceu nada no abismo`,lg_abyD:`{a} acertou dois mergulhos profundos`,lg_abyC:`{a} foi do último lugar à vitória no abismo`});
 /* /🫧 i18n */
 /* =====================================================================
-   🆘 LE SAUVETAGE — fiche (coopératif, 2 à 8, ~15 min)
-   Coopératif et silencieux (mute:1, comme Tempête : chat coupé, réactions seulement). Une mer en grille ; des naufragés
-     cachés. Chaque personne a des BOUÉES (publiques) et un SONAR privé : pour chaque bouée, le nombre de naufragés à
-     0, 1, 2, 3 pas (distance sans diagonale) = 4 « anneaux ». Personne ne peut tout déduire seul·e.
-   Manche (75 s × sablier de l'hôte ; sans sablier : quand tout le monde est prêt), tout en même temps et modifiable
-     jusqu'au bout (✏️ Modifier une fois prêt·e) : 📡 un anneau PAR BOUÉE à partager (défaut : le plus proche pas encore
-     partagé — aussi pour les absent·es, la partie ne bloque jamais), jusqu'à 3 repères (! naufragé / ✕ vide, rendus
-     publics à la fin de la manche) et 1 plongée 🤿 (ou aucune). Fin de manche : anneaux et repères révélés, plongées
-     résolues (deux sur la même case = une seule), ⛈️ −2, et −1 par case plongée à vide. Jamais d'élimination ni de
-     défaite brutale : seule la tempête termine (ou tout le monde repêché). Score = repêchés / total (fin coop).
-   Carte : chacun voit SES anneaux + les anneaux partagés ; reste = naufragés pas encore repêchés sur l'anneau ; une case
-     d'un anneau à 0 est éclaircie (simple tenue de compte, aucune déduction croisée faite à la place des joueurs).
-   Génération (sauGen) : bouées « le plus loin possible » couvrant toute la mer, naufragés au hasard ; on garde la carte
-     seulement si la réunion de TOUS les sonars n'a qu'UNE solution (solveur sauSol : propagation + branchement) et si
-     aucune personne seule n'en a qu'une. Taille selon le nombre (à 2 : 3 bouées chacun, vraie variante) :
-     n=2 7×7, 6 naufragés · 3 7×7, 7 · 4 8×8, 8 · 5 8×8, 9 · 6 9×9, 10 · 7 9×9, 11 · 8 9×9, 12 ; tempête 10/11/12/11/12/11/10.
-   SIM (.sim/sau.js, 400 parties/taille, IA coopératives : bonne = voit 85 % des anneaux partagés, repère 50 % des cases
-     certaines par manche, partage l'anneau le plus utile, se coordonne, parie très peu ; moyenne = 70 % / 40 %, partage au
-     hasard, parie parfois, plongées en double ; faible = 50 % / 30 %, partage par défaut, parie souvent) :
-     victoire n=2→8 : bonne 93/93/98/98/99/99/98 % · moyenne 59/65/66/59/67/55/44 % · faible 32/17/21/12/10/4/2 %.
-     Durée : 4 à 6 manches (8 à 12 min avec la réflexion). Coopératif et simultané : aucun siège ne compte.
-     Rejetés : 1 bouée chacun (à 3-7, la réunion des sonars n'a presque jamais une seule solution), tempête −1 par
-     manche (trop grossier : 98/45/1 %), coût d'une plongée à vide partagé par manche (plonger au hasard devenait rentable).
+   🆘 LE SAUVETAGE — fiche (coopératif, 2 à 8, ~6 min) — refonte « compris en 20 secondes »
+   Une mer en damier (5×5 ou 6×6, colonnes A…, rangées 1…), des naufragés cachés. Objectif affiché en haut :
+     « Repêchez les 5 naufragés avant la tempête · 🙋🏻 3/5 ». Coopératif, aucune élimination.
+   Manche (60 s × sablier de l'hôte ; sans sablier : quand tout le monde est prêt), tout le monde en même temps :
+     • chacun reçoit UN indice secret lisible 🔒 : « Rangée 3 : 2 naufragés » / « Colonne B : personne » (une rangée
+       ou colonne pas encore connue, différente pour chacun ; quand il n'y en a plus : « Case C4 : personne / un
+       naufragé ! » sur une case encore incertaine) ;
+     • chacun choisit une case où plonger 🤿 (ou reste à bord). Les cibles sont visibles de tous en direct (petits
+       points de couleur) : on peut se coordonner sans parler, et son choix trahit un peu son indice — c'est voulu.
+       Modifiable jusqu'à la fin de l'étape (✏️ Modifier = plus prêt·e).
+   Fin de manche : plongées résolues (deux sur la même case = une seule), TOUS les indices de la manche sont dévoilés
+     sur la carte (chiffres au bout des rangées / colonnes = naufragés restants), ⛈️ +1, et +1 par case plongée à vide.
+     Journal clair : « 🤿 Sam · C4 : personne ici, la tempête avance de 1 ». Fin : tout le monde repêché, ou tempête.
+   Tenue de compte (pas de déduction croisée) : une ligne à 0 restant et les cases « personne » sont grisées (mer
+     calme) et ne se plongent pas ; tout le reste est à déduire en croisant rangées et colonnes.
+   Absent·es : ne plongent pas, leur indice est quand même dévoilé ; la partie ne bloque jamais. Arrivée en cours
+     de partie : joue dès la manche suivante (join).
+   SIM (.sim/sau.js, 400 parties par taille dont 1/4 avec un·e absent·e, IA nourries par la vraie vue filtrée par hide,
+     moteur réel GAct/gTick) : 0 blocage, 0 fuite. Victoire n=2→8 :
+     attentive (plonge sur le sûr, sinon si ≥ 50 %, évite les cibles des autres) 79/78/78/83/85/90/79 % ;
+     attentive mais distraite (rate 20 % des indices, regarde les cibles 1 fois sur 2) 74/80/77/91/90/91/84 % ;
+     au hasard (plonge une fois sur deux, case au hasard) 6/10/7/4/4/4/2 %. 3 à 7 manches.
+     Le hasard est puni vite (chaque plongée à vide coûte) : écart voulu entre « on croise les indices » et « on tente ».
+   Rejeté : anneaux de sonar + bouées + repères (version 1 : « un démineur à information partagée », trop abstrait) ;
+     7×7 à 6-8 (2 manches pour tout dévoiler, le hasard ne gagnait jamais) ; tempête plafonnée par manche (pas plus
+     juste, moins lisible) ; plus de naufragés (rallonge sans rien apprendre).
    ===================================================================== */
-/* CF[n] = [largeur, hauteur, naufragés, bouées par personne, portée du sonar] ; T[n] = crans de tempête au départ */
-const SAU={CF:[0,0,[7,7,6,3,3],[7,7,7,2,3],[8,8,8,2,3],[8,8,9,2,3],[9,9,10,2,3],[9,9,11,2,3],[9,9,12,2,3]],
- T:[0,0,10,11,12,11,12,11,10],RC:2,RT:75,PN:3};
-const sauD=(W,a,b)=>Math.abs(a%W-b%W)+Math.abs((a/W|0)-(b/W|0));
-const sauRing=(W,H,c,d)=>{const o=[];for(let i=0;i<W*H;i++)if(sauD(W,c,i)==d)o.push(i);return o};
-const sauBin=(f,k,cap)=>{let r=1;for(let i=1;i<=k;i++){r=r*(f-k+i)/i;if(r>=cap)return cap}return Math.round(r)};
-/* solveur : cases 0/1, contraintes « k naufragés parmi ces cases » + total ; fix[i] = -1 inconnu / 0 vide / 1 naufragé.
-   Propagation (k = 0 → tout vide, k = libres → tout plein) + branchement sur la contrainte la plus serrée. Compte jusqu'à lim. */
-function sauSol(N,cons,tot,fix,lim,rnd){lim=lim||2;
- const C=cons.map(x=>x.c).concat([[...Array(N).keys()]]),M=C.length,G=M-1,need=cons.map(x=>x.k).concat([tot]),free=C.map(c=>c.length);
- const inC=[...Array(N)].map(()=>[]);C.forEach((c,j)=>c.forEach(i=>inC[i].push(j)));
- const v=new Int8Array(N).fill(-1);
- const set=(i,b)=>{v[i]=b;for(const j of inC[i]){free[j]--;if(b)need[j]--}},uns=i=>{const b=v[i];v[i]=-1;for(const j of inC[i]){free[j]++;if(b)need[j]++}};
- if(fix)for(let i=0;i<N;i++)if(fix[i]>=0)set(i,fix[i]);
- const bad=j=>need[j]<0||need[j]>free[j];let n=0,sol=null;
- for(let j=0;j<M;j++)if(bad(j))return{n:0,sol:null};
- const rec=()=>{if(n>=lim)return;const tr=[];let ok=true;
-  for(let ch=1;ch&&ok;){ch=0;for(let j=0;j<M;j++){if(bad(j)){ok=false;break}
-   if(free[j]&&(need[j]==0||need[j]==free[j])){const b=need[j]?1:0;for(const i of C[j])if(v[i]<0){set(i,b);tr.push(i)}ch=1}}}
-  if(ok){let bj=-1,bf=1e9;for(let j=0;j<G;j++)if(free[j]&&free[j]<bf){bf=free[j];bj=j}
-   if(bj<0){n+=sauBin(free[G],need[G],lim);if(!sol){sol=Array.from(v);let fr=sol.map((x,i)=>x<0?i:-1).filter(i=>i>=0);
-     if(rnd)for(let i=fr.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[fr[i],fr[j]]=[fr[j],fr[i]]}fr.forEach((i,j)=>sol[i]=j<need[G]?1:0)}}
-   else{const cs=C[bj].filter(i=>v[i]<0),i=rnd?cs[Math.floor(rnd()*cs.length)]:cs[0],ord=rnd?(rnd()<need[bj]/free[bj]?[1,0]:[0,1]):[1,0];
-    for(const b of ord){set(i,b);rec();uns(i);if(n>=lim)break}}}
-  for(let t=tr.length-1;t>=0;t--)uns(tr[t])};
- rec();return{n:Math.min(n,lim),sol}}
-/* contraintes connues : anneaux [{b,d,k}] des bouées B */
-const sauCons=(W,H,B,L)=>L.map(x=>({c:sauRing(W,H,B[x.b],x.d),k:x.k}));
-/* génération : bouées bien réparties qui couvrent toute la mer, naufragés au hasard ; on garde la carte seulement si
-   la réunion de TOUS les sonars n'admet qu'une solution, et si personne ne peut la trouver seul·e */
-function sauGen(n,rnd){rnd=rnd||Math.random;const[W,H,S,nb,R]=SAU.CF[n],N=W*H,NB=n*nb,D=(a,b)=>sauD(W,a,b);
- const pick=k=>{const a=[...Array(N).keys()];for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a.slice(0,k)};
- /* bouées : point le plus éloigné des autres (départ et égalités au hasard), jamais sur le bord si possible */
- const far=()=>{const b=[pick(1)[0]];while(b.length<NB){let bv=-1,bc=[];for(let i=0;i<N;i++){if(b.includes(i))continue;const x=i%W,y=i/W|0,m=Math.min(...b.map(z=>D(z,i)))-(x==0||y==0||x==W-1||y==H-1?.6:0);
-   if(m>bv+1e-9){bv=m;bc=[i]}else if(Math.abs(m-bv)<1e-9)bc.push(i)}b.push(bc[Math.floor(rnd()*bc.length)])}return b};
- let B=null;
- for(let t=0;t<900;t++){if(!B||t%15==0){B=null;for(let k=0;k<30&&!B;k++){const b=far();if([...Array(N).keys()].every(i=>b.some(x=>D(x,i)<=R)))B=b}}
-  if(!B)continue;const sv=pick(S).sort((a,b)=>a-b);
-  const rg=B.map(b=>{const r=Array(R+1).fill(0);sv.forEach(c=>{const d=D(b,c);if(d<=R)r[d]++});return r});
-  const all=bi=>bi.flatMap(b=>rg[b].map((k,d)=>({b,d,k})));
-  if(sauSol(N,sauCons(W,H,B,all(B.map((_,i)=>i))),S,null,2).n!=1)continue;
-  let solo=false;for(let p=0;p<n&&!solo;p++)if(sauSol(N,sauCons(W,H,B,all([...Array(nb).keys()].map(j=>p*nb+j))),S,null,2).n<2)solo=true;
-  if(solo)continue;return{W,H,R,S,nb,B,sv,rg}}
- return null}
-const SG={t:'v',hl:null};/* affichage local (jamais envoyé) : outil choisi, anneau surligné */
-GAMES.sau={icon:'🆘',rx:RX,min:2,max:8,dur:12,tags:['skill'],mute:1,SAU,gen:sauGen,sol:sauSol,
- init(s){const g=s.game,n=s.order.length;let P=null;while(!P)P=sauGen(n);const pl=shuf(s.order);
-  g.W=P.W;g.H=P.H;g.R=P.R;g.S=P.S;g.nb=P.nb;g.bu=P.B.map((c,i)=>({p:pl[Math.floor(i/P.nb)],c,j:i%P.nb}));g.sv=P.sv;g.rg=P.rg;
-  g.sh=[];g.fd=[];g.em=[];g.tk=g.T0=SAU.T[n];g.pn={};g.ev=null;g.rs={};g.wd={};this.go(s)},
- go(s){const g=s.game;g.ch={};gWait(g,SAU.RT,'p')},
- kn(g,i){return g.fd.some(x=>x.c==i)||g.em.some(x=>x.c==i)},
- isSh(g,b,d){return g.sh.some(x=>x.b==b&&x.d==d)},
- un(g,b){const o=[];for(let d=0;d<=g.R;d++)if(!this.isSh(g,b,d))o.push(d);return o},
- act(s,from,a){const g=s.game;if(g.st!='p')return;const N=g.W*g.H,c=g.ch[from]||(g.ch[from]={s:{},v:-1,p:{}});
-  if(a.rdy){g.done[from]=1;return true}
-  if(a.sh){const b=+a.sh.b,d=+a.sh.d;if(!g.bu[b]||g.bu[b].p!=from||!Number.isInteger(d)||d<0||d>g.R||this.isSh(g,b,d))return;c.s[b]=d;return true}
-  if(a.v!=null){const v=+a.v;if(v!==-1&&!(Number.isInteger(v)&&v>=0&&v<N&&!this.kn(g,v)))return;c.v=v;return true}
-  if(a.pn){const i=+a.pn.c,t=a.pn.t||0;if(!Number.isInteger(i)||i<0||i>=N||!['y','x',0].includes(t))return;
-   if(!t){if(!(i in c.p))return;delete c.p[i];return true}if(this.kn(g,i)||(!(i in c.p)&&Object.keys(c.p).length>=SAU.PN))return;c.p[i]=t;return true}},
- /* fin de manche : un anneau par bouée (le choix, sinon le plus proche pas encore partagé — absent·es compris),
-    plongées (deux sur la même case = une seule), repères rendus publics, la tempête avance */
- next(s){const g=s.game;if(g.st!='p')return;const SV=new Set(g.sv),nw=[],D={},dv=[];let w=0;
-  g.bu.forEach((u,b)=>{const c=g.ch[u.p],un=this.un(g,b);if(!un.length)return;const d=c&&un.includes(c.s[b])?c.s[b]:un[0];g.sh.push({b,d,k:g.rg[b][d],r:g.r});nw.push(g.sh.length-1)});
-  s.order.forEach(p=>{const c=g.ch[p];if(c&&c.v>=0&&!this.kn(g,c.v))(D[c.v]=D[c.v]||[]).push(p)});
-  for(const k in D){const i=+k,ps=D[k],ok=SV.has(i);(ok?g.fd:g.em).push({c:i,p:ps,r:g.r});
-   ps.forEach(p=>{if(ok)g.rs[p]=(g.rs[p]||0)+1;else g.wd[p]=(g.wd[p]||0)+1});if(ok)g.lr=ps[0];else w++;dv.push({c:i,p:ps,ok:ok?1:0})}
-  g.pn={};s.order.forEach(p=>{const c=g.ch[p],o={};if(c)for(const i in c.p)if(!this.kn(g,+i))o[i]=c.p[i];if(Object.keys(o).length)g.pn[p]=o});
-  g.tk=Math.max(0,g.tk-SAU.RC-w);g.ev={r:g.r,dv,sh:nw,w};g.r++;
-  if(g.fd.length>=g.S||g.tk<=0){g.over=1;g.ch={};return}this.go(s)},
- /* secrets : les naufragés (personne), les sonars (chacun les siens), les choix en cours (chacun les siens) */
- hide(g,n){const o={...g};delete o.sv;o.rg=g.rg.map((r,b)=>g.bu[b].p==n?r:null);o.ch=g.ch&&g.ch[n]?{[n]:g.ch[n]}:{};return o},
- fin(s){const g=s.game;return{pts:g.sc,coop:{v:g.fd.length,max:g.S}}},
+/* CF[n] = [côté de la mer, naufragés, crans de tempête au départ] */
+const SAU={CF:[0,0,[5,5,9],[5,5,7],[5,5,6],[6,6,7],[6,7,7],[6,7,7],[6,7,6]],RT:60,L:'ABCDEF'};
+const sauX=(W,i)=>SAU.L[i%W]+((i/W|0)+1);/* nom de case : lettre de colonne + numéro de rangée (toujours en ltr) */
+const sauLn=(W,t,i)=>{const o=[];for(let j=0;j<W;j++)o.push(t=='r'?i*W+j:j*W+i);return o};
+GAMES.sau={icon:'🆘',rx:RX,min:2,max:8,dur:6,tags:['skill'],join:1,SAU,
+ init(s){const g=s.game,n=Math.min(8,Math.max(2,s.order.length)),[W,S,T]=SAU.CF[n];
+  g.W=W;g.S=S;g.T0=g.tk=T;g.sv=shuf([...Array(W*W).keys()]).slice(0,S).sort((a,b)=>a-b);
+  g.pub=[];g.cl={};g.ch={};g.fd=[];g.em=[];g.ev=null;g.rs={};g.wd={};this.go(s)},
+ go(s){const g=s.game;gJn(s);this.deal(s);g.ch={};gWait(g,SAU.RT,'p')},
+ /* ce que sait m (indices publics + son indice secret ; m=null : public seulement) */
+ info(g,m){const W=g.W,F=new Set(g.fd.map(x=>x.c)),E=new Set(g.em.map(x=>x.c)),L=g.pub.slice(),c=m&&g.cl&&g.cl[m];
+  if(c&&!L.some(y=>y.t==c.t&&y.i==c.i))L.push({...c,own:1});
+  const emp=new Set(E),yes=new Set(),ln={};
+  L.forEach(x=>{if(x.t=='x'){if(x.k)yes.add(x.i);else emp.add(x.i);return}
+   const cs=sauLn(W,x.t,x.i),rem=x.k-cs.filter(i=>F.has(i)).length;ln[x.t+x.i]={rem,own:x.own?1:0};if(rem<=0)cs.forEach(i=>{if(!F.has(i))emp.add(i)})});
+  F.forEach(i=>{yes.delete(i);emp.delete(i)});yes.forEach(i=>emp.delete(i));return{F,E,emp,yes,ln}},
+ /* un indice par personne : une rangée / colonne pas encore dévoilée (différente pour chacun), sinon une case incertaine */
+ deal(s){const g=s.game,W=g.W,I=this.info(g,null),have=new Set(g.pub.filter(x=>x.t!='x').map(x=>x.t+x.i)),SV=new Set(g.sv);
+  const lines=shuf([...Array(W).keys()].flatMap(i=>[{t:'r',i},{t:'c',i}]).filter(x=>!have.has(x.t+x.i)));
+  const cells=shuf([...Array(W*W).keys()].filter(i=>!I.F.has(i)&&!I.emp.has(i)&&!I.yes.has(i)));g.cl={};
+  shuf(s.order).forEach(p=>{let x=lines.shift();if(x)x.k=sauLn(W,x.t,x.i).filter(i=>SV.has(i)).length;else{const i=cells.shift();x=i==null?null:{t:'x',i,k:SV.has(i)?1:0}}if(x)g.cl[p]=x})},
+ act(s,from,a){const g=s.game;if(g.st!='p')return;
+  if(a.rdy){if(g.done[from])return;g.done[from]=1;return true}
+  if(a.v!=null){const v=+a.v;if(v!==-1){if(!Number.isInteger(v)||v<0||v>=g.W*g.W)return;const I=this.info(g,from);if(I.F.has(v)||I.emp.has(v))return}
+   const cur=g.ch[from]==null?-1:g.ch[from];if(cur===v)return;if(v===-1)delete g.ch[from];else g.ch[from]=v;return true}},
+ /* fin de manche : plongées (deux sur la même case = une seule), indices dévoilés, la tempête avance */
+ next(s){const g=s.game;if(g.st!='p')return;const SV=new Set(g.sv),F=new Set(g.fd.map(x=>x.c)),E=new Set(g.em.map(x=>x.c)),D={},dv=[];let w=0;
+  s.order.forEach(p=>{const v=g.ch[p];if(Number.isInteger(v)&&v>=0&&!F.has(v)&&!E.has(v))(D[v]=D[v]||[]).push(p)});
+  for(const k in D){const i=+k,ps=D[k],ok=SV.has(i);(ok?g.fd:g.em).push({c:i,p:ps,r:g.r});ps.forEach(p=>{const o=ok?g.rs:g.wd;o[p]=(o[p]||0)+1});
+   if(ok)g.lr=ps[0];else w++;dv.push({c:i,p:ps,ok:ok?1:0})}
+  const cl=[];s.order.forEach(p=>{const x=g.cl[p];if(x&&!g.pub.some(y=>y.t==x.t&&y.i==x.i)){g.pub.push({...x,p,r:g.r});cl.push(g.pub.length-1)}});
+  const dt=1+w;g.tk=Math.max(0,g.tk-dt);g.ev={r:g.r,dv,cl,w,dt};g.r++;g.cl={};g.ch={};
+  if(g.fd.length>=g.S||g.tk<=0){g.over=1;return}this.go(s)},
+ /* secrets : les naufragés (personne), l'indice de la manche (chacun le sien) */
+ hide(g,n){const o={...g};delete o.sv;o.cl=g.cl&&g.cl[n]?{[n]:g.cl[n]}:{};return o},
+ fin(s){const g=s.game;return{pts:g.sc,coop:{v:g.fd.length,max:g.S}}},lost(s){const g=s.game;return g.fd.length<g.S},
  log(s){const g=s.game,L=[],R=g.rs||{},mx=Math.max(0,...s.order.map(p=>R[p]||0)),top=s.order.filter(p=>(R[p]||0)==mx);
-  if(mx>=3&&top.length==1)L.push({k:'sauR',n:top});if(g.fd.length>=g.S&&g.lr&&g.tk<=2)L.push({k:'sauL',n:[g.lr]});return L},/* 📜 */
+  if(mx>=2&&top.length==1)L.push({k:'sauR',n:top});if(g.fd.length>=g.S&&g.lr&&g.tk<=1)L.push({k:'sauL',n:[g.lr]});return L},/* 📜 */
  /* ---------- vue ---------- */
- /* ce que JE sais : mes anneaux + ceux partagés ; reste = naufragés pas encore repêchés sur l'anneau */
- rings(g,m){const L=[],F=new Set(g.fd.map(x=>x.c));
-  g.bu.forEach((u,b)=>{const r=(g.rg||[])[b];if(r&&u.p==m)r.forEach((k,d)=>L.push({b,d,k,own:1,sh:this.isSh(g,b,d)}))});
-  g.sh.forEach(x=>{if(!L.some(y=>y.b==x.b&&y.d==x.d))L.push({b:x.b,d:x.d,k:x.k,own:0,sh:1})});
-  L.forEach(x=>{x.c=sauRing(g.W,g.H,g.bu[x.b].c,x.d);x.rem=x.k-x.c.filter(i=>F.has(i)).length});return L},
- bdot(g,b,cl){const u=g.bu[b];return `<i class="saubd ${cl||''}" style="--c:${col(u.p)}" dir="ltr">${u.j+1}</i>`},
- map(s,g,m,o){const W=g.W,N=W*g.H,K=this.rings(g,m),F={},E={},cl=new Set(),tk=[...Array(N)].map(()=>[]),c=(g.ch||{})[m]||{p:{},v:-1},lst=g.ev?g.ev.r:-9;
-  g.fd.forEach(x=>F[x.c]=x);g.em.forEach(x=>E[x.c]=x);
-  K.forEach(x=>{if(x.rem<=0)x.c.forEach(i=>cl.add(i));else x.c.forEach(i=>tk[i].push(g.bu[x.b].p))});
-  const hl=o.hl?K.find(x=>x.b+':'+x.d==o.hl):null,H=new Set(hl?hl.c:[]),Bu={};g.bu.forEach((u,b)=>Bu[u.c]=b);
-  const pins={};for(const p in g.pn||{})for(const i in g.pn[p])(pins[i]=pins[i]||[]).push([p,g.pn[p][i]]);
-  const miss=o.end?new Set((g.sv||[]).filter(i=>!F[i])):new Set();
-  const cells=[...Array(N).keys()].map(i=>{const f=F[i],e=E[i],k=f||e,nw=k&&k.r==lst&&!o.end?'nw':'',b=Bu[i],my=c.v==i,mp=c.p[i];
-   const cls=['sauc',f?'fd':'',e?'em':'',!k&&cl.has(i)?'clr':'',H.has(i)?'hl':'',my?'dv':'',miss.has(i)?'ms':'',nw].filter(Boolean).join(' ');
-   const tks=!k&&!cl.has(i)&&tk[i].length?`<span class="saut">${tk[i].slice(0,6).map(p=>`<i style="--c:${col(p)}"></i>`).join('')}</span>`:'';
-   const pn=(pins[i]||[]).slice(0,4).map(([p,t])=>`<i class="saupn ${t}" style="--c:${col(p)}">${t=='y'?'!':'✕'}</i>`).join('');
-   const in_=f?'<b class="sauf">🙋🏻</b>':e?'<b class="saue">✕</b>':miss.has(i)?'<b class="sauf">🙋🏻</b>':'';
-   return `<${o.on?'button':'span'} class="${cls}" ${o.on?`data-sc="${i}" aria-label="${(i%W)+1}·${(i/W|0)+1}"`:''}>${tks}${b!=null?this.bdot(g,b):''}${in_}${pn?`<span class="saupns">${pn}</span>`:''}${mp?`<i class="saump ${mp}">${mp=='y'?'!':'✕'}</i>`:''}${my?'<b class="saudv">🤿</b>':''}</${o.on?'button':'span'}>`}).join('');
-  return `<div class="saumw"><div class="saum" dir="ltr" style="--w:${W}">${cells}</div></div>`},
- storm(g){const T=g.T0,t=g.tk,nx=Math.min(t,SAU.RC);
-  return `<div class="saust"><span class="sausi">⛈️</span><span class="saubar" dir="ltr">${[...Array(T).keys()].map(j=>`<i class="${j<t-nx?'on':j<t?'on nx':''}"></i>`).join('')}</span><b class="sautk">${GTn('sauTk',t)}</b></div>`},
- evt(s,g){const e=g.ev;if(!e)return `<p class="sauev">${GT('sauGo')}</p>`;
-  const d=e.dv.map(x=>`<span class="sauevi ${x.ok?'ok':'no'}">${x.p.map(p=>DT(p)).join('')}${x.ok?'🙋🏻':'✕'}</span>`).join('');
-  return `<p class="sauev" aria-live="polite">${d||`<span class="mut">${GT('sauEv0')}</span>`}${e.sh.length?`<span class="sauevs">📡 ${GTn('sauEvS',e.sh.length)}</span>`:''}${e.w?`<span class="sauevw">⛈️ −${e.w}</span>`:''}</p>`},
- view(s){const g=s.game,m=meN(),R=this,pl=s.order.includes(m),c=(g.ch||{})[m]||{s:{},v:-1,p:{}},dn=!!g.done[m],on=pl&&!dn,K=R.rings(g,m);
-  if(SG.k!==s.gid+g.k){SG.k=s.gid+g.k;SG.hl=null}
-  const mine=g.bu.map((u,b)=>b).filter(b=>g.bu[b].p==m);
-  /* mon sonar : un rang par bouée ; anneau choisi pour le partage = choix sinon le plus proche pas encore partagé */
-  const son=pl?`<div class="sausn"><p class="gpre">📡 ${GT('sauMine')}</p>${mine.map(b=>{const un=R.un(g,b),pick=un.includes(c.s[b])?c.s[b]:un[0];
-   return `<div class="saurw">${R.bdot(g,b,'big')}${K.filter(x=>x.b==b).map(x=>{const k=x.b+':'+x.d,sel=!x.sh&&x.d==pick;
-    return `<button class="sauk ${x.sh?'sh':''} ${sel?'sel':''} ${SG.hl==k?'hl':''} ${x.rem<=0?'z':''}" data-sk="${k}" ${on||x.sh?'':'disabled'} aria-pressed="${sel}"><small dir="ltr">${x.d}</small><b dir="ltr">${Math.max(0,x.rem)}</b>${x.sh?'<i>📡</i>':sel?'<i class="sausel">📡</i>':''}</button>`}).join('')}</div>`}).join('')}<p class="sauhelp">${GT('sauMineD')}</p></div>`:'';
-  const oth=K.filter(x=>!x.own),byP=s.order.filter(p=>p!=m&&oth.some(x=>g.bu[x.b].p==p));
-  const shd=`<div class="saush"><p class="gpre">${GT('sauShd')}</p>${byP.length?byP.map(p=>`<div class="saurw">${oth.filter(x=>g.bu[x.b].p==p).sort((a,b)=>a.b-b.b||a.d-b.d).map(x=>{const k=x.b+':'+x.d;
-   return `<button class="sauk o ${SG.hl==k?'hl':''} ${x.rem<=0?'z':''}" data-sk="${k}">${R.bdot(g,x.b)}<small dir="ltr">${x.d}</small><b dir="ltr">${Math.max(0,x.rem)}</b></button>`}).join('')}</div>`).join(''):`<p class="sauhelp">${GT('sauSh0')}</p>`}</div>`;
-  const np=Object.keys(c.p).length;
-  const tools=on?`<div class="sautl" role="group">${[['v','🤿',GT('sauTv')],['y','!',GT('sauTy')],['x','✕',GT('sauTx')]].map(([t,i,l])=>`<button class="ghost ${SG.t==t?'sel':''}" data-st="${t}" aria-pressed="${SG.t==t}"><i class="sauti ${t}">${i}</i>${l}${t!='v'&&SG.t==t?` <small dir="ltr">${np}/${SAU.PN}</small>`:''}</button>`).join('')}</div>`:'';
-  const crew=`<div class="saucr">${s.order.map(p=>`<span class="abm ${p==m?'me':''}" data-rxp="${esc(p)}">${DT(p)}<b>${p==m?esc(GT('me')):esc(p)}</b>${(g.rs||{})[p]?`<em>🙋🏻${g.rs[p]}</em>`:''}${g.done[p]?'<i class="tpok" aria-hidden="true"></i>':''}</span>`).join('')}</div>`;
-  const lg=`<p class="tplg sauLg"><span><i class="saulgc"></i>${GT('sauLgC')}</span><span><i class="saulgt"></i>${GT('sauLgT')}</span><span><i class="saulgp">!</i>${GT('sauLgP')}</span></p>`;
-  const top=`<div class="sautp">${R.storm(g)}<span class="sausv">🙋🏻 <b dir="ltr">${g.fd.length} / ${g.S}</b></span></div>`;
+ /* texte d'un indice ; pour une ligne : naufragés RESTANTS (comme le chiffre au bout de la ligne) */
+ clT(g,x){if(!x)return GT('sauSec0');const F=new Set(g.fd.map(y=>y.c)),k=x.t=='x'?x.k:Math.max(0,x.k-sauLn(g.W,x.t,x.i).filter(i=>F.has(i)).length),nk=x.t=='x'?GT(k?'sauX1':'sauX0'):k?GTn('sauNk',k):GT('sauN0');
+  return GT('sauClue',{a:GT(x.t=='r'?'sauRow':x.t=='c'?'sauCol':'sauCell',{i:`<span dir="ltr">${x.t=='r'?x.i+1:x.t=='c'?SAU.L[x.i]:sauX(g.W,x.i)}</span>`}),b:`<b>${nk}</b>`})},
+ map(s,g,m,o){const W=g.W,I=this.info(g,o.end?null:m),my=o.end?null:(g.cl||{})[m],sec=new Set(my?(my.t=='x'?[my.i]:sauLn(W,my.t,my.i)):[]);
+  const aim={};if(!o.end)for(const p in g.ch||{})(aim[g.ch[p]]=aim[g.ch[p]]||[]).push(p);
+  const SV=o.end?new Set(g.sv||[]):null,lst=g.ev&&!o.end?g.ev.r:-9,FR={},ER={};g.fd.forEach(x=>FR[x.c]=x);g.em.forEach(x=>ER[x.c]=x);
+  const badge=(t,i)=>{const L=I.ln[t+i];return `<span class="saulb ${t}${L?(L.own?' own':''):' unk'}${L&&L.rem<=0?' z':''}">${L?`${L.own?'<i>🔒</i>':''}${Math.max(0,L.rem)}`:'?'}</span>`};
+  let h=`<span class="sauco"></span>`+[...Array(W).keys()].map(j=>`<span class="sauch">${SAU.L[j]}</span>`).join('')+`<span class="sauco"></span>`;
+  for(let y=0;y<W;y++){h+=`<span class="sauch">${y+1}</span>`;
+   for(let x=0;x<W;x++){const i=y*W+x,f=FR[i],e=ER[i],nw=(f||e)&&(f||e).r==lst?' nw':'',cm=!f&&!e&&I.emp.has(i),ys=!f&&I.yes.has(i),ms=SV&&!f&&SV.has(i),A=aim[i]||[],mi=A.includes(m);
+    const cls=`sauc${f?' fd':e?' em':cm?' cm':''}${ys?' ys':''}${ms?' ms':''}${sec.has(i)?' sec':''}${mi?' dv':''}${nw}`;
+    const in_=f||ms||ys?'<b class="sauf">🙋🏻</b>':e?'<b class="saue">✕</b>':'';
+    const dots=A.filter(p=>p!=m).slice(0,4).map(p=>`<i style="--c:${col(p)}"></i>`).join('');
+    const tag=o.on?'button':'span';
+    h+=`<${tag} class="${cls}" ${o.on?`data-sc="${i}" aria-label="${sauX(W,i)}" aria-pressed="${mi}"`:''}>${in_}${dots?`<span class="saudt">${dots}</span>`:''}${mi?'<b class="saudv">🤿</b>':''}</${tag}>`}
+   h+=badge('r',y)}
+  h+=`<span class="sauco"></span>`+[...Array(W).keys()].map(j=>badge('c',j)).join('')+`<span class="sauco"></span>`;
+  return `<div class="saumw"><div class="saum" dir="ltr" style="--w:${W};--me:${col(m)}">${h}</div></div>`},
+ storm(g){const T=g.T0,t=g.tk;
+  return `<div class="saust"><span class="sausi" aria-hidden="true">⛈️</span><span class="saubar" dir="ltr">${[...Array(T).keys()].map(j=>`<i class="${j<t?'on':''}${j==t-1?' nx':''}"></i>`).join('')}</span><b class="sautk">${GTn('sauTk',t)}</b></div>`},
+ evt(g){const e=g.ev;if(!e)return `<div class="sauev"><p>${GT('sauGo')}</p></div>`;
+  const L=e.dv.map(x=>`<p class="${x.ok?'ok':'no'}">🤿 ${GT(x.ok?'sauEvOk':'sauEvNo',{n:x.p.map(B).join(' + '),c:`<b dir="ltr">${sauX(g.W,x.c)}</b>`})}</p>`);
+  if(!e.dv.length)L.push(`<p class="mut">⛵ ${GT('sauEv0')}</p>`);
+  if(e.cl.length)L.push(`<p>🔭 ${GTn('sauEvC',e.cl.length)}</p>`);
+  L.push(`<p class="st">⛈️ ${GT('sauEvT')}</p>`);
+  return `<div class="sauev" aria-live="polite"><p class="sauevh">${GT('sauEvH',{v:e.r+1})}</p>${L.join('')}</div>`},
+ legend(){return `<p class="tplg sauLg"><span><i class="saulg u"></i>${GT('sauLgU')}</span><span><i class="saulg e">✕</i>${GT('sauLgE')}</span><span><i class="saulg f">🙋🏻</i>${GT('sauLgF')}</span><span><i class="saulg n">2</i>${GT('sauLgN')}</span></p>`},
+ view(s){const g=s.game,m=meN(),R=this,pl=s.order.includes(m),dn=!!g.done[m],on=pl&&!dn,my=(g.cl||{})[m],v=(g.ch||{})[m],W=g.W;
+  const top=`<div class="saugl"><span class="saugt">🎯 ${GT('sauGoal',{v:g.S})}</span><b class="sausv" dir="ltr">🙋🏻 ${g.fd.length} / ${g.S}</b></div>${R.storm(g)}`;
+  const sc=pl?`<div class="sausc" style="--c:${col(m)}"><span class="sausk" aria-hidden="true">🔒</span><div><small>${GT('sauSec')}</small><p class="sausct">${R.clT(g,my)}</p><small class="mut">${GT('sauSecD')}</small></div></div>`:'';
   const ed=pl&&dn?`<button class="ghost gedit ga" id="sauedit">✏️ ${GT('edit')}</button>`:'';
-  const res={html:`<div class="card c saucard">${top}${R.evt(s,g)}${R.map(s,g,m,{on,hl:SG.hl})}${tools}${ed}${son}${shd}${lg}${crew}<p class="tpmu">🤫 ${GT('sauMu')}</p></div>`,
-   bind(){$$('[data-st]').forEach(b=>b.onclick=()=>{SG.t=b.dataset.st;render()});
-    $$('[data-sk]').forEach(b=>b.onclick=()=>{const k=b.dataset.sk,[bi,d]=k.split(':').map(Number);SG.hl=SG.hl==k&&!(g.bu[bi].p==m&&on&&!R.isSh(g,bi,d))?null:k;
-     if(on&&g.bu[bi].p==m&&!R.isSh(g,bi,d))gs({sh:{b:bi,d}});else render()});
-    $$('[data-sc]').forEach(b=>b.onclick=()=>{const i=+b.dataset.sc;if(R.kn(g,i)){toast(GT('sauKn'));return}
-     if(SG.t=='v')gs({v:c.v==i?-1:i});else{const t=c.p[i]==SG.t?0:SG.t;if(t&&!(i in c.p)&&np>=SAU.PN){toast(GT('sauFull',{v:SAU.PN}));return}gs({pn:{c:i,t}})}});
+  const stay=on&&v!=null?`<button class="ghost sausty" id="saustay">⛵ ${GT('sauStay')}</button>`:'';
+  const crew=`<div class="saucr">${s.order.map(p=>`<span class="abm ${p==m?'me':''}" data-rxp="${esc(p)}">${DT(p)}<b>${p==m?esc(GT('me')):esc(p)}</b>${(g.ch||{})[p]!=null?`<em dir="ltr">🤿 ${sauX(W,g.ch[p])}</em>`:''}${(g.rs||{})[p]?`<em>🙋🏻${g.rs[p]}</em>`:''}${g.done[p]?'<i class="tpok" aria-hidden="true"></i>':''}</span>`).join('')}</div>`;
+  const res={html:`<div class="card c saucard">${top}${R.evt(g)}${sc}${R.map(s,g,m,{on})}${stay}${ed}${R.legend()}${crew}</div>`,
+   bind(){const I=R.info(g,m);
+    $$('[data-sc]').forEach(b=>b.onclick=()=>{const i=+b.dataset.sc;if(I.F.has(i)||I.E.has(i)){toast(GT('sauKn'));return}if(I.emp.has(i)){toast(GT('sauCalm'));return}
+     gs({v:v===i?-1:i})});
+    $('#saustay')&&($('#saustay').onclick=()=>gs({v:-1}));
     $('#sauedit')&&($('#sauedit').onclick=()=>gs({undo:1}));$('#sauok')&&($('#sauok').onclick=()=>gs({rdy:1}))}};
-  if(on)Object.assign(res,{hint:GT(c.v>=0?'sauHintV':'sauHint'),hintBtn:`<button class="pri gokb" id="sauok">${GT('sauRdy')}</button>`,mine:true});
+  if(on)Object.assign(res,{hint:v!=null?GT('sauHintV',{c:`<b dir="ltr">${sauX(W,v)}</b>`}):GT('sauHint'),hintBtn:`<button class="pri gokb" id="sauok">${GT('sauRdy')}</button>`,mine:true});
   return res},
  endView(s){const g=s.game,ok=g.fd.length>=g.S,m=meN();
-  return `<p class="gbig2 ga ${ok?'ok':''}">${ok?'🌈':'⛈️'} ${g.fd.length} / ${g.S}</p><p class="gnote ga" ${dl(1)}>${GT(ok?'sauWin':'sauLost')}</p>
+  return `<p class="gbig2 ga ${ok?'ok':''}">${ok?'🌈':'⛈️'} 🙋🏻 <span dir="ltr">${g.fd.length} / ${g.S}</span></p><p class="gnote ga" ${dl(1)}>${GT(ok?'sauWin':'sauLost')}</p>
    <div class="ga sauend" ${dl(2)}>${this.map(s,g,m,{end:1})}</div>
    <div class="abres abfin">${[...s.order].sort((a,b)=>((g.rs||{})[b]||0)-((g.rs||{})[a]||0)).map((p,i)=>`<div class="abrr ga ${p==m?'me':''}" ${dl(i,.3)}>${DT(p)}<b class="abnm">${esc(p)}</b><span class="abac" dir="ltr">🙋🏻 ${(g.rs||{})[p]||0} · ✕ ${(g.wd||{})[p]||0}</span></div>`).join('')}</div>
-   <p class="mut cqlg">🙋🏻 ${GT('sauLgF')} · ✕ ${GT('sauLgE')}</p>`}};
-/* 🆘 tutoriel : mer en grille 6×5, bouées, anneaux qui se croisent, plongées, tempête */
-const tuSa=(i,j)=>[85+26*i,33+26*j],tuSaG=()=>`<svg class="tub sautu" viewBox="0 0 300 180">${[...Array(30).keys()].map(k=>`<rect x="${73+26*(k%6)}" y="${21+26*(k/6|0)}" width="24" height="24" rx="5"/>`).join('')}</svg>`,
- tuSq=(L,cl,d,o)=>L.map(([i,j],k)=>TU.e(...tuSa(i,j),`<i class="tusq ${cl}"></i>`,d+.06*k,o?'p o':'p',o?'--o:'+o+'s':'')).join(''),
- tuBu=(i,j,c,n)=>TU.e(...tuSa(i,j),`<i class="tubu" style="--c:${TU.c[c]}">${n||1}</i>`),
- TSA=[[2,2],[1,1],[1,3],[0,0],[0,4]],TSB=[[1,3],[5,3],[2,2],[4,2],[3,1],[2,4],[4,4]];
+   <p class="mut cqlg">🙋🏻 ${GT('sauLgF2')} · ✕ ${GT('sauLgW')}${ok?'':` · <span class="sauendm">🙋🏻</span> ${GT('sauLgM')}`}</p>`}};
+/* 🆘 tutoriel : mer 5×5, indice secret sur une rangée, croisement avec une colonne, plongées, tempête */
+const tuSa=(i,j)=>[150+28*(i-2),22+28*j],
+ tuSaG=()=>`<svg class="tub sautu" viewBox="0 0 300 180">${[...Array(25).keys()].map(k=>`<rect x="${81+28*(k%5)}" y="${9+28*(k/5|0)}" width="26" height="26" rx="5"/>`).join('')}</svg>`,
+ tuSq=(L,cl,d)=>L.map(([i,j],k)=>TU.e(...tuSa(i,j),`<i class="tusq ${cl}"></i>`,d+.05*k,'p')).join(''),
+ tuRw=j=>[0,1,2,3,4].map(i=>[i,j]),tuCl=i=>[0,1,2,3,4].map(j=>[i,j]);
 GAMES.sau.tut=[
- {k:'tu_sau1',d:5,s:()=>tuSaG()+[[1,1],[4,0],[3,3]].map(([i,j],k)=>TU.e(...tuSa(i,j),'🙋🏻',.3+.25*k,'p o','--o:2.2s')).join('')+TU.e(150,162,TU.cd('🙋🏻 ? 🙋🏻 ? 🙋🏻'),2.4,'p')},
- {k:'tu_sau2',d:6,s:()=>tuSaG()+TU.e(36,85,TU.av(0))+tuBu(0,2,0)+tuSq(TSA,'a',.5)+TU.e(150,162,TU.cd('<small>2</small> → 1 🙋🏻','ok'),1.6,'p')},
- {k:'tu_sau3',d:7,s:()=>tuSaG()+TU.e(36,85,TU.av(0,false))+TU.e(264,110,TU.av(1,false))+tuBu(0,2,0)+tuBu(3,3,1)+tuSq(TSA,'a',.2)+TU.e(264,76,'📡',1,'p')+tuSq(TSB,'b',1.3)+tuSq([[2,2],[1,3]],'ab',2.6)},
- {k:'tu_sau4',d:6,s:()=>tuSaG()+tuSq([[2,2],[1,3]],'ab',0)+TU.mv(36,40,...tuSa(2,2),'🤿',.3,'o','--o:1.3s')+TU.e(...tuSa(2,2),'🙋🏻',1.3,'p')+TU.e(36,60,TU.pt('+1 🙋🏻'),1.7,'p')+
-  TU.mv(264,40,...tuSa(1,3),'🤿',2.2,'o','--o:3.2s')+TU.e(...tuSa(1,3),'<b class="tusx">✕</b>',3.2,'p')+TU.e(264,60,TU.pt('⛈️ −1','no'),3.6,'p')},
- {k:'tu_sau5',d:7,s:()=>TU.e(150,50,TU.cd('⛈️ 10'),0,'a o','--o:1.4s')+TU.e(150,50,TU.cd('⛈️ 8'),1.4,'p o','--o:3s')+TU.e(150,50,TU.cd('⛈️ 7','no'),3,'p')+
-  TU.e(150,92,TU.pt('〰️ −2','no'),1.1,'p o','--o:2.6s')+TU.e(150,92,TU.pt('✕ −1','no'),2.7,'p')+TU.e(150,146,'🙋🏻🙋🏻🙋🏻',.3,'p big')},
- {k:'tu_sau6',d:6,s:()=>tuSaG()+TU.e(36,40,TU.cd('💬 ✕','no'),.2,'p')+TU.e(...tuSa(2,2),`<i class="saupn y" style="--c:${TU.c[0]}">!</i>`,.8,'p')+TU.e(...tuSa(4,1),`<i class="saupn x" style="--c:${TU.c[1]}">✕</i>`,1.2,'p')+
-  TU.e(264,60,'😎',1.8,'p big')+TU.e(264,120,'🦈',2.2,'p big')},
- {k:'tu_sau7',x:'2',d:5,s:()=>tuSaG()+TU.e(36,85,TU.av(0,false))+TU.e(264,85,TU.av(1,false))+tuBu(0,0,0,1)+tuBu(4,1,0,2)+tuBu(1,4,0,3)+tuBu(5,4,1,1)+tuBu(2,2,1,2)+tuBu(3,0,1,3)}];
+ {k:'tu_sau1',d:6,s:()=>tuSaG()+[[1,1],[4,0],[3,3],[0,4],[2,2]].map(([i,j],k)=>TU.e(...tuSa(i,j),'🙋🏻',.3+.2*k,'p o','--o:2.8s')).join('')+TU.e(40,140,'⛵',0,'a big')+TU.e(262,96,'⛈️',.4,'p big')+TU.e(40,40,TU.cd('🙋🏻 0/5'),1.6,'p')},
+ {k:'tu_sau2',d:6,s:()=>tuSaG()+TU.e(38,96,TU.av(0))+TU.e(38,40,'🔒',.3,'p big')+tuSq(tuRw(2),'a',.8)+TU.e(244,78,TU.cd('2'),1.4,'p')+TU.e(150,166,TU.cd('🔒 3 → 2 🙋🏻','ok'),1.9,'p')},
+ {k:'tu_sau3',d:7,s:()=>tuSaG()+TU.e(38,96,TU.av(0,false))+TU.e(262,140,TU.av(1,false))+tuSq(tuRw(2),'a',0)+TU.e(244,78,TU.cd('2'))+tuSq(tuCl(1),'b',.8)+TU.e(122,164,TU.cd('1'),1.3,'p')+
+  tuSq([[1,2]],'ab',2)+TU.mv(38,60,...tuSa(1,2),'🤿',2.6)+TU.e(262,104,'👀',3.4,'p')},
+ {k:'tu_sau4',d:7,s:()=>tuSaG()+TU.e(40,30,TU.cd('⛈️ 5'),0,'a o','--o:3.4s')+TU.e(40,30,TU.cd('⛈️ 4','no'),3.4,'p o','--o:4.6s')+TU.e(40,30,TU.cd('⛈️ 3','no'),4.6,'p')+
+  TU.mv(40,120,...tuSa(1,2),'🤿',.3,'o','--o:1.3s')+TU.e(...tuSa(1,2),'🙋🏻',1.3,'p')+TU.e(40,120,TU.pt('+1 🙋🏻'),1.6,'p')+
+  TU.mv(262,120,...tuSa(3,4),'🤿',2.3,'o','--o:3.3s')+TU.e(...tuSa(3,4),'<b class="tusx">✕</b>',3.3,'p')+TU.e(262,90,TU.pt('⛈️ +1','no'),3.5,'p')+TU.e(150,166,TU.cd('🏁 ⛈️ +1','no'),4.6,'p')}];
 if(typeof document!='undefined'){const c=document.createElement('style');c.id='sau-css';c.textContent=`
-.saucard,.sauend{--sea:#cfe8f1;--sea2:#a9d3e3;--clr:#eef6f8;--glow:#e8a33a}
-[data-theme=dark] .saucard,[data-theme=dark] .sauend{--sea:#16425c;--sea2:#0d2c40;--clr:#0b1d2a}
-.sautp{display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap}
-.saust{display:flex;align-items:center;gap:6px;flex:1;min-width:150px}
+.saucard,.sauend{--sea:#bfe3ef;--sea2:#8ec9dd;--deep:#2f7fa3;--calm:#eef4f6;--glow:#e8a33a;--fd:#c8f0e2}
+[data-theme=dark] .saucard,[data-theme=dark] .sauend{--sea:#1d5878;--sea2:#103a52;--deep:#7cc4e0;--calm:#2a3a44;--fd:#1f6b5a}
+.saugl{display:flex;align-items:center;justify-content:space-between;gap:6px 12px;flex-wrap:wrap}
+.saugt{font:700 14px Nunito,sans-serif;text-align:start;flex:1;min-width:0}
+.sausv{font:600 20px Fredoka,Nunito,sans-serif;white-space:nowrap}
+.saust{display:flex;align-items:center;gap:6px;margin-top:6px}
 .sausi{font-size:18px;line-height:1}
-.saubar{display:flex;gap:2px;flex:1;min-width:60px;max-width:220px}
-.saubar i{flex:1;height:10px;border-radius:3px;background:color-mix(in srgb,var(--mut) 22%,transparent)}
+.saubar{display:flex;gap:3px;flex:1;min-width:60px}
+.saubar i{flex:1;height:10px;border-radius:3px;background:color-mix(in srgb,var(--mut) 20%,transparent)}
 .saubar i.on{background:#5b8fb0}.saubar i.nx{background:var(--glow);animation:sauNx 1.6s ease-in-out infinite alternate}
 @keyframes sauNx{to{opacity:.45}}
-.sautk{font:700 12.5px Nunito;color:var(--mut);white-space:nowrap}
-.sausv{font:700 14px Nunito;white-space:nowrap}
-.sauev{display:flex;flex-wrap:wrap;gap:6px 10px;justify-content:center;align-items:center;min-height:26px;margin:8px 0;font-size:13.5px}
-.sauevi{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:99px;background:var(--paper2);animation:gin .34s var(--gease) both}.sauevi.no{color:var(--bad);font-weight:800}
-.sauevs,.sauevw{font-weight:700;font-size:12.5px;color:var(--mut)}
-.saumw{container-type:inline-size;width:min(100%,440px);margin:0 auto}
-.saum{display:grid;grid-template-columns:repeat(var(--w),1fr);gap:2px;padding:4px;border-radius:14px;background:var(--sea2);font-size:calc(100cqw / var(--w) * .46)}
-.gw .saum .sauc{position:relative;aspect-ratio:1;display:grid;place-items:center;border-radius:6px;background:var(--sea);padding:0;margin:0;border:0;min-width:0;min-height:0;height:auto;width:auto;font:inherit;line-height:1;color:var(--txt);box-shadow:none;transform:none}
+.sautk{font:700 12.5px Nunito,sans-serif;color:var(--mut);white-space:nowrap}
+.sauev{margin:10px 0 0;padding:8px 12px;border-radius:12px;background:var(--paper2);text-align:start;font-size:13.5px;line-height:1.35}
+.sauev p{margin:2px 0}.sauev .ok{color:var(--ok,#1f8a5b);font-weight:700}.sauev .no{color:var(--bad);font-weight:700}.sauev .st{color:var(--mut);font-size:12.5px}
+.sauevh{font:800 11px Nunito,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+.sauev p:not(.sauevh){animation:gin .34s var(--gease) both}
+.sausc{display:flex;gap:10px;align-items:center;margin:10px 0 0;padding:8px 12px;border-radius:12px;border:2px dashed var(--c);background:color-mix(in srgb,var(--c) 10%,var(--paper));text-align:start}
+.sausk{font-size:22px;line-height:1}.sausc small{display:block;font-size:11.5px;font-weight:700}.sausc small.mut{font-weight:400}
+.sausct{margin:2px 0;font:600 17px Fredoka,Nunito,sans-serif}
+.saumw{container-type:inline-size;width:min(100%,430px);margin:10px auto 0}
+.saum{display:grid;grid-template-columns:.6fr repeat(var(--w),1fr) .75fr;gap:3px;align-items:center;font-size:calc(100cqw / (var(--w) + 1.4) * .5)}
+.sauch{text-align:center;font:800 max(11px,.55em) Nunito,sans-serif;color:var(--mut)}
+.gw .saum .sauc{position:relative;aspect-ratio:1;display:grid;place-items:center;border-radius:7px;padding:0;margin:0;border:0;min-width:0;min-height:0;height:auto;width:auto;font:inherit;line-height:1;color:var(--txt);box-shadow:none;transform:none;
+ background:radial-gradient(120% 60% at 50% 115%,var(--sea2) 0 40%,transparent 41%),radial-gradient(120% 60% at 50% 70%,color-mix(in srgb,var(--sea2) 55%,var(--sea)) 0 38%,transparent 39%),var(--sea)}
 .gw .saum button.sauc{cursor:pointer}.gw .saum button.sauc:active{transform:scale(.92)}
-.gw .saum .sauc.clr,.gw .saum .sauc.em{background:var(--clr)}
-.gw .saum .sauc.fd{background:color-mix(in srgb,#2fa894 32%,var(--sea))}
-.gw .saum .sauc.hl{box-shadow:inset 0 0 0 2.5px var(--acc)}
-.gw .saum .sauc.dv{box-shadow:inset 0 0 0 3px var(--glow)}
-.gw .saum .sauc.ms{box-shadow:inset 0 0 0 2px var(--bad)}.sauc.ms .sauf{opacity:.6;filter:grayscale(.7)}
-.sauf{position:relative;font-size:1.15em}.saue{position:relative;color:var(--bad);font-size:.85em;opacity:.75}
+@media (hover:hover){.gw .saum button.sauc:hover{box-shadow:inset 0 0 0 2px var(--deep)}}
+.gw .saum .sauc.cm,.gw .saum .sauc.em{background:var(--calm)}
+.gw .saum .sauc.fd{background:var(--fd)}
+.gw .saum .sauc.sec{box-shadow:inset 0 0 0 2.5px var(--me)}
+.gw .saum .sauc.dv{box-shadow:inset 0 0 0 3.5px var(--glow),0 0 10px var(--glow)}
+.gw .saum .sauc.ys .sauf{animation:sauWv 1s ease-in-out infinite alternate}
+.sauc.ms{box-shadow:inset 0 0 0 2px var(--bad)}.sauc.ms .sauf{opacity:.55;filter:grayscale(.6)}
+.sauf{position:relative;font-size:1.25em}.saue{position:relative;color:var(--bad);font-size:1.1em}
 .sauc.nw .sauf,.sauc.nw .saue{animation:sauPop .6s var(--gease) both}
+.sauc.fd .sauf{animation:sauWv 1.2s ease-in-out infinite alternate}
+.sauc.fd.nw .sauf{animation:sauPop .6s var(--gease) both,sauWv 1.2s ease-in-out .6s infinite alternate}
 @keyframes sauPop{from{transform:scale(.3);opacity:0}}
-.saut{position:absolute;left:3px;right:3px;bottom:3px;display:flex;gap:1px;height:3px}
-.saut i{flex:1;border-radius:2px;background:var(--c)}
-.saubd{position:absolute;inset:16%;display:grid;place-items:center;border-radius:50%;border:2.5px solid var(--c);background:color-mix(in srgb,var(--c) 20%,var(--paper));font:800 .55em Nunito,sans-serif;font-style:normal;color:var(--txt)}
-.sauc.fd .saubd,.sauc.em .saubd{opacity:.45}
-.saubd.big{position:static;width:26px;height:26px;flex:none;font-size:13px}
-.sauk .saubd{position:static;width:18px;height:18px;border-width:2px;font-size:10px;align-self:center}
-.saupns{position:absolute;top:1px;right:1px;display:flex;gap:1px}
-.saupn,.saump{display:inline-grid;place-items:center;width:max(9px,.5em);height:max(9px,.5em);border-radius:50%;background:var(--c,#2fa894);color:#fff;font:900 max(7px,.32em) Nunito,sans-serif;font-style:normal;line-height:1}
-.saupn.x,.saump.x{border-radius:2px;background:var(--c,var(--bad))}
-.saump{position:absolute;top:1px;left:1px;--c:transparent;color:var(--txt);box-shadow:0 0 0 1.5px var(--txt);background:var(--paper)}
-.saudv{position:absolute;inset:0;display:grid;place-items:center;animation:sauDv 1.4s ease-in-out infinite alternate}
+@keyframes sauWv{from{transform:rotate(-8deg)}to{transform:rotate(8deg)}}
+.saudt{position:absolute;top:3px;left:3px;display:flex;gap:2px}.saudt i{width:max(7px,.32em);height:max(7px,.32em);border-radius:50%;background:var(--c);box-shadow:0 0 0 1.5px var(--paper)}
+.saudv{position:absolute;inset:0;display:grid;place-items:center;font-size:1.1em;animation:sauDv 1.4s ease-in-out infinite alternate}
 @keyframes sauDv{from{transform:translateY(4%)}to{transform:translateY(-8%)}}
-.sautl{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:10px}
-.sautl button{padding:7px 12px;font-size:14px;display:inline-flex;align-items:center;gap:6px}
-.sautl small{font:700 11px Nunito;color:var(--mut)}
-.sauti{font-style:normal;display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font:900 12px Nunito,sans-serif;line-height:1}
-.sauti.y{background:#2fa894;color:#fff}.sauti.x{background:var(--bad);color:#fff;border-radius:5px}.sauti.v{width:auto;height:auto;font-size:16px}
-.sausn,.saush{margin-top:14px;text-align:start}
-.saurw{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px}
-.gw .sauk{position:relative;display:inline-flex;align-items:baseline;gap:5px;padding:5px 10px;border-radius:12px;min-width:0;font:inherit;background:var(--paper2);border:1.5px solid var(--edge);box-shadow:none;color:var(--txt)}
-.sauk small{font:700 11px Nunito;color:var(--mut)}.sauk b{font:600 17px Fredoka,Nunito,sans-serif;line-height:1}
-.gw .sauk.sel{border-color:var(--acc);box-shadow:0 0 0 1.5px var(--acc)}.gw .sauk.hl{background:color-mix(in srgb,var(--acc) 16%,var(--paper2))}
-.sauk.z b{color:var(--mut)}.sauk.sh{opacity:.8}.sauk i{font-style:normal;font-size:11px}
-.sausel{animation:sauNx 1.2s ease-in-out infinite alternate}
-.gw .sauk:disabled{opacity:.55}
-.sauhelp{font-size:12px;color:var(--mut);margin:6px 0 0;line-height:1.35}
-.saucr{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px}.saucr .abm em{font-style:normal;font-size:12px}
-.saulgc{width:12px;height:12px;border-radius:3px;background:var(--clr);box-shadow:0 0 0 1px var(--edge)}
-.saulgt{width:14px;height:3px;border-radius:2px;background:linear-gradient(90deg,#ef8354 50%,#2fa894 50%)}
-.saulgp{width:12px;height:12px;border-radius:50%;background:#2fa894;color:#fff;font:900 8px Nunito,sans-serif;display:inline-grid;place-items:center;font-style:normal}
+.saulb{display:grid;place-items:center;justify-self:center;min-width:1.5em;height:1.5em;padding:0 .2em;border-radius:99px;font:800 max(12px,.6em) Nunito,sans-serif;background:var(--deep);color:#fff;line-height:1}
+.saulb.unk{background:none;color:color-mix(in srgb,var(--mut) 55%,transparent);font-weight:700}
+.saulb.z{background:color-mix(in srgb,var(--mut) 30%,transparent);color:var(--txt)}
+.saulb.own{background:var(--paper);color:var(--txt);box-shadow:0 0 0 2px var(--me)}.saulb i{font-style:normal;font-size:.7em;margin-inline-end:1px}
+.sausty{display:block;margin:10px auto 0;padding:6px 14px;font-size:13.5px}
 .sauLg{margin-top:12px}
+.saulg{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:4px;font:900 10px Nunito,sans-serif;font-style:normal;line-height:1}
+.saulg.u{background:var(--sea);box-shadow:inset 0 -5px 0 var(--sea2)}.saulg.e{background:var(--calm);color:var(--bad)}.saulg.f{background:var(--fd);font-size:11px}
+.saulg.n{border-radius:99px;background:var(--deep);color:#fff}
+.saucr{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px}.saucr .abm em{font-style:normal;font-size:12px}
 .sauend .saumw{width:min(100%,360px);margin:12px auto 0}
-.sautu rect{fill:#7ec4d944;stroke:var(--edge);stroke-width:1}
-[data-theme=dark] .sautu rect{fill:#2d6a8a44;stroke:#2c5574}
-.tusq{display:block;width:24px;height:24px;border-radius:5px;background:#ef835466}.tusq.b{background:#2fa89466}
+.sauendm{opacity:.55;filter:grayscale(.6)}
+.sautu rect{fill:#7ec4d966;stroke:#5ea9c2;stroke-width:1}
+[data-theme=dark] .sautu rect{fill:#2d6a8a66;stroke:#3f7da0}
+.tusq{display:block;width:26px;height:26px;border-radius:5px;background:#ef835455}.tusq.b{background:#2fa89455}
 .tusq.ab{background:none;box-shadow:0 0 0 3px #e8a33a,0 0 12px #e8a33a99}
-.tubu{display:grid;place-items:center;width:18px;height:18px;border-radius:50%;border:2.5px solid var(--c);background:var(--paper);font:800 10px Nunito,sans-serif;font-style:normal;color:var(--txt)}
 .tusx{color:var(--bad);font-size:18px}
-@media (max-width:420px){.sautl button{padding:6px 9px;font-size:13px}.gw .sauk{padding:4px 8px}.sauk b{font-size:15px}}
-@media (prefers-reduced-motion:reduce){.saudv,.saubar i.nx,.sausel,.sauc.nw .sauf,.sauc.nw .saue{animation:none}}
+@media (max-width:420px){.sauev{font-size:13px}.sausct{font-size:16px}}
+@media (prefers-reduced-motion:reduce){.saudv,.saubar i.nx,.sauc .sauf,.sauc.nw .saue,.sauev p{animation:none!important}}
 `;(document.head||document.documentElement).appendChild(c)}
 /* /🆘 */
 
 /* 🆘 textes du Sauvetage (9 langues) */
 const GSA=(l,o)=>Object.assign(GI18N[l].ui,o);
-GSA('fr',{n_sau:`Le Sauvetage`,d_sau:`En silence, croisez vos sonars pour repêcher les naufragés`,coop_sau:`Le sauvetage`,
-r_sau:`Coopératif et silencieux. Des naufragés sont cachés en mer. Ton sonar, secret, compte combien sont à 0, 1, 2 ou 3 pas de chacune de tes 2 bouées (sans diagonale). À chaque manche, tous en même temps : partage un anneau par bouée 📡, pose jusqu'à 3 repères, plonge sur une case 🤿. La tempête avance de 2 par manche et de 1 par plongée à vide : repêchez tout le monde avant elle !`,
-r_sau2:`Coopératif et silencieux, à deux. Des naufragés sont cachés en mer. Ton sonar, secret, compte combien sont à 0, 1, 2 ou 3 pas de chacune de tes 3 bouées (sans diagonale). À chaque manche, en même temps : partage un anneau par bouée 📡, pose jusqu'à 3 repères, plonge sur une case 🤿. La tempête avance de 2 par manche et de 1 par plongée à vide : repêchez tout le monde avant elle !`,
-sauTk:`{v} cran|{v} crans`,sauGo:`Première manche : partagez vos anneaux, plongez quand c'est sûr`,sauEv0:`Personne n'a plongé`,sauEvS:`{v} anneau partagé|{v} anneaux partagés`,
-sauMine:`Ton sonar`,sauMineD:`Petit chiffre : distance en pas depuis la bouée. Grand : naufragés encore à cette distance. Touche un anneau pour le voir sur la carte et le partager 📡 à la fin de la manche.`,
-sauShd:`Anneaux partagés`,sauSh0:`Rien encore : les anneaux arrivent à la fin de la manche.`,sauTv:`Plonger`,sauTy:`Naufragé`,sauTx:`Vide`,sauRdy:`Prêt`,
-sauHint:`Choisis tes anneaux, tes repères, ta plongée… puis Prêt`,sauHintV:`Plongée choisie 🤿 : Prêt quand tu veux`,sauKn:`Cette case est déjà fouillée`,sauFull:`{v} repères au plus : retire-en un d'abord`,
-sauLgC:`vide d'après un anneau`,sauLgT:`anneaux qui passent ici`,sauLgP:`repères`,sauLgF:`repêchés`,sauLgE:`plongées à vide`,
-sauMu:`Pas un mot : le chat se tait. Anneaux, repères et réactions seulement.`,sauWin:`Tout le monde est à bord !`,sauLost:`La tempête a eu le dernier mot…`,
-tu_sau1:`Des naufragés sont cachés en mer. Personne ne sait où.`,
-tu_sau2:`Ton sonar est secret : ici, à 2 pas de ta bouée, il y a 1 naufragé, quelque part sur cet anneau.`,
-tu_sau3:`Chaque manche, chacun partage un anneau 📡. Là où les anneaux se croisent, le naufragé se cache.`,
-tu_sau4:`Puis tout le monde plonge en même temps 🤿. Une plongée à vide ne fait rien perdre… sauf du temps.`,
-tu_sau5:`⛈️ La tempête avance de 2 à chaque manche, et de 1 par plongée à vide. Repêchez tout le monde avant elle.`,
-tu_sau6:`Pas de chat : seulement des repères (! naufragé, ✕ vide) sur la carte, et des réactions.`,
-tu_sau7:`À deux, chacun a 3 bouées et partage 3 anneaux par manche.`,
+GSA('fr',{n_sau:`Le Sauvetage`,d_sau:`Indices secrets, plongées et tempête : repêchez tout le monde ensemble`,coop_sau:`Le sauvetage`,
+r_sau:`Coopératif. Des naufragés sont cachés en mer. Chaque manche, tu reçois un indice secret 🔒 (« Rangée 3 : 2 naufragés »), dévoilé à tous en fin de manche : croisez-les ! Choisis une case où plonger 🤿 : naufragé = repêché, case vide = la tempête avance de 1. Elle avance aussi de 1 à chaque manche.`,
+sauGoal:`Repêchez les {v} naufragés avant la tempête`,sauTk:`{v} cran avant la tempête|{v} crans avant la tempête`,
+sauGo:`Manche 1 : lis ton indice secret, puis touche une case pour y plonger.`,sauEvH:`Manche {v}`,
+sauEvOk:`{n} · {c} : naufragé repêché !`,sauEvNo:`{n} · {c} : personne ici, la tempête avance de 1`,sauEv0:`Personne n'a plongé`,
+sauEvC:`{v} indice dévoilé sur la carte|{v} indices dévoilés sur la carte`,sauEvT:`Fin de manche : la tempête avance de 1`,
+sauSec:`Ton indice secret`,sauSecD:`Dévoilé à tout le monde à la fin de la manche`,sauSec0:`Rien de neuf : la mer est déjà connue`,
+sauClue:`{a} : {b}`,sauRow:`Rangée {i}`,sauCol:`Colonne {i}`,sauCell:`Case {i}`,sauN0:`personne`,sauNk:`{v} naufragé|{v} naufragés`,sauX0:`personne`,sauX1:`un naufragé !`,
+sauHint:`Touche une case pour y plonger 🤿, ou reste à bord`,sauHintV:`Tu plonges en {c} 🤿`,sauRdy:`Prêt`,sauStay:`Rester à bord`,
+sauKn:`Déjà fouillée`,sauCalm:`Personne ici, d'après les indices`,
+sauLgU:`mer inconnue`,sauLgE:`personne`,sauLgF:`repêché`,sauLgN:`naufragés restants dans la rangée / colonne`,sauLgF2:`repêchés`,sauLgW:`plongées à vide`,sauLgM:`pas retrouvés`,
+sauWin:`Tout le monde est à bord !`,sauLost:`La tempête a eu le dernier mot…`,
+tu_sau1:`Des naufragés 🙋🏻 sont cachés en mer. Repêchez-les tous avant la tempête ⛈️.`,
+tu_sau2:`Chaque manche, tu reçois un indice secret 🔒 : ici « Rangée 3 : 2 naufragés ».`,
+tu_sau3:`À la fin de la manche, tous les indices sont dévoilés. Croisez-les, et plongez 🤿 là où ils se rejoignent. On voit où visent les autres.`,
+tu_sau4:`Naufragé trouvé : repêché 🙋🏻 ! Case vide ✕ : la tempête avance de 1. Elle avance aussi de 1 à chaque manche.`,
 lg_sauR:`{a} a repêché le plus de naufragés au Sauvetage`,lg_sauL:`{a} a repêché le dernier naufragé juste avant la tempête`});
-GSA('en',{n_sau:`The Rescue`,d_sau:`In silence, cross your sonars to pull the castaways out`,coop_sau:`The rescue`,
-r_sau:`Co-op and silent. Castaways are hidden at sea. Your secret sonar counts how many are 0, 1, 2 or 3 steps from each of your 2 buoys (no diagonals). Each round, all at once: share one ring per buoy 📡, place up to 3 markers, dive into a cell 🤿. The storm moves 2 closer per round and 1 per empty dive: rescue everyone before it hits!`,
-r_sau2:`Co-op and silent, for two. Castaways are hidden at sea. Your secret sonar counts how many are 0, 1, 2 or 3 steps from each of your 3 buoys (no diagonals). Each round, at the same time: share one ring per buoy 📡, place up to 3 markers, dive into a cell 🤿. The storm moves 2 closer per round and 1 per empty dive: rescue everyone before it hits!`,
-sauTk:`{v} notch|{v} notches`,sauGo:`First round: share your rings, dive when you're sure`,sauEv0:`Nobody dived`,sauEvS:`{v} ring shared|{v} rings shared`,
-sauMine:`Your sonar`,sauMineD:`Small number: distance in steps from the buoy. Big one: castaways still at that distance. Tap a ring to see it on the map and share it 📡 at the end of the round.`,
-sauShd:`Shared rings`,sauSh0:`Nothing yet: rings arrive at the end of the round.`,sauTv:`Dive`,sauTy:`Castaway`,sauTx:`Empty`,sauRdy:`Ready`,
-sauHint:`Pick your rings, markers, dive… then Ready`,sauHintV:`Dive chosen 🤿: Ready whenever you like`,sauKn:`This cell has already been searched`,sauFull:`{v} markers at most: remove one first`,
-sauLgC:`empty according to a ring`,sauLgT:`rings passing here`,sauLgP:`markers`,sauLgF:`rescued`,sauLgE:`empty dives`,
-sauMu:`Not a word: the chat is silent. Rings, markers and reactions only.`,sauWin:`Everyone is on board!`,sauLost:`The storm had the last word…`,
-tu_sau1:`Castaways are hidden at sea. Nobody knows where.`,
-tu_sau2:`Your sonar is secret: here, 2 steps from your buoy, there is 1 castaway, somewhere on this ring.`,
-tu_sau3:`Each round, everyone shares a ring 📡. Where rings cross, that's where the castaway hides.`,
-tu_sau4:`Then everyone dives at the same time 🤿. An empty dive costs nothing… except time.`,
-tu_sau5:`⛈️ The storm moves 2 closer each round, and 1 per empty dive. Rescue everyone before it hits.`,
-tu_sau6:`No chat: only markers (! castaway, ✕ empty) on the map, and reactions.`,
-tu_sau7:`For two, each player has 3 buoys and shares 3 rings per round.`,
+GSA('en',{n_sau:`The Rescue`,d_sau:`Secret clues, dives and a storm: rescue everyone together`,coop_sau:`The rescue`,
+r_sau:`Co-op. Castaways are hidden at sea. Each round, you get a secret clue 🔒 ("Row 3: 2 castaways"), revealed to everyone at the end of the round: cross them! Pick a cell to dive 🤿: castaway = rescued, empty cell = the storm moves 1 closer. It also moves 1 closer every round.`,
+sauGoal:`Rescue the {v} castaways before the storm`,sauTk:`{v} notch before the storm|{v} notches before the storm`,
+sauGo:`Round 1: read your secret clue, then tap a cell to dive there.`,sauEvH:`Round {v}`,
+sauEvOk:`{n} · {c}: castaway rescued!`,sauEvNo:`{n} · {c}: nobody here, the storm moves 1 closer`,sauEv0:`Nobody dived`,
+sauEvC:`{v} clue revealed on the map|{v} clues revealed on the map`,sauEvT:`End of round: the storm moves 1 closer`,
+sauSec:`Your secret clue`,sauSecD:`Revealed to everyone at the end of the round`,sauSec0:`Nothing new: the sea is already mapped`,
+sauClue:`{a}: {b}`,sauRow:`Row {i}`,sauCol:`Column {i}`,sauCell:`Cell {i}`,sauN0:`nobody`,sauNk:`{v} castaway|{v} castaways`,sauX0:`nobody`,sauX1:`a castaway!`,
+sauHint:`Tap a cell to dive there 🤿, or stay on board`,sauHintV:`You dive at {c} 🤿`,sauRdy:`Ready`,sauStay:`Stay on board`,
+sauKn:`Already searched`,sauCalm:`Nobody here, according to the clues`,
+sauLgU:`unknown sea`,sauLgE:`nobody`,sauLgF:`rescued`,sauLgN:`castaways left in the row / column`,sauLgF2:`rescued`,sauLgW:`empty dives`,sauLgM:`not found`,
+sauWin:`Everyone is on board!`,sauLost:`The storm had the last word…`,
+tu_sau1:`Castaways 🙋🏻 are hidden at sea. Rescue them all before the storm ⛈️.`,
+tu_sau2:`Each round, you get a secret clue 🔒: here "Row 3: 2 castaways".`,
+tu_sau3:`At the end of the round, all clues are revealed. Cross them and dive 🤿 where they meet. You can see where the others are aiming.`,
+tu_sau4:`Castaway found: rescued 🙋🏻! Empty cell ✕: the storm moves 1 closer. It also moves 1 closer every round.`,
 lg_sauR:`{a} pulled the most castaways out in The Rescue`,lg_sauL:`{a} rescued the last castaway just before the storm`});
-GSA('es',{n_sau:`El Rescate`,d_sau:`En silencio, cruzad vuestros sonares para rescatar a los náufragos`,coop_sau:`El rescate`,
-r_sau:`Cooperativo y en silencio. Hay náufragos escondidos en el mar. Tu sonar, secreto, cuenta cuántos hay a 0, 1, 2 o 3 pasos de cada una de tus 2 boyas (sin diagonales). En cada ronda, todos a la vez: comparte un anillo por boya 📡, pon hasta 3 marcas y bucea en una casilla 🤿. La tormenta avanza 2 por ronda y 1 por inmersión en vano: ¡rescatad a todos antes de que llegue!`,
-r_sau2:`Cooperativo y en silencio, a dos. Hay náufragos escondidos en el mar. Tu sonar, secreto, cuenta cuántos hay a 0, 1, 2 o 3 pasos de cada una de tus 3 boyas (sin diagonales). En cada ronda, a la vez: comparte un anillo por boya 📡, pon hasta 3 marcas y bucea en una casilla 🤿. La tormenta avanza 2 por ronda y 1 por inmersión en vano: ¡rescatad a todos antes de que llegue!`,
-sauTk:`{v} muesca|{v} muescas`,sauGo:`Primera ronda: compartid vuestros anillos, bucead cuando haya certeza`,sauEv0:`Nadie ha buceado`,sauEvS:`{v} anillo compartido|{v} anillos compartidos`,
-sauMine:`Tu sonar`,sauMineD:`Número pequeño: distancia en pasos desde la boya. Grande: náufragos que quedan a esa distancia. Toca un anillo para verlo en el mapa y compartirlo 📡 al final de la ronda.`,
-sauShd:`Anillos compartidos`,sauSh0:`Nada aún: los anillos llegan al final de la ronda.`,sauTv:`Bucear`,sauTy:`Náufrago`,sauTx:`Vacío`,sauRdy:`Listo`,
-sauHint:`Elige tus anillos, tus marcas, tu inmersión… y luego Listo`,sauHintV:`Inmersión elegida 🤿: Listo cuando quieras`,sauKn:`Esta casilla ya se ha registrado`,sauFull:`{v} marcas como máximo: quita una primero`,
-sauLgC:`vacía según un anillo`,sauLgT:`anillos que pasan por aquí`,sauLgP:`marcas`,sauLgF:`rescatados`,sauLgE:`inmersiones en vano`,
-sauMu:`Ni una palabra: el chat calla. Solo anillos, marcas y reacciones.`,sauWin:`¡Todos a bordo!`,sauLost:`La tormenta tuvo la última palabra…`,
-tu_sau1:`Hay náufragos escondidos en el mar. Nadie sabe dónde.`,
-tu_sau2:`Tu sonar es secreto: aquí, a 2 pasos de tu boya, hay 1 náufrago, en algún punto de este anillo.`,
-tu_sau3:`En cada ronda, cada uno comparte un anillo 📡. Donde los anillos se cruzan, se esconde el náufrago.`,
-tu_sau4:`Luego todos bucean a la vez 🤿. Una inmersión en vano no quita nada… salvo tiempo.`,
-tu_sau5:`⛈️ La tormenta avanza 2 en cada ronda y 1 por inmersión en vano. Rescatad a todos antes de que llegue.`,
-tu_sau6:`Sin chat: solo marcas (! náufrago, ✕ vacío) en el mapa, y reacciones.`,
-tu_sau7:`A dos, cada uno tiene 3 boyas y comparte 3 anillos por ronda.`,
+GSA('es',{n_sau:`El Rescate`,d_sau:`Pistas secretas, inmersiones y tormenta: rescatad a todos juntos`,coop_sau:`El rescate`,
+r_sau:`Cooperativo. Hay náufragos escondidos en el mar. En cada ronda recibes una pista secreta 🔒 («Fila 3: 2 náufragos»), que se revela a todos al final de la ronda: ¡cruzadlas! Elige una casilla para bucear 🤿: náufrago = rescatado, casilla vacía = la tormenta avanza 1. También avanza 1 en cada ronda.`,
+sauGoal:`Rescatad a los {v} náufragos antes de la tormenta`,sauTk:`{v} muesca antes de la tormenta|{v} muescas antes de la tormenta`,
+sauGo:`Ronda 1: lee tu pista secreta y toca una casilla para bucear allí.`,sauEvH:`Ronda {v}`,
+sauEvOk:`{n} · {c}: ¡náufrago rescatado!`,sauEvNo:`{n} · {c}: aquí no hay nadie, la tormenta avanza 1`,sauEv0:`Nadie ha buceado`,
+sauEvC:`{v} pista revelada en el mapa|{v} pistas reveladas en el mapa`,sauEvT:`Fin de ronda: la tormenta avanza 1`,
+sauSec:`Tu pista secreta`,sauSecD:`Se revela a todos al final de la ronda`,sauSec0:`Nada nuevo: el mar ya está cartografiado`,
+sauClue:`{a}: {b}`,sauRow:`Fila {i}`,sauCol:`Columna {i}`,sauCell:`Casilla {i}`,sauN0:`nadie`,sauNk:`{v} náufrago|{v} náufragos`,sauX0:`nadie`,sauX1:`¡un náufrago!`,
+sauHint:`Toca una casilla para bucear 🤿, o quédate a bordo`,sauHintV:`Buceas en {c} 🤿`,sauRdy:`Listo`,sauStay:`Quedarme a bordo`,
+sauKn:`Ya registrada`,sauCalm:`Aquí no hay nadie, según las pistas`,
+sauLgU:`mar desconocido`,sauLgE:`nadie`,sauLgF:`rescatado`,sauLgN:`náufragos que quedan en la fila / columna`,sauLgF2:`rescatados`,sauLgW:`inmersiones en vano`,sauLgM:`no encontrados`,
+sauWin:`¡Todos a bordo!`,sauLost:`La tormenta tuvo la última palabra…`,
+tu_sau1:`Hay náufragos 🙋🏻 escondidos en el mar. Rescatadlos a todos antes de la tormenta ⛈️.`,
+tu_sau2:`En cada ronda recibes una pista secreta 🔒: aquí «Fila 3: 2 náufragos».`,
+tu_sau3:`Al final de la ronda se revelan todas las pistas. Cruzadlas y bucead 🤿 donde se encuentran. Se ve adónde apuntan los demás.`,
+tu_sau4:`Náufrago encontrado: ¡rescatado 🙋🏻! Casilla vacía ✕: la tormenta avanza 1. También avanza 1 en cada ronda.`,
 lg_sauR:`{a} rescató a más náufragos en El Rescate`,lg_sauL:`{a} rescató al último náufrago justo antes de la tormenta`});
-GSA('it',{n_sau:`Il Salvataggio`,d_sau:`In silenzio, incrociate i sonar per ripescare i naufraghi`,coop_sau:`Il salvataggio`,
-r_sau:`Cooperativo e silenzioso. In mare sono nascosti dei naufraghi. Il tuo sonar, segreto, conta quanti sono a 0, 1, 2 o 3 passi da ciascuna delle tue 2 boe (niente diagonali). A ogni turno, tutti insieme: condividi un anello per boa 📡, metti fino a 3 segnali, tuffati in una casella 🤿. La tempesta avanza di 2 a turno e di 1 per ogni tuffo a vuoto: salvate tutti prima che arrivi!`,
-r_sau2:`Cooperativo e silenzioso, in due. In mare sono nascosti dei naufraghi. Il tuo sonar, segreto, conta quanti sono a 0, 1, 2 o 3 passi da ciascuna delle tue 3 boe (niente diagonali). A ogni turno, insieme: condividi un anello per boa 📡, metti fino a 3 segnali, tuffati in una casella 🤿. La tempesta avanza di 2 a turno e di 1 per ogni tuffo a vuoto: salvate tutti prima che arrivi!`,
-sauTk:`{v} tacca|{v} tacche`,sauGo:`Primo turno: condividete gli anelli, tuffatevi quando c'è certezza`,sauEv0:`Nessuno si è tuffato`,sauEvS:`{v} anello condiviso|{v} anelli condivisi`,
-sauMine:`Il tuo sonar`,sauMineD:`Numero piccolo: distanza in passi dalla boa. Grande: naufraghi rimasti a quella distanza. Tocca un anello per vederlo sulla mappa e condividerlo 📡 a fine turno.`,
-sauShd:`Anelli condivisi`,sauSh0:`Ancora niente: gli anelli arrivano a fine turno.`,sauTv:`Tuffati`,sauTy:`Naufrago`,sauTx:`Vuoto`,sauRdy:`Pronto`,
-sauHint:`Scegli anelli, segnali, tuffo… poi Pronto`,sauHintV:`Tuffo scelto 🤿: Pronto quando vuoi`,sauKn:`Questa casella è già stata esplorata`,sauFull:`Al massimo {v} segnali: togline uno prima`,
-sauLgC:`vuota secondo un anello`,sauLgT:`anelli che passano qui`,sauLgP:`segnali`,sauLgF:`salvati`,sauLgE:`tuffi a vuoto`,
-sauMu:`Neanche una parola: la chat tace. Solo anelli, segnali e reazioni.`,sauWin:`Tutti a bordo!`,sauLost:`La tempesta ha avuto l'ultima parola…`,
-tu_sau1:`In mare sono nascosti dei naufraghi. Nessuno sa dove.`,
-tu_sau2:`Il tuo sonar è segreto: qui, a 2 passi dalla tua boa, c'è 1 naufrago, da qualche parte su questo anello.`,
-tu_sau3:`A ogni turno, ognuno condivide un anello 📡. Dove gli anelli si incrociano, si nasconde il naufrago.`,
-tu_sau4:`Poi tutti si tuffano insieme 🤿. Un tuffo a vuoto non fa perdere niente… tranne tempo.`,
-tu_sau5:`⛈️ La tempesta avanza di 2 a ogni turno e di 1 per ogni tuffo a vuoto. Salvate tutti prima che arrivi.`,
-tu_sau6:`Niente chat: solo segnali (! naufrago, ✕ vuoto) sulla mappa, e reazioni.`,
-tu_sau7:`In due, ognuno ha 3 boe e condivide 3 anelli a turno.`,
+GSA('it',{n_sau:`Il Salvataggio`,d_sau:`Indizi segreti, tuffi e tempesta: salvate tutti insieme`,coop_sau:`Il salvataggio`,
+r_sau:`Cooperativo. In mare sono nascosti dei naufraghi. A ogni turno ricevi un indizio segreto 🔒 («Riga 3: 2 naufraghi»), svelato a tutti a fine turno: incrociateli! Scegli una casella dove tuffarti 🤿: naufrago = salvato, casella vuota = la tempesta avanza di 1. Avanza di 1 anche a ogni turno.`,
+sauGoal:`Salvate i {v} naufraghi prima della tempesta`,sauTk:`{v} tacca prima della tempesta|{v} tacche prima della tempesta`,
+sauGo:`Turno 1: leggi il tuo indizio segreto, poi tocca una casella per tuffarti.`,sauEvH:`Turno {v}`,
+sauEvOk:`{n} · {c}: naufrago salvato!`,sauEvNo:`{n} · {c}: nessuno qui, la tempesta avanza di 1`,sauEv0:`Nessuno si è tuffato`,
+sauEvC:`{v} indizio svelato sulla mappa|{v} indizi svelati sulla mappa`,sauEvT:`Fine del turno: la tempesta avanza di 1`,
+sauSec:`Il tuo indizio segreto`,sauSecD:`Svelato a tutti a fine turno`,sauSec0:`Niente di nuovo: il mare è già mappato`,
+sauClue:`{a}: {b}`,sauRow:`Riga {i}`,sauCol:`Colonna {i}`,sauCell:`Casella {i}`,sauN0:`nessuno`,sauNk:`{v} naufrago|{v} naufraghi`,sauX0:`nessuno`,sauX1:`un naufrago!`,
+sauHint:`Tocca una casella per tuffarti 🤿, o resta a bordo`,sauHintV:`Ti tuffi in {c} 🤿`,sauRdy:`Pronto`,sauStay:`Resto a bordo`,
+sauKn:`Già esplorata`,sauCalm:`Nessuno qui, secondo gli indizi`,
+sauLgU:`mare ignoto`,sauLgE:`nessuno`,sauLgF:`salvato`,sauLgN:`naufraghi rimasti nella riga / colonna`,sauLgF2:`salvati`,sauLgW:`tuffi a vuoto`,sauLgM:`non trovati`,
+sauWin:`Tutti a bordo!`,sauLost:`La tempesta ha avuto l'ultima parola…`,
+tu_sau1:`In mare sono nascosti dei naufraghi 🙋🏻. Salvateli tutti prima della tempesta ⛈️.`,
+tu_sau2:`A ogni turno ricevi un indizio segreto 🔒: qui «Riga 3: 2 naufraghi».`,
+tu_sau3:`A fine turno tutti gli indizi vengono svelati. Incrociateli e tuffatevi 🤿 dove si incontrano. Si vede dove mirano gli altri.`,
+tu_sau4:`Naufrago trovato: salvato 🙋🏻! Casella vuota ✕: la tempesta avanza di 1. Avanza di 1 anche a ogni turno.`,
 lg_sauR:`{a} ha ripescato più naufraghi nel Salvataggio`,lg_sauL:`{a} ha salvato l'ultimo naufrago proprio prima della tempesta`});
-GSA('de',{n_sau:`Die Rettung`,d_sau:`Kreuzt schweigend eure Sonare und rettet die Schiffbrüchigen`,coop_sau:`Die Rettung`,
-r_sau:`Kooperativ und stumm. Im Meer sind Schiffbrüchige versteckt. Dein geheimes Sonar zählt, wie viele 0, 1, 2 oder 3 Schritte von jeder deiner 2 Bojen entfernt sind (keine Diagonalen). Jede Runde, alle gleichzeitig: Teile einen Ring pro Boje 📡, setze bis zu 3 Markierungen, tauche in ein Feld 🤿. Der Sturm rückt pro Runde 2 näher und pro leerem Tauchgang 1: Rettet alle, bevor er kommt!`,
-r_sau2:`Kooperativ und stumm, zu zweit. Im Meer sind Schiffbrüchige versteckt. Dein geheimes Sonar zählt, wie viele 0, 1, 2 oder 3 Schritte von jeder deiner 3 Bojen entfernt sind (keine Diagonalen). Jede Runde, gleichzeitig: Teile einen Ring pro Boje 📡, setze bis zu 3 Markierungen, tauche in ein Feld 🤿. Der Sturm rückt pro Runde 2 näher und pro leerem Tauchgang 1: Rettet alle, bevor er kommt!`,
-sauTk:`{v} Kerbe|{v} Kerben`,sauGo:`Erste Runde: Teilt eure Ringe, taucht, wenn ihr sicher seid`,sauEv0:`Niemand ist getaucht`,sauEvS:`{v} Ring geteilt|{v} Ringe geteilt`,
-sauMine:`Dein Sonar`,sauMineD:`Kleine Zahl: Abstand in Schritten von der Boje. Große Zahl: Schiffbrüchige, die noch in diesem Abstand sind. Tippe einen Ring an, um ihn auf der Karte zu sehen und am Rundenende zu teilen 📡.`,
-sauShd:`Geteilte Ringe`,sauSh0:`Noch nichts: Die Ringe kommen am Rundenende.`,sauTv:`Tauchen`,sauTy:`Schiffbrüchig`,sauTx:`Leer`,sauRdy:`Fertig`,
-sauHint:`Wähle Ringe, Markierungen, Tauchgang … dann Fertig`,sauHintV:`Tauchgang gewählt 🤿: Fertig, wann du willst`,sauKn:`Dieses Feld wurde schon abgesucht`,sauFull:`Höchstens {v} Markierungen: Entferne zuerst eine`,
-sauLgC:`leer laut einem Ring`,sauLgT:`Ringe, die hier verlaufen`,sauLgP:`Markierungen`,sauLgF:`gerettet`,sauLgE:`leere Tauchgänge`,
-sauMu:`Kein Wort: Der Chat schweigt. Nur Ringe, Markierungen und Reaktionen.`,sauWin:`Alle sind an Bord!`,sauLost:`Der Sturm hatte das letzte Wort …`,
-tu_sau1:`Im Meer sind Schiffbrüchige versteckt. Niemand weiß, wo.`,
-tu_sau2:`Dein Sonar ist geheim: Hier, 2 Schritte von deiner Boje, ist 1 Schiffbrüchiger, irgendwo auf diesem Ring.`,
-tu_sau3:`Jede Runde teilt jede Person einen Ring 📡. Wo sich die Ringe kreuzen, versteckt sich der Schiffbrüchige.`,
-tu_sau4:`Dann tauchen alle gleichzeitig 🤿. Ein leerer Tauchgang kostet nichts … außer Zeit.`,
-tu_sau5:`⛈️ Der Sturm rückt jede Runde 2 näher und pro leerem Tauchgang 1. Rettet alle, bevor er kommt.`,
-tu_sau6:`Kein Chat: nur Markierungen (! schiffbrüchig, ✕ leer) auf der Karte und Reaktionen.`,
-tu_sau7:`Zu zweit hat jede Person 3 Bojen und teilt 3 Ringe pro Runde.`,
-lg_sauR:`{a} hat bei der Rettung die meisten Schiffbrüchigen geborgen`,lg_sauL:`{a} hat den letzten Schiffbrüchigen kurz vor dem Sturm gerettet`});
-GSA('ru',{n_sau:`Спасение`,d_sau:`Молча скрестите сонары и спасите потерпевших крушение`,coop_sau:`Спасение`,
-r_sau:`Кооперативная игра без слов. В море спрятаны потерпевшие крушение. Твой секретный сонар считает, сколько их в 0, 1, 2 или 3 шагах от каждого из твоих 2 буёв (без диагоналей). Каждый раунд, все одновременно: поделись одним кольцом на буй 📡, поставь до 3 меток, ныряй в клетку 🤿. Шторм приближается на 2 за раунд и на 1 за каждый пустой нырок: спасите всех, пока он не пришёл!`,
-r_sau2:`Кооперативная игра без слов, вдвоём. В море спрятаны потерпевшие крушение. Твой секретный сонар считает, сколько их в 0, 1, 2 или 3 шагах от каждого из твоих 3 буёв (без диагоналей). Каждый раунд, одновременно: поделись одним кольцом на буй 📡, поставь до 3 меток, ныряй в клетку 🤿. Шторм приближается на 2 за раунд и на 1 за каждый пустой нырок: спасите всех, пока он не пришёл!`,
-sauTk:`{v} деление|{v} деления|{v} делений`,sauGo:`Первый раунд: делитесь кольцами, ныряйте, когда уверены`,sauEv0:`Никто не нырял`,sauEvS:`{v} кольцо открыто|{v} кольца открыто|{v} колец открыто`,
-sauMine:`Твой сонар`,sauMineD:`Маленькое число — расстояние в шагах от буя. Большое — сколько потерпевших ещё на этом расстоянии. Нажми на кольцо, чтобы увидеть его на карте и поделиться им 📡 в конце раунда.`,
-sauShd:`Открытые кольца`,sauSh0:`Пока ничего: кольца появятся в конце раунда.`,sauTv:`Нырнуть`,sauTy:`Здесь человек`,sauTx:`Пусто`,sauRdy:`Готово`,
-sauHint:`Выбери кольца, метки, нырок… потом «Готово»`,sauHintV:`Нырок выбран 🤿: жми «Готово», когда захочешь`,sauKn:`Эту клетку уже обыскали`,sauFull:`Не больше {v} меток: сначала убери одну`,
-sauLgC:`пусто по данным кольца`,sauLgT:`кольца, проходящие здесь`,sauLgP:`метки`,sauLgF:`спасено`,sauLgE:`пустые нырки`,
-sauMu:`Ни слова: чат молчит. Только кольца, метки и реакции.`,sauWin:`Все на борту!`,sauLost:`Последнее слово осталось за штормом…`,
-tu_sau1:`В море спрятаны потерпевшие крушение. Никто не знает где.`,
-tu_sau2:`Твой сонар секретный: здесь, в 2 шагах от твоего буя, 1 человек — где-то на этом кольце.`,
-tu_sau3:`Каждый раунд все делятся одним кольцом 📡. Где кольца пересекаются, там и прячется человек.`,
-tu_sau4:`Потом все ныряют одновременно 🤿. Пустой нырок ничего не отнимает… кроме времени.`,
-tu_sau5:`⛈️ Шторм приближается на 2 каждый раунд и на 1 за пустой нырок. Спасите всех, пока он не пришёл.`,
-tu_sau6:`Чата нет: только метки (! человек, ✕ пусто) на карте и реакции.`,
-tu_sau7:`Вдвоём у каждого 3 буя, и каждый раунд он открывает 3 кольца.`,
-lg_sauR:`{a} {g.a:спас|спасла|спас(ла)} больше всех в «Спасении»`,lg_sauL:`{a} {g.a:спас|спасла|спас(ла)} последнего человека прямо перед штормом`});
-GSA('zh',{n_sau:`海上救援`,d_sau:`默默交叉你们的声呐，救起落水者`,coop_sau:`海上救援`,
-r_sau:`合作游戏，全程无声。海里藏着落水者。你的秘密声呐会显示：距离你的 2 个浮标 0、1、2、3 步（不算斜线）的地方各有几个人。每一轮大家同时：每个浮标分享一个圆环 📡，放最多 3 个标记，选一格潜水 🤿。风暴每轮逼近 2 格，每次扑空再逼近 1 格：在它到来前救起所有人！`,
-r_sau2:`两人合作，全程无声。海里藏着落水者。你的秘密声呐会显示：距离你的 3 个浮标 0、1、2、3 步（不算斜线）的地方各有几个人。每一轮同时：每个浮标分享一个圆环 📡，放最多 3 个标记，选一格潜水 🤿。风暴每轮逼近 2 格，每次扑空再逼近 1 格：在它到来前救起所有人！`,
-sauTk:`还剩 {v} 格`,sauGo:`第一轮：分享圆环，有把握再潜水`,sauEv0:`没有人潜水`,sauEvS:`分享了 {v} 个圆环`,
-sauMine:`你的声呐`,sauMineD:`小数字：离浮标的步数。大数字：这个距离上还剩几个落水者。点一个圆环，可以在地图上查看，并在本轮结束时分享 📡。`,
-sauShd:`已分享的圆环`,sauSh0:`还没有：圆环会在本轮结束时出现。`,sauTv:`潜水`,sauTy:`有人`,sauTx:`空的`,sauRdy:`好了`,
-sauHint:`选好圆环、标记和潜水位置……然后点“好了”`,sauHintV:`已选潜水位置 🤿：随时可以点“好了”`,sauKn:`这一格已经搜过了`,sauFull:`最多 {v} 个标记：先去掉一个`,
-sauLgC:`根据某个圆环为空`,sauLgT:`经过这里的圆环`,sauLgP:`标记`,sauLgF:`救起`,sauLgE:`扑空`,
-sauMu:`一句话也不说：聊天已静音。只能用圆环、标记和表情。`,sauWin:`所有人都上船了！`,sauLost:`风暴笑到了最后……`,
-tu_sau1:`海里藏着落水者，没有人知道在哪里。`,
-tu_sau2:`你的声呐是秘密的：这里，离你的浮标 2 步的地方有 1 个人，就在这个圆环上的某一格。`,
-tu_sau3:`每一轮，每人分享一个圆环 📡。圆环交叉的地方，就是落水者藏身之处。`,
-tu_sau4:`然后大家同时潜水 🤿。扑空不会失去什么……除了时间。`,
-tu_sau5:`⛈️ 风暴每轮逼近 2 格，每次扑空再逼近 1 格。在它到来前救起所有人。`,
-tu_sau6:`没有聊天：只有地图上的标记（! 有人，✕ 空的）和表情。`,
-tu_sau7:`两人对局时，每人有 3 个浮标，每轮分享 3 个圆环。`,
-lg_sauR:`{a} 在「海上救援」里救起的人最多`,lg_sauL:`{a} 在风暴来临前救起了最后一个落水者`});
-GSA('he',{n_sau:`החילוץ`,d_sau:`בשקט, מצליבים סונארים כדי לחלץ את הניצולים`,coop_sau:`החילוץ`,
-r_sau:`שיתופי ושקט. ניצולים מוסתרים בים. הסונאר הסודי שלך סופר כמה מהם נמצאים במרחק 0, 1, 2 או 3 צעדים מכל אחד משני המצופים שלך (בלי אלכסונים). בכל סבב, כולם בבת אחת: משתפים טבעת אחת לכל מצוף 📡, מניחים עד 3 סימונים וצוללים למשבצת 🤿. הסערה מתקרבת ב־2 בכל סבב וב־1 על כל צלילה ריקה: חלצו את כולם לפני שהיא מגיעה!`,
-r_sau2:`שיתופי ושקט, בשניים. ניצולים מוסתרים בים. הסונאר הסודי שלך סופר כמה מהם נמצאים במרחק 0, 1, 2 או 3 צעדים מכל אחד מ־3 המצופים שלך (בלי אלכסונים). בכל סבב, בו־זמנית: משתפים טבעת אחת לכל מצוף 📡, מניחים עד 3 סימונים וצוללים למשבצת 🤿. הסערה מתקרבת ב־2 בכל סבב וב־1 על כל צלילה ריקה: חלצו את כולם לפני שהיא מגיעה!`,
-sauTk:`שנתה {v}|{v} שנתות`,sauGo:`סבב ראשון: משתפים טבעות, צוללים כשבטוחים`,sauEv0:`אף אחד לא צלל`,sauEvS:`טבעת אחת שותפה|{v} טבעות שותפו`,
-sauMine:`הסונאר שלך`,sauMineD:`מספר קטן: מרחק בצעדים מהמצוף. מספר גדול: כמה ניצולים עוד נמצאים במרחק הזה. נגיעה בטבעת מראה אותה במפה ומשתפת אותה 📡 בסוף הסבב.`,
-sauShd:`טבעות משותפות`,sauSh0:`עדיין כלום: הטבעות מגיעות בסוף הסבב.`,sauTv:`לצלול`,sauTy:`ניצול`,sauTx:`ריק`,sauRdy:`מוכן`,
-sauHint:`בוחרים טבעות, סימונים וצלילה… ואז מוכן`,sauHintV:`הצלילה נבחרה 🤿: מוכן מתי שרוצים`,sauKn:`המשבצת הזאת כבר נסרקה`,sauFull:`לכל היותר {v} סימונים: קודם מסירים אחד`,
-sauLgC:`ריק לפי טבעת`,sauLgT:`טבעות שעוברות כאן`,sauLgP:`סימונים`,sauLgF:`חולצו`,sauLgE:`צלילות ריקות`,
-sauMu:`אף מילה: הצ'אט שותק. רק טבעות, סימונים ותגובות.`,sauWin:`כולם על הסיפון!`,sauLost:`לסערה הייתה המילה האחרונה…`,
-tu_sau1:`ניצולים מוסתרים בים. אף אחד לא יודע איפה.`,
-tu_sau2:`הסונאר שלך סודי: כאן, 2 צעדים מהמצוף שלך, יש ניצול אחד, איפשהו על הטבעת הזאת.`,
-tu_sau3:`בכל סבב, כל אחד משתף טבעת 📡. איפה שהטבעות נחתכות, שם מסתתר הניצול.`,
-tu_sau4:`ואז כולם צוללים בבת אחת 🤿. צלילה ריקה לא עולה כלום… חוץ מזמן.`,
-tu_sau5:`⛈️ הסערה מתקרבת ב־2 בכל סבב וב־1 על כל צלילה ריקה. חלצו את כולם לפני שהיא מגיעה.`,
-tu_sau6:`אין צ'אט: רק סימונים (! ניצול, ✕ ריק) על המפה, ותגובות.`,
-tu_sau7:`בשניים, לכל אחד 3 מצופים והוא משתף 3 טבעות בכל סבב.`,
-lg_sauR:`{a} {g.a:חילץ|חילצה|חילץ/ה} הכי הרבה ניצולים בחילוץ`,lg_sauL:`{a} {g.a:חילץ|חילצה|חילץ/ה} את הניצול האחרון רגע לפני הסערה`});
-GSA('pt',{n_sau:`O Resgate`,d_sau:`Em silêncio, cruzem seus sonares para resgatar os náufragos`,coop_sau:`O resgate`,
-r_sau:`Cooperativo e silencioso. Há náufragos escondidos no mar. Seu sonar, secreto, conta quantos estão a 0, 1, 2 ou 3 passos de cada uma das suas 2 boias (sem diagonais). A cada rodada, todos ao mesmo tempo: compartilhe um anel por boia 📡, ponha até 3 marcas e mergulhe numa casa 🤿. A tempestade avança 2 por rodada e 1 por mergulho em vão: resgatem todo mundo antes que ela chegue!`,
-r_sau2:`Cooperativo e silencioso, a dois. Há náufragos escondidos no mar. Seu sonar, secreto, conta quantos estão a 0, 1, 2 ou 3 passos de cada uma das suas 3 boias (sem diagonais). A cada rodada, ao mesmo tempo: compartilhe um anel por boia 📡, ponha até 3 marcas e mergulhe numa casa 🤿. A tempestade avança 2 por rodada e 1 por mergulho em vão: resgatem todo mundo antes que ela chegue!`,
-sauTk:`{v} marca|{v} marcas`,sauGo:`Primeira rodada: compartilhem os anéis, mergulhem quando tiverem certeza`,sauEv0:`Ninguém mergulhou`,sauEvS:`{v} anel compartilhado|{v} anéis compartilhados`,
-sauMine:`Seu sonar`,sauMineD:`Número pequeno: distância em passos desde a boia. Grande: náufragos que ainda estão a essa distância. Toque num anel para vê-lo no mapa e compartilhá-lo 📡 no fim da rodada.`,
-sauShd:`Anéis compartilhados`,sauSh0:`Nada ainda: os anéis chegam no fim da rodada.`,sauTv:`Mergulhar`,sauTy:`Náufrago`,sauTx:`Vazio`,sauRdy:`Pronto`,
-sauHint:`Escolha anéis, marcas, mergulho… e depois Pronto`,sauHintV:`Mergulho escolhido 🤿: Pronto quando quiser`,sauKn:`Esta casa já foi vasculhada`,sauFull:`No máximo {v} marcas: tire uma antes`,
-sauLgC:`vazia segundo um anel`,sauLgT:`anéis que passam aqui`,sauLgP:`marcas`,sauLgF:`resgatados`,sauLgE:`mergulhos em vão`,
-sauMu:`Nenhuma palavra: o chat fica em silêncio. Só anéis, marcas e reações.`,sauWin:`Todo mundo a bordo!`,sauLost:`A tempestade teve a última palavra…`,
-tu_sau1:`Há náufragos escondidos no mar. Ninguém sabe onde.`,
-tu_sau2:`Seu sonar é secreto: aqui, a 2 passos da sua boia, há 1 náufrago, em algum lugar deste anel.`,
-tu_sau3:`A cada rodada, cada um compartilha um anel 📡. Onde os anéis se cruzam, o náufrago se esconde.`,
-tu_sau4:`Depois todo mundo mergulha ao mesmo tempo 🤿. Um mergulho em vão não tira nada… só tempo.`,
-tu_sau5:`⛈️ A tempestade avança 2 a cada rodada e 1 por mergulho em vão. Resgatem todo mundo antes que ela chegue.`,
-tu_sau6:`Sem chat: só marcas (! náufrago, ✕ vazio) no mapa, e reações.`,
-tu_sau7:`A dois, cada um tem 3 boias e compartilha 3 anéis por rodada.`,
-lg_sauR:`{a} resgatou mais náufragos no Resgate`,lg_sauL:`{a} resgatou o último náufrago logo antes da tempestade`});
+GSA('de',{n_sau:`Die Rettung`,d_sau:`Geheime Hinweise, Tauchgänge und ein Sturm: Rettet gemeinsam alle`,coop_sau:`Die Rettung`,
+r_sau:`Kooperativ. Im Meer sind Schiffbrüchige versteckt. Jede Runde bekommst du einen geheimen Hinweis 🔒 („Reihe 3: 2 Schiffbrüchige“), der am Rundenende allen gezeigt wird: Kombiniert sie! Wähle ein Feld zum Tauchen 🤿: Schiffbrüchiger = gerettet, leeres Feld = der Sturm rückt 1 näher. Er rückt auch jede Runde 1 näher.`,
+sauGoal:`Rettet die {v} Schiffbrüchigen vor dem Sturm`,sauTk:`noch {v} Kerbe bis zum Sturm|noch {v} Kerben bis zum Sturm`,
+sauGo:`Runde 1: Lies deinen geheimen Hinweis und tippe dann ein Feld zum Tauchen an.`,sauEvH:`Runde {v}`,
+sauEvOk:`{n} · {c}: Schiffbrüchige gerettet!`,sauEvNo:`{n} · {c}: niemand hier, der Sturm rückt 1 näher`,sauEv0:`Niemand ist getaucht`,
+sauEvC:`{v} Hinweis auf der Karte aufgedeckt|{v} Hinweise auf der Karte aufgedeckt`,sauEvT:`Rundenende: Der Sturm rückt 1 näher`,
+sauSec:`Dein geheimer Hinweis`,sauSecD:`Wird am Rundenende allen gezeigt`,sauSec0:`Nichts Neues: Das Meer ist schon kartiert`,
+sauClue:`{a}: {b}`,sauRow:`Reihe {i}`,sauCol:`Spalte {i}`,sauCell:`Feld {i}`,sauN0:`niemand`,sauNk:`{v} Schiffbrüchige|{v} Schiffbrüchige`,sauX0:`niemand`,sauX1:`eine schiffbrüchige Person!`,
+sauHint:`Tippe ein Feld an, um zu tauchen 🤿, oder bleib an Bord`,sauHintV:`Du tauchst bei {c} 🤿`,sauRdy:`Fertig`,sauStay:`An Bord bleiben`,
+sauKn:`Schon abgesucht`,sauCalm:`Laut den Hinweisen ist hier niemand`,
+sauLgU:`unbekanntes Meer`,sauLgE:`niemand`,sauLgF:`gerettet`,sauLgN:`übrige Schiffbrüchige in Reihe / Spalte`,sauLgF2:`gerettet`,sauLgW:`leere Tauchgänge`,sauLgM:`nicht gefunden`,
+sauWin:`Alle sind an Bord!`,sauLost:`Der Sturm hatte das letzte Wort …`,
+tu_sau1:`Im Meer sind Schiffbrüchige 🙋🏻 versteckt. Rettet alle vor dem Sturm ⛈️.`,
+tu_sau2:`Jede Runde bekommst du einen geheimen Hinweis 🔒: hier „Reihe 3: 2 Schiffbrüchige“.`,
+tu_sau3:`Am Rundenende werden alle Hinweise aufgedeckt. Kombiniert sie und taucht 🤿 dort, wo sie sich kreuzen. Man sieht, wohin die anderen zielen.`,
+tu_sau4:`Gefunden: gerettet 🙋🏻! Leeres Feld ✕: Der Sturm rückt 1 näher. Er rückt auch jede Runde 1 näher.`,
+lg_sauR:`{a} hat bei der Rettung die meisten Schiffbrüchigen herausgezogen`,lg_sauL:`{a} hat die letzte schiffbrüchige Person kurz vor dem Sturm gerettet`});
+GSA('ru',{n_sau:`Спасение`,d_sau:`Тайные подсказки, погружения и шторм: спасите всех вместе`,coop_sau:`Спасение`,
+r_sau:`Кооператив. В море спрятаны потерпевшие крушение. Каждый раунд ты получаешь тайную подсказку 🔒 («Ряд 3: 2 человека»), в конце раунда её видят все: сопоставляйте! Выбери клетку для погружения 🤿: человек = спасён, пустая клетка = шторм ближе на 1. Он также приближается на 1 каждый раунд.`,
+sauGoal:`Спасите {v} человек до шторма`,sauTk:`{v} деление до шторма|{v} деления до шторма|{v} делений до шторма`,
+sauGo:`Раунд 1: прочитай тайную подсказку и коснись клетки, чтобы нырнуть.`,sauEvH:`Раунд {v}`,
+sauEvOk:`{n} · {c}: человек спасён!`,sauEvNo:`{n} · {c}: здесь никого, шторм ближе на 1`,sauEv0:`Никто не нырял`,
+sauEvC:`{v} подсказка открыта на карте|{v} подсказки открыты на карте|{v} подсказок открыто на карте`,sauEvT:`Конец раунда: шторм ближе на 1`,
+sauSec:`Твоя тайная подсказка`,sauSecD:`В конце раунда её увидят все`,sauSec0:`Ничего нового: море уже на карте`,
+sauClue:`{a}: {b}`,sauRow:`Ряд {i}`,sauCol:`Столбец {i}`,sauCell:`Клетка {i}`,sauN0:`никого`,sauNk:`{v} человек|{v} человека|{v} человек`,sauX0:`никого`,sauX1:`здесь человек!`,
+sauHint:`Коснись клетки, чтобы нырнуть 🤿, или останься на борту`,sauHintV:`Ты ныряешь в {c} 🤿`,sauRdy:`Готово`,sauStay:`Остаться на борту`,
+sauKn:`Уже обыскана`,sauCalm:`По подсказкам здесь никого`,
+sauLgU:`неизвестное море`,sauLgE:`никого`,sauLgF:`спасён`,sauLgN:`осталось в ряду / столбце`,sauLgF2:`спасено`,sauLgW:`пустые погружения`,sauLgM:`не найдены`,
+sauWin:`Все на борту!`,sauLost:`Последнее слово осталось за штормом…`,
+tu_sau1:`В море спрятаны потерпевшие крушение 🙋🏻. Спасите всех до шторма ⛈️.`,
+tu_sau2:`Каждый раунд ты получаешь тайную подсказку 🔒: здесь «Ряд 3: 2 человека».`,
+tu_sau3:`В конце раунда все подсказки открываются. Сопоставьте их и ныряйте 🤿 там, где они пересекаются. Видно, куда целятся другие.`,
+tu_sau4:`Нашли: спасён 🙋🏻! Пустая клетка ✕: шторм ближе на 1. Он также приближается на 1 каждый раунд.`,
+lg_sauR:`{a} спас(ла) больше всех в «Спасении»`,lg_sauL:`{a} спас(ла) последнего человека прямо перед штормом`});
+GSA('zh',{n_sau:`海上救援`,d_sau:`秘密线索、潜水与风暴：一起救起所有人`,coop_sau:`海上救援`,
+r_sau:`合作游戏。海里藏着落水者。每轮你会得到一条秘密线索 🔒（"第 3 行：2 人"），本轮结束时公开给所有人：把线索交叉起来！选一格潜水 🤿：有人 = 救起，空格 = 风暴前进 1。每轮结束风暴也前进 1。`,
+sauGoal:`在风暴来临前救起全部 {v} 名落水者`,sauTk:`距风暴还有 {v} 格`,
+sauGo:`第 1 轮：先看你的秘密线索，再点一格去潜水。`,sauEvH:`第 {v} 轮`,
+sauEvOk:`{n} · {c}：救起一人！`,sauEvNo:`{n} · {c}：这里没人，风暴前进 1`,sauEv0:`没有人潜水`,
+sauEvC:`地图上公开了 {v} 条线索`,sauEvT:`本轮结束：风暴前进 1`,
+sauSec:`你的秘密线索`,sauSecD:`本轮结束时公开给所有人`,sauSec0:`没有新线索：海域已经摸清`,
+sauClue:`{a}：{b}`,sauRow:`第 {i} 行`,sauCol:`第 {i} 列`,sauCell:`格子 {i}`,sauN0:`没有人`,sauNk:`{v} 人`,sauX0:`没有人`,sauX1:`有一人！`,
+sauHint:`点一格去潜水 🤿，或留在船上`,sauHintV:`你将在 {c} 潜水 🤿`,sauRdy:`准备好了`,sauStay:`留在船上`,
+sauKn:`已经搜过了`,sauCalm:`根据线索，这里没人`,
+sauLgU:`未知海域`,sauLgE:`没人`,sauLgF:`已救起`,sauLgN:`该行 / 列剩余人数`,sauLgF2:`救起`,sauLgW:`落空的潜水`,sauLgM:`未找到`,
+sauWin:`所有人都上船了！`,sauLost:`风暴说了算……`,
+tu_sau1:`海里藏着落水者 🙋🏻。在风暴 ⛈️ 来临前把他们全部救起。`,
+tu_sau2:`每轮你会得到一条秘密线索 🔒：这里是"第 3 行：2 人"。`,
+tu_sau3:`本轮结束时，所有线索都会公开。把它们交叉起来，在交汇处潜水 🤿。你能看到别人瞄准哪里。`,
+tu_sau4:`找到了：救起 🙋🏻！空格 ✕：风暴前进 1。每轮结束风暴也前进 1。`,
+lg_sauR:`{a} 在海上救援中救起的人最多`,lg_sauL:`{a} 在风暴来临前救起了最后一人`});
+GSA('he',{n_sau:`החילוץ`,d_sau:`רמזים סודיים, צלילות וסערה: מחלצים את כולם ביחד`,coop_sau:`החילוץ`,
+r_sau:`משחק שיתופי. ניצולים מוסתרים בים. בכל סבב מקבלים רמז סודי 🔒 („שורה 3: 2 ניצולים”), שנחשף לכולם בסוף הסבב: הצליבו אותם! בחרו משבצת לצלילה 🤿: ניצול = חולץ, משבצת ריקה = הסערה מתקרבת ב־1. היא מתקרבת ב־1 גם בכל סבב.`,
+sauGoal:`חלצו את {v} הניצולים לפני הסערה`,sauTk:`עוד {v} שלב עד הסערה|עוד {v} שלבים עד הסערה`,
+sauGo:`סבב 1: קראו את הרמז הסודי, ואז געו במשבצת כדי לצלול.`,sauEvH:`סבב {v}`,
+sauEvOk:`{n} · {c}: ניצול חולץ!`,sauEvNo:`{n} · {c}: אין כאן איש, הסערה מתקרבת ב־1`,sauEv0:`אף אחד לא צלל`,
+sauEvC:`רמז {v} נחשף על המפה|{v} רמזים נחשפו על המפה`,sauEvT:`סוף הסבב: הסערה מתקרבת ב־1`,
+sauSec:`הרמז הסודי שלך`,sauSecD:`ייחשף לכולם בסוף הסבב`,sauSec0:`אין חדש: הים כבר ממופה`,
+sauClue:`{a}: {b}`,sauRow:`שורה {i}`,sauCol:`עמודה {i}`,sauCell:`משבצת {i}`,sauN0:`אף אחד`,sauNk:`ניצול אחד|{v} ניצולים`,sauX0:`אף אחד`,sauX1:`יש כאן ניצול!`,
+sauHint:`געו במשבצת כדי לצלול 🤿, או הישארו על הסיפון`,sauHintV:`צוללים ב־{c} 🤿`,sauRdy:`מוכן`,sauStay:`להישאר על הסיפון`,
+sauKn:`כבר נסרקה`,sauCalm:`לפי הרמזים, אין כאן איש`,
+sauLgU:`ים לא ידוע`,sauLgE:`אף אחד`,sauLgF:`חולץ`,sauLgN:`ניצולים שנותרו בשורה / בעמודה`,sauLgF2:`חולצו`,sauLgW:`צלילות ריקות`,sauLgM:`לא נמצאו`,
+sauWin:`כולם על הסיפון!`,sauLost:`לסערה הייתה המילה האחרונה…`,
+tu_sau1:`ניצולים 🙋🏻 מוסתרים בים. חלצו את כולם לפני הסערה ⛈️.`,
+tu_sau2:`בכל סבב מקבלים רמז סודי 🔒: כאן „שורה 3: 2 ניצולים”.`,
+tu_sau3:`בסוף הסבב כל הרמזים נחשפים. הצליבו אותם וצללו 🤿 איפה שהם נפגשים. רואים לאן האחרים מכוונים.`,
+tu_sau4:`נמצא: חולץ 🙋🏻! משבצת ריקה ✕: הסערה מתקרבת ב־1. היא מתקרבת ב־1 גם בכל סבב.`,
+lg_sauR:`{a} חילץ/ה הכי הרבה ניצולים בחילוץ`,lg_sauL:`{a} חילץ/ה את הניצול האחרון רגע לפני הסערה`});
+GSA('pt',{n_sau:`O Resgate`,d_sau:`Pistas secretas, mergulhos e tempestade: resgatem todo mundo juntos`,coop_sau:`O resgate`,
+r_sau:`Cooperativo. Há náufragos escondidos no mar. A cada rodada você recebe uma pista secreta 🔒 ("Linha 3: 2 náufragos"), revelada a todos no fim da rodada: cruzem as pistas! Escolha uma casa para mergulhar 🤿: náufrago = resgatado, casa vazia = a tempestade avança 1. Ela também avança 1 a cada rodada.`,
+sauGoal:`Resgatem os {v} náufragos antes da tempestade`,sauTk:`{v} marca antes da tempestade|{v} marcas antes da tempestade`,
+sauGo:`Rodada 1: leia sua pista secreta e toque numa casa para mergulhar.`,sauEvH:`Rodada {v}`,
+sauEvOk:`{n} · {c}: náufrago resgatado!`,sauEvNo:`{n} · {c}: ninguém aqui, a tempestade avança 1`,sauEv0:`Ninguém mergulhou`,
+sauEvC:`{v} pista revelada no mapa|{v} pistas reveladas no mapa`,sauEvT:`Fim da rodada: a tempestade avança 1`,
+sauSec:`Sua pista secreta`,sauSecD:`Revelada a todos no fim da rodada`,sauSec0:`Nada de novo: o mar já está mapeado`,
+sauClue:`{a}: {b}`,sauRow:`Linha {i}`,sauCol:`Coluna {i}`,sauCell:`Casa {i}`,sauN0:`ninguém`,sauNk:`{v} náufrago|{v} náufragos`,sauX0:`ninguém`,sauX1:`um náufrago!`,
+sauHint:`Toque numa casa para mergulhar 🤿, ou fique a bordo`,sauHintV:`Você mergulha em {c} 🤿`,sauRdy:`Pronto`,sauStay:`Ficar a bordo`,
+sauKn:`Já vasculhada`,sauCalm:`Ninguém aqui, segundo as pistas`,
+sauLgU:`mar desconhecido`,sauLgE:`ninguém`,sauLgF:`resgatado`,sauLgN:`náufragos restantes na linha / coluna`,sauLgF2:`resgatados`,sauLgW:`mergulhos em vão`,sauLgM:`não encontrados`,
+sauWin:`Todo mundo a bordo!`,sauLost:`A tempestade teve a última palavra…`,
+tu_sau1:`Há náufragos 🙋🏻 escondidos no mar. Resgatem todos antes da tempestade ⛈️.`,
+tu_sau2:`A cada rodada você recebe uma pista secreta 🔒: aqui "Linha 3: 2 náufragos".`,
+tu_sau3:`No fim da rodada, todas as pistas são reveladas. Cruzem as pistas e mergulhem 🤿 onde elas se encontram. Dá para ver onde os outros miram.`,
+tu_sau4:`Náufrago encontrado: resgatado 🙋🏻! Casa vazia ✕: a tempestade avança 1. Ela também avança 1 a cada rodada.`,
+lg_sauR:`{a} resgatou mais náufragos em O Resgate`,lg_sauL:`{a} resgatou o último náufrago logo antes da tempestade`});
 /* /🆘 i18n */
 /* =====================================================================
    🔞 JEUX 18+ : 🤿 Action ou Vérité sous l'eau (avd) · 💃🏻 Le Bal masqué (bal) · 🫁 Jamais je n'ai… en apnée (apn)
