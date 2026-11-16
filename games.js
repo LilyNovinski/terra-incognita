@@ -40,7 +40,7 @@ function gSeenAdd(ids){try{const S=new Set(ids),a=gSeen().filter(x=>!S.has(x)).c
 /* pioche n contenus [réserve,index] selon le ton (0 : tout public seulement) — jamais deux fois dans une partie ;
    d'abord les inédits, puis les plus anciennement vus */
 function gPool(s,k,n){const t=+s.tone||0,w=t==2?[.3,.3,.4]:t==1?[.55,.45,0]:[1,0,0],SI=new Map(gSeen().map((x,i)=>[x,i])),id=(p,i)=>k+(p||'')+':'+i;
- const P3=[0,1,2].map(p=>{if(!w[p])return[];const a=shuf([...Array(GL(k+(p||''),'fr').length).keys()].map(i=>[p,i]));
+ const P3=[0,1,2].map(p=>{if(!w[p])return[];const a=shuf(GL(k+(p||''),'fr').map((v,i)=>v.trim()?[p,i]:null).filter(Boolean));/* réserve absente pour ce ton = rien à piocher (on retombe sur un autre ton) */
   return a.filter(x=>SI.has(id(...x))).sort((x,y)=>SI.get(id(...y))-SI.get(id(...x))).concat(a.filter(x=>!SI.has(id(...x))))}),out=[];
  for(let j=0;j<n;j++){let r=Math.random(),p=0;while(p<2&&(r-=w[p])>0)p++;if(!P3[p].length)p=P3.findIndex(x=>x.length);if(p<0)break;out.push(P3[p].pop())}
  gSeenAdd(out.map(x=>id(...x)));return shuf(out)}
